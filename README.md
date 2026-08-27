@@ -1,129 +1,133 @@
-# PingPong – N1MM Logger+ UDP 12060 lučke
+# PingPong – N1MM Logger+ UDP 12060 lamps
 
-Prikaz, kateri računalnik/postaja v namrežju trenutno **oddaja**.
-Posluša N1MM Logger+ zunanji UDP broadcast (XML) na vratih **12060**
-in prikaže sporočilo odtisnjene funkcijske tipke v barvi tiste postaje.
+> **Language:** [English](README.md) · [Slovenščina](README_SL.md)
 
-Obstajata dve orodji:
+Shows which computer/station in the network is currently **transmitting**.
+It listens to the N1MM Logger+ external UDP broadcast (XML) on port
+**12060** and displays the pressed function-key caption in the station's
+color.
 
-| Datoteka | Kaj je |
+Two tools are provided:
+
+| File | What it is |
 |---|---|
-| `n1mm_lamps.py` / `lucke.exe` | **Lučka** – majhno okno, ki sveti v barvi postaje na oddaji |
-| `n1mm_watch.py` / `PingPong.bat` | **Opazovalec** – podrobni dnevnik vseh paketov (debug/analiza) |
+| `n1mm_lamps.py` / `lucke.exe` | **Lamp** – small window that lights up in the transmitting station's color |
+| `n1mm_watch.py` / `PingPong.bat` | **Watcher** – detailed log of all packets (debug/analysis) |
 
 ---
 
-## 1. N1MM Logger+ nastavitev
+## 1. N1MM Logger+ setup
 
-1. V vsakem računalniku N1MM Logger+: **File → Settings → Configurer →
-   External Broadcast**, izberi poročila **RadioInfo**, **ContactInfo**,
-   **Spot**, **AppInfo**, **dynamicresults** …
-2. **Broadcast Address**: `192.168.0.255` (broadcast celega omrežja, da
-   vsak PC vidi vse postaje).
-3. **Broadcast Port**: `12060` (privzeto, nezamenjaj).
-4. Kot je poročil N1MM: **“Broadcast Data” je treba uporabiti tudi na
-   ostalih računalnikih** (npr. Run2), drugače ne pošiljajo ničesar.
+1. On each N1MM Logger+ PC: **File → Settings → Configurer →
+   External Broadcast**, enable the reports you need (**RadioInfo**,
+   **ContactInfo**, **Spot**, **AppInfo**, **dynamicresults**, …).
+2. **Broadcast Address**: `192.168.0.255` (subnet broadcast so every PC
+   sees every station).
+3. **Broadcast Port**: `12060` (default, do not change).
+4. Per N1MM: **"Broadcast Data" must also be enabled on the other
+   computers** (e.g. Run2), otherwise they send nothing.
 
-> N1MM pošilja samo **naslov** tipke (npr. `F1 CQ`), ne razširjenega
-> CW/besedila. `Frekvenca` v `RadioInfo` je v desetinah Hz:
-> Freq=701500 pomeni 7015,00 kHz.
+> N1MM only broadcasts the key **caption** (e.g. `F1 CQ`), not the
+> expanded CW/text. `Freq` in `RadioInfo` is in units of 10 Hz:
+> Freq=701500 means 7015.00 kHz.
 
 ---
 
-## 2. Lučka (n1mm_lamps.py / lucke.exe)
+## 2. Lamp (n1mm_lamps.py / lucke.exe)
 
-### Vedenje
+### Behavior
 
-- Okno sveti **natanko toliko časa, kot postaja res oddaja**:
-  pri `IsTransmitting=True` se prižge, pri `False` takoj ugasne.
-- V oknu se prikaže besedilo zadnje pritisnjene funkcijske tipke
-  (predpona `Fx` se izpusti).
-- Okno je vedno na vrhu (`topmost`).
+- The lamp lights up **exactly as long as the station is actually
+  transmitting**: on `IsTransmitting=True` it turns on, on `False` it
+  turns off immediately.
+- The window shows the text of the last pressed function key (the `Fx`
+  prefix is stripped).
+- The window is always on top (`topmost`).
 
-### Skupinski ključ (pas + mode)
+### Group key (band + mode)
 
-Okno prikazuje **samo oddaje postaj na istem pasu in modeu kot lokalni
-računalnik** (tisti, kjer okno teče):
+The window shows **only transmissions from stations on the same band
+and mode as the local computer** (the one running the window):
 
-- Pasovi: **1.8, 3.5, 7, 14, 21, 28** MHz
-- Modei: **CW, RTTY, USB, LSB**
+- Bands: **1.8, 3.5, 7, 14, 21, 28** MHz
+- Modes: **CW, RTTY, USB, LSB**
 
-Primer: PC1, PC2, PC3 na 14 MHz CW → barve se lepo menjajo. Če je
-PC4 na npr. 7 MHz CW, njegove oddaje **nikoli ne bodo** prikazane v
-oknu, in obratno.
+Example: PC1, PC2, PC3 on 14 MHz CW → colors alternate nicely. If PC4
+is on e.g. 7 MHz CW, its transmissions are **never** shown in this
+window, and vice versa.
 
-- Ključ se samodejno spreminja, ko lokalna postaja zamenja pas/mode
-  (v nogi okna piše `spremljam 14 CW`).
-- Postaja v temi nobenega od teh pasov/modeov se ne prikazuje.
+- The key follows the local station automatically when it changes
+  band/mode (the footer shows `watching 14 CW`).
+- A station on none of these bands/modes is never displayed.
 
-### Zagon
+### Running
 
 ```bat
-        dvojni klik:  lucke.exe     (samostojna programska datoteka)
-  ali:  dvojni klik:  Lampice.bat   (zažene pythonw n1mm_lamps.py)
+        double-click:  lucke.exe     (standalone executable)
+   or:  double-click:  Lampice.bat   (runs pythonw n1mm_lamps.py)
 ```
 
-Argumenti:
+Arguments:
 
 ```bat
 python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 ```
 
-- `--port` – vrata UDP (privzeto 12060).
-- `--stale` – varnostna rezerva v sekundah; če od oddajajoče postaje
-  v tem času ni nobenega paketa, lučka ugasne (privzeto 5.0).
-- `--config` – pot do `lamps.cfg`.
+- `--port` – UDP port (default 12060).
+- `--stale` – safety fallback in seconds; if no packet arrives from the
+  transmitting station within this time, the lamp turns off (default 5.0).
+- `--config` – path to `lamps.cfg`.
 
-### lamps.cfg (opcijsko)
+### lamps.cfg (optional)
 
-Samodejno zaznavanje postaj deluje **tudi brez** te datoteke. Če hočeš
-stabilne oznake/barve, vsaka vrstica pomeni:
+Automatic station detection works **even without** this file. To assign
+stable labels/colors, each line is:
 
 ```
-IP,oznaka,barva
+IP,label,color
 ```
 
-Primer:
+Example:
 
 ```
 192.168.0.77,PC1,red
 192.168.0.69,Run2,green
 ```
 
-- Vrstice s `#` se preskočijo.
-- Če `lamps.cfg` ne obstaja ali ne vsebuje postaje, nova postaja dobi
-  oznako iz paketa in barvo iz samodejne palete.
-- `lucke.exe` bere `lamps.cfg` iz **iste mape, kjer je exe**.
+- Lines starting with `#` are skipped.
+- If `lamps.cfg` is missing or a station is not listed, the new station
+  gets its label from the packet and a color from the auto palette.
+- `lucke.exe` reads `lamps.cfg` from the **same folder as the exe**.
 
 ---
 
-## 3. Opazovalec (n1mm_watch.py)
+## 3. Watcher (n1mm_watch.py)
 
-Podroben vpogled v ves UDP promet: tabela postaj levo, promet desno,
-podrobnosti/hex izbranega paketa spodaj.
+Detailed view of all UDP traffic: station table on the left, traffic on
+the right, detail/hex of the selected packet at the bottom.
 
 ```bat
-        dvojni klik:  PingPong.bat
+        double-click:  PingPong.bat
 ```
 
 ```bat
 python n1mm_watch.py [--port 12060] [--bind 0.0.0.0] [--log FILE] [--selftest]
 ```
 
-- Gumb **Ustavi/Poslušaj** – preklapljanje med poslušanjem.
-- **Zamrzni** – preneha dodajati vrstice (promet še teče).
-- **Avtopomik** – sledenje zadnjem paketu.
-- **Hex/surovo** – podrobnosti paketa kot hex + surovi XML.
-- **Zapisuj v datoteko** – JSON vrstice v `n1mm_pingpong.log`
-  (privzeta lokacija poleg skripte; povej z `--log`).
-- **Počisti** – izprazni prikaz.
-- `--selftest` – preveri razčlenjevanje s testnimi paketi.
+- **Stop/Listen** button – toggles listening.
+- **Freeze** – stops adding rows (traffic still recorded).
+- **Autoscroll** – follows the latest packet.
+- **Hex/raw** – shows packet details as hex + raw XML.
+- **Log to file** – JSON lines into `n1mm_pingpong.log` (default next to
+  the script; change with `--log`).
+- **Clear** – empties the display.
+- `--selftest` – verifies parsing with sample packets.
 
 ---
 
-## 4. Gradnja samostojnega EXE (pokriti PC)
+## 4. Building the standalone EXE (for PCs without Python)
 
-Potrebuje Python + PyInstaller:
+Requires Python + PyInstaller:
 
 ```bat
 python -m pip install pyinstaller
@@ -131,22 +135,22 @@ python -m PyInstaller --onefile --windowed --name lucke --manifest manifest.xml 
 copy /Y dist\lucke.exe lucke.exe
 ```
 
-`manifest.xml` poskrbi, da ima okno moderne kontrole (common controls).
-Rezultat je ena datoteka `lucke.exe` (brez Python znamke) – prekopiraj
-jo na ostale računalnike skupaj z (opcijskim) `lamps.cfg`.
+`manifest.xml` makes the window use modern common controls. The result
+is a single `lucke.exe` (no Python required) – copy it to the other
+computers together with the (optional) `lamps.cfg`.
 
 ---
 
-## 5. Datoteke
+## 5. Files
 
 ```
-n1mm_lamps.py    – lučka (izvorna koda)
-lucke.exe        – lučka (samostojna, brez Pythona)
-Lampice.bat      – zaganjalnik lučke (pythonw)
-lamps.cfg        – opcijsko: IP,oznaka,barva
-n1mm_watch.py    – opazovalec prometa
-PingPong.bat     – zaganjalnik opazovalca
-manifest.xml     – manifest za PyInstaller (common controls)
-lucke.spec       – nastavitve zadnje gradnje PyInstaller
-dist\            – izhod PyInstaller (aktualni lucke.exe)
+n1mm_lamps.py    – lamp (source code)
+lucke.exe        – lamp (standalone, no Python needed)
+Lampice.bat      – lamp launcher (pythonw)
+lamps.cfg        – optional: IP,label,color
+n1mm_watch.py    – traffic watcher
+PingPong.bat     – watcher launcher
+manifest.xml     – PyInstaller manifest (common controls)
+lucke.spec       – last PyInstaller build settings
+dist\            – PyInstaller output (current lucke.exe)
 ```
