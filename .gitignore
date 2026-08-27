@@ -3,6 +3,7 @@ dist/
 build/
 lucke.spec
 *.exe
+!lucke.exe
 
 # Logs & cache
 n1mm_pingpong.log
