@@ -1,0 +1,10 @@
+# Build artifacts
+dist/
+build/
+lucke.spec
+*.exe
+
+# Logs & cache
+n1mm_pingpong.log
+__pycache__/
+*.pyc
