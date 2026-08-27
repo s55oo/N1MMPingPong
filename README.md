@@ -18,6 +18,12 @@ Two tools are provided:
 
 ---
 
+## Screenshot
+
+![PingPong lamp](PingPong.png)
+
+---
+
 ## 1. N1MM Logger+ setup
 
 1. On each N1MM Logger+ PC: **File → Settings → Configurer →

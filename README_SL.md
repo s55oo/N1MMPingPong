@@ -17,6 +17,12 @@ Obstajata dve orodji:
 
 ---
 
+## Zaslonska slika
+
+![PingPong lučka](PingPong.png)
+
+---
+
 ## 1. N1MM Logger+ nastavitev
 
 1. V vsakem računalniku N1MM Logger+: **File → Settings → Configurer →
