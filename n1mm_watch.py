@@ -4,9 +4,15 @@ Listens for the N1MM external UDP broadcast (XML) on port 12060 and
 shows every packet in a small window. Traffic is grouped per station
 (StationName) so the same tool works for two up to six networked PCs.
 
+Made by S55OO with AI assistance.
+
+Version: 1.0
+
 Usage:
     python n1mm_watch.py [--port 12060] [--bind 0.0.0.0] [--log FILE] [--selftest]
 """
+
+__version__ = "1.0"
 
 import argparse
 import json
@@ -231,7 +237,7 @@ class App:
 
     def _build_ui(self):
         root = self.root
-        root.title("N1MM PingPong  -  UDP {}".format(DEFAULT_PORT))
+        root.title("N1MM PingPong  -  UDP {}  v{}".format(DEFAULT_PORT, __version__))
         root.geometry("1020x640")
         root.minsize(760, 420)
 

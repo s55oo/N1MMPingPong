@@ -1,6 +1,8 @@
 # PingPong – N1MM Logger+ UDP 12060 lučke
 
-> **Jezik:** [English](README.md) · [Slovenščina](README_SL.md)
+> **Verzija:** 1.0 · **Jezik:** [English](README.md) · [Slovenščina](README_SL.md)
+>
+> Naredil **S55OO** s pomočjo **AI**.
 
 Prikaz, kateri računalnik/postaja v namrežju trenutno **oddaja**.
 Posluša N1MM Logger+ zunanji UDP broadcast (XML) na vratih **12060**

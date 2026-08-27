@@ -1,6 +1,8 @@
 # PingPong – N1MM Logger+ UDP 12060 lamps
 
-> **Language:** [English](README.md) · [Slovenščina](README_SL.md)
+> **Version:** 1.0 · **Language:** [English](README.md) · [Slovenščina](README_SL.md)
+>
+> Made by **S55OO** with **AI** assistance.
 
 Shows which computer/station in the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port

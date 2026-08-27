@@ -18,9 +18,15 @@ in lamps.cfg ("IP,label,color" per line, '#' ignored) assign a wanted
 label/color to known computers; any new station gets a label from
 its packet and a color from the auto palette.
 
+Made by S55OO with AI assistance.
+
+Version: 1.0
+
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 """
+
+__version__ = "1.0"
 
 import argparse
 import os
@@ -282,7 +288,7 @@ class DisplayApp:
         return bool(self.tracked) and station.key == self.tracked
 
     def _build(self):
-        self.root.title("PingPong  -  UDP {}".format(self.port))
+        self.root.title("PingPong  -  UDP {}  v{}".format(self.port, __version__))
         self.root.attributes("-topmost", True)
         frame = tk.Frame(self.root, padx=6, pady=4)
         frame.pack()
