@@ -43,9 +43,9 @@ DEFAULT_STALE = 5.0
 COLOR_IDLE = "#3a3a3a"
 COLOR_PALETTE = [
     "red",
-    "green",
-    "dodger blue",
     "orange",
+    "light blue",
+    "light green",
     "purple",
     "cyan",
     "gold",
@@ -169,6 +169,17 @@ def read_config(config_path):
     return hints
 
 
+def write_config(config_path, ip, label, color):
+    if not config_path:
+        return
+    line = ",".join([ip, label or "", color])
+    try:
+        with open(config_path, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        pass
+
+
 def open_socket(bind_ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -223,6 +234,7 @@ class DisplayApp:
         self.root = root
         self.port = port
         self.stale = stale
+        self.config_path = config_path
         self.hints = read_config(config_path)
         self.local = set(local_interfaces())
         self.stations = {}
@@ -239,19 +251,8 @@ class DisplayApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
 
-    def _effective_source(self, src):
-        if src == "127.0.0.1":
-            for ip in self.hints:
-                if ip in self.local:
-                    return ip
-            for ip in self.local:
-                if ip.startswith("192.168.") or ip.startswith("10."):
-                    return ip
-            return "local"
-        return src
-
     def _station(self, src, station_name):
-        ip = self._effective_source(src)
+        ip = src
         if ip in self.stations:
             return self.stations[ip]
         hint_label, hint_color = self.hints.get(ip, ("", ""))
@@ -260,6 +261,7 @@ class DisplayApp:
             free = [c for c in COLOR_PALETTE if c not in self.used_colors]
             color = free[0] if free else COLOR_PALETTE[-1]
             self.used_colors.add(color)
+            write_config(self.config_path, ip, station_name or ip, color)
         label = hint_label or station_name or ip
         station = Station(ip, label, color)
         self.stations[ip] = station
@@ -281,7 +283,7 @@ class DisplayApp:
             if mode:
                 station.mode = mode
             station.key = group_of(station.freq, station.mode)
-            if station.ip in self.local or station.ip == "local":
+            if station.ip in self.local:
                 self.tracked = station.key
 
     def _is_tracked(self, station):

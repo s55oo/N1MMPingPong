@@ -83,8 +83,13 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 
 ### lamps.cfg (optional)
 
-Automatic station detection works **even without** this file. To assign
-stable labels/colors, each line is:
+Automatic station detection works **even without** this file. Stations
+are assigned colors **in order of appearance**: the first detected station
+gets **red**, the second **orange**, the third **light blue**, the fourth
+**light green**, and so on through the rest of the palette (purple, cyan,
+gold, pink, brown, lime green).
+
+To assign stable labels/colors manually, each line is:
 
 ```
 IP,label,color
@@ -98,8 +103,10 @@ Example:
 ```
 
 - Lines starting with `#` are skipped.
-- If `lamps.cfg` is missing or a station is not listed, the new station gets
-  its label from the packet and a color from the auto palette.
+- When a new station is detected that is **not** in `lamps.cfg`, the app
+  assigns it the next unused palette color **in order of appearance** and
+  **writes the entry back to `lamps.cfg`** automatically, so the color stays
+  fixed on the next run. Edit the file any time to override a label/color.
 - `n1mm_lamps.exe` reads `lamps.cfg` from the **same folder as the exe**.
 
 ---
