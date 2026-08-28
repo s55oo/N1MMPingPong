@@ -20,13 +20,13 @@ its packet and a color from the auto palette.
 
 Made by S55OO with AI assistance.
 
-Version: 1.0
+Version: 1.1
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import argparse
 import os
