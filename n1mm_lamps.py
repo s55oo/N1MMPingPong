@@ -20,13 +20,13 @@ its packet and a color from the auto palette.
 
 Made by S55OO with AI assistance.
 
-Version: 1.2
+Version: 1.3
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 """
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 import argparse
 import base64
@@ -317,12 +317,16 @@ class DisplayApp:
             highlightthickness=1,
             highlightbackground="#888888",
         )
-        self.canvas.pack()
+        self.canvas.pack(fill=tk.X)
         self.text_id = self.canvas.create_text(
             165, 44, text="—", font=("Segoe UI", 20, "bold"), fill="white"
         )
+        self.canvas.bind("<Configure>", self._recenter_text)
         self.info = tk.Label(frame, text="", font=("Segoe UI", 8), justify=tk.CENTER)
         self.info.pack(fill=tk.X)
+
+    def _recenter_text(self, event):
+        self.canvas.coords(self.text_id, event.width / 2.0, event.height / 2.0)
 
     def _open_help(self):
         try:
