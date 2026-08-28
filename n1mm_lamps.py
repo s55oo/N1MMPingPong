@@ -20,15 +20,16 @@ its packet and a color from the auto palette.
 
 Made by S55OO with AI assistance.
 
-Version: 1.1
+Version: 1.2
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import argparse
+import base64
 import os
 import re
 import socket
@@ -36,10 +37,15 @@ import sys
 import threading
 import time
 import tkinter as tk
+import webbrowser
 import xml.etree.ElementTree as ET
 
 DEFAULT_PORT = 12060
 DEFAULT_STALE = 5.0
+HELP_URL = "https://github.com/s55oo/N1MMPingPong"
+HELP_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
+)
 COLOR_IDLE = "#3a3a3a"
 COLOR_PALETTE = [
     "red",
@@ -294,6 +300,15 @@ class DisplayApp:
         self.root.attributes("-topmost", True)
         frame = tk.Frame(self.root, padx=6, pady=4)
         frame.pack()
+        top = tk.Frame(frame)
+        top.pack(fill=tk.X)
+        tk.Label(top, text="PingPong", font=("Segoe UI", 8, "bold")).pack(side=tk.LEFT)
+        self.help_icon = tk.PhotoImage(
+            data=base64.b64decode(HELP_ICON_B64.encode("ascii"))
+        )
+        self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2")
+        self.help_link.pack(side=tk.RIGHT)
+        self.help_link.bind("<Button-1>", lambda e: self._open_help())
         self.canvas = tk.Canvas(
             frame,
             width=330,
@@ -308,6 +323,12 @@ class DisplayApp:
         )
         self.info = tk.Label(frame, text="", font=("Segoe UI", 8), justify=tk.CENTER)
         self.info.pack(fill=tk.X)
+
+    def _open_help(self):
+        try:
+            webbrowser.open(HELP_URL)
+        except Exception:
+            pass
 
     def _font_for(self, text):
         length = len(text)

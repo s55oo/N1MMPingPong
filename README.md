@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.1 · Made by **S55OO** with AI assistance.
+> **Version:** 1.2 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -54,6 +54,8 @@ Two tools are provided:
 - The window shows the text of the last pressed function key (the `Fx`
   prefix is stripped).
 - The window is always on top (`topmost`).
+- A small **help icon** (top-right) opens this documentation in your default
+  browser.
 
 ### Group key (band + mode)
 
@@ -170,6 +172,7 @@ lamps.cfg        – optional: IP,label,color (auto-written on first discovery)
 n1mm_watch.py    – traffic watcher
 PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
+help.png         – help icon shown in the lamp window (embedded in the exe)
 n1mm_lamps.spec  – last PyInstaller build settings
 dist\            – PyInstaller output (current n1mm_lamps.exe)
 ```
