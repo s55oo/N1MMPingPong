@@ -1,9 +1,9 @@
 # Build artifacts
 dist/
 build/
-lucke.spec
+n1mm_lamps.spec
 *.exe
-!lucke.exe
+!n1mm_lamps.exe
 
 # Logs & cache
 n1mm_pingpong.log

@@ -8,7 +8,7 @@ Obstajata dve orodji:
 
 | Datoteka | Kaj je |
 |---|---|
-| `n1mm_lamps.py` / `lucke.exe` | **Lučka** – majhno okno, ki sveti v barvi postaje na oddaji |
+| `n1mm_lamps.py` / `n1mm_lamps.exe` | **Lučka** – majhno okno, ki sveti v barvi postaje na oddaji |
 | `n1mm_watch.py` / `PingPong.bat` | **Opazovalec** – podrobni dnevnik vseh paketov (debug/analiza) |
 
 ---
@@ -30,7 +30,7 @@ Obstajata dve orodji:
 
 ---
 
-## 2. Lučka (n1mm_lamps.py / lucke.exe)
+## 2. Lučka (n1mm_lamps.py / n1mm_lamps.exe)
 
 ### Vedenje
 
@@ -59,7 +59,7 @@ oknu, in obratno.
 ### Zagon
 
 ```bat
-        dvojni klik:  lucke.exe     (samostojna programska datoteka)
+        dvojni klik:  n1mm_lamps.exe     (samostojna programska datoteka)
   ali:  dvojni klik:  Lampice.bat   (zažene pythonw n1mm_lamps.py)
 ```
 
@@ -93,7 +93,7 @@ Primer:
 - Vrstice s `#` se preskočijo.
 - Če `lamps.cfg` ne obstaja ali ne vsebuje postaje, nova postaja dobi
   oznako iz paketa in barvo iz samodejne palete.
-- `lucke.exe` bere `lamps.cfg` iz **iste mape, kjer je exe**.
+- `n1mm_lamps.exe` bere `lamps.cfg` iz **iste mape, kjer je exe**.
 
 ---
 
@@ -127,12 +127,12 @@ Potrebuje Python + PyInstaller:
 
 ```bat
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name lucke --manifest manifest.xml n1mm_lamps.py
-copy /Y dist\lucke.exe lucke.exe
+python -m PyInstaller --onefile --windowed --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
+copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
 ```
 
 `manifest.xml` poskrbi, da ima okno moderne kontrole (common controls).
-Rezultat je ena datoteka `lucke.exe` (brez Python znamke) – prekopiraj
+Rezultat je ena datoteka `n1mm_lamps.exe` (brez Python znamke) – prekopiraj
 jo na ostale računalnike skupaj z (opcijskim) `lamps.cfg`.
 
 ---
@@ -141,12 +141,12 @@ jo na ostale računalnike skupaj z (opcijskim) `lamps.cfg`.
 
 ```
 n1mm_lamps.py    – lučka (izvorna koda)
-lucke.exe        – lučka (samostojna, brez Pythona)
+n1mm_lamps.exe        – lučka (samostojna, brez Pythona)
 Lampice.bat      – zaganjalnik lučke (pythonw)
 lamps.cfg        – opcijsko: IP,oznaka,barva
 n1mm_watch.py    – opazovalec prometa
 PingPong.bat     – zaganjalnik opazovalca
 manifest.xml     – manifest za PyInstaller (common controls)
-lucke.spec       – nastavitve zadnje gradnje PyInstaller
-dist\            – izhod PyInstaller (aktualni lucke.exe)
+n1mm_lamps.spec       – nastavitve zadnje gradnje PyInstaller
+dist\            – izhod PyInstaller (aktualni n1mm_lamps.exe)
 ```
