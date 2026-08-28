@@ -1,5 +1,7 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
+> **Version:** 1.1 · Made by **S55OO** with AI assistance.
+
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
 and displays the caption of the pressed function key in that station's color.
@@ -24,11 +26,17 @@ Two tools are provided:
 1. On each N1MM Logger+ PC: **File → Settings → Configurer →
    External Broadcast**, enable the reports you need (**RadioInfo**,
    **ContactInfo**, **Spot**, **AppInfo**, **dynamicresults** …).
-2. **Broadcast Address**: `192.168.0.255` (subnet broadcast so every
-   PC sees every station).
+2. **Broadcast Address**: your subnet broadcast (e.g. `192.168.178.255`)
+   so every PC sees every station. Use the address of whichever network
+   you run on – **LAN or VPN** – and match it in N1MM on every PC.
 3. **Broadcast Port**: `12060` (default, do not change).
 4. Per N1MM: **“Broadcast Data” must also be enabled on the other
    computers** (e.g. Run2), otherwise they send nothing.
+
+> The app listens on all interfaces and **discovers stations
+> automatically** – no per-PC IP configuration is needed. It follows the
+> traffic that N1MM broadcasts, whether that arrives over your LAN or a
+> VPN link.
 
 > N1MM only broadcasts the key **caption** (e.g. `F1 CQ`), not the
 > expanded CW/text. `Freq` in `RadioInfo` is in units of 10 Hz:
@@ -98,8 +106,10 @@ IP,label,color
 Example:
 
 ```
-192.168.0.77,PC1,red
-192.168.0.69,Run2,green
+192.168.178.55,PC1,red
+192.168.178.56,Run2,orange
+192.168.178.57,Run3,light blue
+192.168.178.58,Run4,light green
 ```
 
 - Lines starting with `#` are skipped.
@@ -156,7 +166,7 @@ computers together with the (optional) `lamps.cfg`.
 ```
 n1mm_lamps.py    – lamp (source code)
 n1mm_lamps.exe   – lamp (standalone, no Python needed)
-lamps.cfg        – optional: IP,label,color
+lamps.cfg        – optional: IP,label,color (auto-written on first discovery)
 n1mm_watch.py    – traffic watcher
 PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
