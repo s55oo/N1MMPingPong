@@ -20,13 +20,13 @@ its packet and a color from the auto palette.
 
 Made by S55OO with AI assistance.
 
-Version: 1.3
+Version: 1.4
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 """
 
-__version__ = "1.3"
+__version__ = "1.4"
 
 import argparse
 import base64
@@ -70,7 +70,7 @@ BANDS = [
 ]
 MODES_ALLOWED = {"CW", "RTTY", "USB", "LSB"}
 
-FONT_SIZES = [(4, 22), (8, 18), (12, 14), (9999, 12)]
+FONT_SIZES = [(4, 26), (8, 22), (12, 18), (9999, 16)]
 
 
 def band_of(freq_str):
