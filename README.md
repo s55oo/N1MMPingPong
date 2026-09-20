@@ -161,6 +161,17 @@ copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
 single `n1mm_lamps.exe` (no Python required) – copy it to the other
 computers together with the (optional) `lamps.cfg`.
 
+**Antivirus false positives:** a locally-built EXE can get flagged by
+Windows Defender / other AV engines – PyInstaller's prebuilt bootloader
+and UPX-compressed binaries are both common heuristic triggers, even
+though the EXE is clean. The command above already disables UPX
+(`--noupx`), and the released EXE is built by the
+[**Build n1mm_lamps.exe**](.github/workflows/build-exe.yml) GitHub Actions
+workflow, which compiles the PyInstaller bootloader **from source** on a
+clean Windows runner – the actual fix for the prebuilt-bootloader
+fingerprint – and runs a Defender scan on the fresh build as a sanity
+check. Prefer a release download over a local build if AV flags one.
+
 ---
 
 ## 5. Files
