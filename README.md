@@ -153,7 +153,7 @@ Requires Python + PyInstaller:
 
 ```bat
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
+python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
 copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
 ```
 
