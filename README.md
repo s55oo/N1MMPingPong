@@ -198,6 +198,14 @@ clean Windows runner – the actual fix for the prebuilt-bootloader
 fingerprint – and runs a Defender scan on the fresh build as a sanity
 check. Prefer a release download over a local build if AV flags one.
 
+**Releases are automatic.** On every push to `main` the workflow reads
+`__version__` from `n1mm_lamps.py`. If release `v<version>` doesn't exist
+yet, it creates the tag and release and attaches the freshly built EXE.
+Release notes come from `releases/v<version>.md` (falls back to
+GitHub-generated notes). To publish a new version: bump `__version__`, add
+`releases/vX.Y.md`, push to `main`. Existing releases are never
+overwritten.
+
 ---
 
 ## 5. Files

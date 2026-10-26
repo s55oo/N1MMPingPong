@@ -3,12 +3,20 @@ name: Build n1mm_lamps.exe
 # Builds the standalone exe on a clean GitHub Windows runner, with the
 # PyInstaller bootloader compiled from source (the prebuilt one is what
 # antivirus engines fingerprint - Trojan:Win32/Wacatac.B!ml false positives).
-# Result is an artifact of the run. On a pushed v* tag the exe is also
-# attached to that tag's GitHub release (created if it doesn't exist yet).
+# Result is an artifact of the run.
+#
+# Automatic releases: on every push to main the version is read from
+# __version__ in n1mm_lamps.py. If release v<version> doesn't exist yet,
+# the tag and release are created and the exe is attached. Release notes
+# come from releases/v<version>.md if present, otherwise GitHub generates
+# them. So to publish: bump __version__ (and add releases/vX.Y.md), push.
+# An existing release is never overwritten by a main push; pushing a v*
+# tag by hand re-uploads the exe to that tag's release.
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
 
 permissions:
@@ -58,13 +66,32 @@ jobs:
           path: dist/n1mm_lamps.exe
           if-no-files-found: error
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$env:GITHUB_REF_NAME" --repo "$env:GITHUB_REPOSITORY" *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create "$env:GITHUB_REF_NAME" --repo "$env:GITHUB_REPOSITORY" --title "PingPong $env:GITHUB_REF_NAME" --generate-notes
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $m = Select-String -Path n1mm_lamps.py -Pattern '^__version__\s*=\s*"([^"]+)"'
+            if (-not $m) { "No __version__ found - skipping release"; exit 0 }
+            $tag = "v" + $m.Matches[0].Groups[1].Value
           }
-          gh release upload "$env:GITHUB_REF_NAME" dist/n1mm_lamps.exe --repo "$env:GITHUB_REPOSITORY" --clobber
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          $exists = ($LASTEXITCODE -eq 0)
+          if ($exists -and $env:GITHUB_REF -notlike 'refs/tags/*') {
+            "Release $tag already exists - nothing to do"; exit 0
+          }
+          if (-not $exists) {
+            $notes = "releases/$tag.md"
+            if (Test-Path $notes) {
+              gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PingPong $tag" --notes-file $notes
+            } else {
+              gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PingPong $tag" --generate-notes
+            }
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          gh release upload $tag dist/n1mm_lamps.exe --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          "Released $tag" >> $env:GITHUB_STEP_SUMMARY
