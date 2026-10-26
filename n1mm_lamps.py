@@ -18,21 +18,29 @@ in lamps.cfg ("IP,label,color" per line, '#' ignored) assign a wanted
 label/color to known computers; any new station gets a label from
 its packet and a color from the auto palette.
 
+Network discovery: all IPv4 adapters of this PC (LAN, Wi-Fi, VPN) are
+enumerated reliably, so the local station is always recognised. PCs
+running PingPong also announce themselves to each other with a small
+hello broadcast on a separate port (12070), so a PC whose N1MM
+broadcast does not arrive here is still listed in the footer.
+
 Made by S55OO with AI assistance.
 
-Version: 1.4
+Version: 1.5
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
+                         [--discovery-port 12070] [--no-discovery]
 """
 
-__version__ = "1.4"
+__version__ = "1.5"
 
 import argparse
 import base64
 import os
 import re
 import socket
+import struct
 import sys
 import threading
 import time
@@ -42,6 +50,11 @@ import xml.etree.ElementTree as ET
 
 DEFAULT_PORT = 12060
 DEFAULT_STALE = 5.0
+DEFAULT_DISCOVERY_PORT = 12070
+HELLO_INTERVAL = 3.0
+PEER_TIMEOUT = 12.0
+NETWORK_REFRESH = 30.0
+LOCAL_N1MM_RECENT = 10.0
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -133,19 +146,114 @@ def packet_info(data):
     return True, caption, station, is_tx, freq, mode
 
 
-def local_interfaces():
-    ips = []
+def _usable_ip(ip):
+    return bool(ip) and not ip.startswith("127.") and not ip.startswith("169.254.") \
+        and ip != "0.0.0.0"
+
+
+def _broadcast_of(ip, mask):
+    ip_n = struct.unpack("!I", socket.inet_aton(ip))[0]
+    mask_n = struct.unpack("!I", socket.inet_aton(mask))[0]
+    return socket.inet_ntoa(struct.pack("!I", (ip_n | (~mask_n & 0xFFFFFFFF))))
+
+
+def _windows_ipv4_table():
+    """All IPv4 addresses of all adapters (LAN, Wi-Fi, VPN) via iphlpapi.
+
+    Returns [(ip, netmask), ...]. Works regardless of Windows language and
+    of how the host name resolves, unlike gethostbyname_ex().
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    class MIB_IPADDRROW(ctypes.Structure):
+        _fields_ = [
+            ("dwAddr", wintypes.DWORD),
+            ("dwIndex", wintypes.DWORD),
+            ("dwMask", wintypes.DWORD),
+            ("dwBCastAddr", wintypes.DWORD),
+            ("dwReasmSize", wintypes.DWORD),
+            ("unused1", ctypes.c_ushort),
+            ("wType", ctypes.c_ushort),
+        ]
+
+    MIB_IPADDR_DISCONNECTED = 0x0008
+    MIB_IPADDR_DELETED = 0x0040
+    iphlpapi = ctypes.windll.iphlpapi
+    size = wintypes.ULONG(0)
+    iphlpapi.GetIpAddrTable(None, ctypes.byref(size), False)
+    if not size.value:
+        return []
+    buf = ctypes.create_string_buffer(size.value)
+    if iphlpapi.GetIpAddrTable(buf, ctypes.byref(size), False) != 0:
+        return []
+    count = ctypes.cast(buf, ctypes.POINTER(wintypes.DWORD))[0]
+    rows = ctypes.cast(
+        ctypes.addressof(buf) + ctypes.sizeof(wintypes.DWORD),
+        ctypes.POINTER(MIB_IPADDRROW),
+    )
+    result = []
+    for i in range(count):
+        row = rows[i]
+        if row.wType & (MIB_IPADDR_DISCONNECTED | MIB_IPADDR_DELETED):
+            continue
+        ip = socket.inet_ntoa(struct.pack("<I", row.dwAddr))
+        mask = socket.inet_ntoa(struct.pack("<I", row.dwMask))
+        result.append((ip, mask))
+    return result
+
+
+def _route_ip():
+    """IP of the adapter holding the default route (no packet is sent)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        ips.extend(socket.gethostbyname_ex(socket.gethostname())[2])
+        sock.connect(("10.255.255.255", 1))
+        return sock.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        sock.close()
+
+
+def local_networks():
+    """[(ip, broadcast), ...] for every active IPv4 adapter on this PC."""
+    nets = []
+    seen = set()
+
+    def add(ip, mask):
+        if _usable_ip(ip) and ip not in seen:
+            seen.add(ip)
+            try:
+                nets.append((ip, _broadcast_of(ip, mask)))
+            except OSError:
+                pass
+
+    if sys.platform == "win32":
+        try:
+            for ip, mask in _windows_ipv4_table():
+                add(ip, mask)
+        except Exception:
+            pass
+    # Fallbacks (non-Windows, or if the API call failed). Netmask unknown
+    # here, so assume /24, which matches typical home/club networks.
+    candidates = []
+    try:
+        candidates.extend(socket.gethostbyname_ex(socket.gethostname())[2])
     except OSError:
         pass
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            if info[4][0] not in ips:
-                ips.append(info[4][0])
+            candidates.append(info[4][0])
     except OSError:
         pass
-    return [ip for ip in ips if not ip.startswith("127.")]
+    candidates.append(_route_ip())
+    for ip in candidates:
+        add(ip, "255.255.255.0")
+    return nets
+
+
+def local_interfaces():
+    return [ip for ip, _ in local_networks()]
 
 
 def parse_spec(spec):
@@ -221,6 +329,130 @@ def listener_loop(bind_ip, port, on_packet, stop):
         pass
 
 
+def make_hello(node_id, host, ips, local_n1mm):
+    root = ET.Element("PingPongHello")
+    for tag, value in (
+        ("Id", node_id),
+        ("Host", host),
+        ("Version", __version__),
+        ("Ips", ",".join(ips)),
+        ("LocalN1MM", "true" if local_n1mm else "false"),
+    ):
+        ET.SubElement(root, tag).text = value
+    return ET.tostring(root, encoding="utf-8")
+
+
+def parse_hello(data):
+    try:
+        root = ET.fromstring(data.decode("utf-8", errors="replace"))
+    except ET.ParseError:
+        return None
+    if root.tag != "PingPongHello":
+        return None
+
+    def get(tag):
+        return (root.findtext(tag) or "").strip()
+
+    node_id = get("Id")
+    if not node_id:
+        return None
+    return {
+        "id": node_id,
+        "host": get("Host"),
+        "version": get("Version"),
+        "ips": [ip.strip() for ip in get("Ips").split(",") if ip.strip()],
+        "local_n1mm": get("LocalN1MM").lower() == "true",
+    }
+
+
+def _sender_socket(ip):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.bind((ip, 0))
+    return sock
+
+
+def discovery_loop(port, node_id, get_local_n1mm, on_networks, on_hello, stop):
+    """Active discovery between PCs running PingPong.
+
+    Every HELLO_INTERVAL seconds a small PingPongHello packet is broadcast
+    on every active adapter (LAN, Wi-Fi, VPN) on the discovery port, which
+    is separate from N1MM's 12060 so N1MM and other loggers never see it.
+    Hellos from other PCs make them known even if their N1MM sends nothing;
+    our own hello coming back tells us which of our addresses are live.
+    """
+    try:
+        recv = open_socket("0.0.0.0", port)
+    except OSError:
+        recv = None
+    host = socket.gethostname()
+    senders = {}
+    nets = []
+    next_refresh = 0.0
+    next_hello = 0.0
+    while not stop.is_set():
+        now = time.time()
+        if now >= next_refresh:
+            nets = local_networks()
+            wanted = set(ip for ip, _ in nets)
+            for ip in list(senders):
+                if ip not in wanted:
+                    try:
+                        senders.pop(ip).close()
+                    except OSError:
+                        pass
+            for ip in wanted:
+                if ip not in senders:
+                    try:
+                        senders[ip] = _sender_socket(ip)
+                    except OSError:
+                        pass
+            on_networks(nets)
+            next_refresh = now + NETWORK_REFRESH
+        if now >= next_hello:
+            payload = make_hello(
+                node_id, host, [ip for ip, _ in nets], get_local_n1mm()
+            )
+            for ip, bcast in nets:
+                sock = senders.get(ip)
+                if sock is None:
+                    continue
+                for target in (bcast, "255.255.255.255"):
+                    try:
+                        sock.sendto(payload, (target, port))
+                    except OSError:
+                        pass
+            next_hello = now + HELLO_INTERVAL
+        if recv is None:
+            stop.wait(0.3)
+            continue
+        try:
+            data, addr = recv.recvfrom(65535)
+        except socket.timeout:
+            continue
+        except OSError:
+            stop.wait(0.3)
+            continue
+        info = parse_hello(data)
+        if info:
+            on_hello(addr[0], info)
+    for sock in list(senders.values()) + ([recv] if recv else []):
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+class Peer:
+    def __init__(self, node_id):
+        self.id = node_id
+        self.host = ""
+        self.version = ""
+        self.ips = set()
+        self.local_n1mm = False
+        self.last_seen = 0.0
+
+
 class Station:
     def __init__(self, ip, label, color):
         self.ip = ip
@@ -236,14 +468,18 @@ class Station:
 
 
 class DisplayApp:
-    def __init__(self, root, config_path, port, stale):
+    def __init__(self, root, config_path, port, stale, discovery_port=None):
         self.root = root
         self.port = port
         self.stale = stale
         self.config_path = config_path
         self.hints = read_config(config_path)
-        self.local = set(local_interfaces())
+        self.local_nets = set(local_interfaces())
+        self.self_seen = set()
+        self.local = set(self.local_nets)
         self.stations = {}
+        self.peers = {}
+        self.node_id = base64.b16encode(os.urandom(6)).decode("ascii")
         self.used_colors = set(color for _, color in self.hints.values() if color)
         self.tracked = None
         self._build()
@@ -254,6 +490,20 @@ class DisplayApp:
             daemon=True,
         )
         self.thread.start()
+        if discovery_port:
+            self.discovery = threading.Thread(
+                target=discovery_loop,
+                args=(
+                    discovery_port,
+                    self.node_id,
+                    self._local_n1mm_active,
+                    self.on_networks,
+                    self.on_hello,
+                    self.stop,
+                ),
+                daemon=True,
+            )
+            self.discovery.start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
 
@@ -291,6 +541,51 @@ class DisplayApp:
             station.key = group_of(station.freq, station.mode)
             if station.ip in self.local:
                 self.tracked = station.key
+
+    def on_networks(self, nets):
+        self.local_nets = set(ip for ip, _ in nets)
+        self.local = self.local_nets | self.self_seen
+
+    def on_hello(self, src, info):
+        if info["id"] == self.node_id:
+            # Our own broadcast came back: src is certainly one of our IPs.
+            if src not in self.local:
+                self.self_seen.add(src)
+                self.local = self.local_nets | self.self_seen
+            return
+        peer = self.peers.get(info["id"])
+        if peer is None:
+            peer = Peer(info["id"])
+            self.peers[info["id"]] = peer
+        peer.host = info["host"] or src
+        peer.version = info["version"]
+        peer.ips = set(info["ips"]) | {src}
+        peer.local_n1mm = info["local_n1mm"]
+        peer.last_seen = time.time()
+
+    def _local_n1mm_active(self):
+        now = time.time()
+        return any(
+            st.ip in self.local and (now - st.last_seen) <= LOCAL_N1MM_RECENT
+            for st in list(self.stations.values())
+        )
+
+    def _peer_rows(self, now):
+        """Footer notes for PingPong PCs whose N1MM traffic we do not get."""
+        station_ips = set(self.stations)
+        rows = []
+        for peer in list(self.peers.values()):
+            if (now - peer.last_seen) > PEER_TIMEOUT:
+                continue
+            if peer.ips & station_ips:
+                continue
+            if peer.local_n1mm:
+                # Its N1MM runs, but the broadcast does not reach this PC:
+                # usually a wrong Broadcast Address in that PC's N1MM.
+                rows.append("{}: N1MM ne pride sem".format(peer.host))
+            else:
+                rows.append("{}: ni N1MM".format(peer.host))
+        return rows
 
     def _is_tracked(self, station):
         return bool(self.tracked) and station.key == self.tracked
@@ -345,7 +640,7 @@ class DisplayApp:
         now = time.time()
         active = None
         latest = -1.0
-        for station in self.stations.values():
+        for station in list(self.stations.values()):
             if (
                 station.tx
                 and (now - station.last_seen) <= self.stale
@@ -375,13 +670,12 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
             header = "spremljam {} · ".format(group_label(self.tracked) or "nezano")
-            if self.stations:
-                rows = "  |  ".join(
-                    "{}: {}".format(st.label, st.count)
-                    for st in self.stations.values()
-                )
-            else:
-                rows = "ni podatkov"
+            parts = [
+                "{}: {}".format(st.label, st.count)
+                for st in list(self.stations.values())
+            ]
+            parts.extend(self._peer_rows(now))
+            rows = "  |  ".join(parts) if parts else "ni podatkov"
             self.info.configure(text=header + rows)
 
         self.root.after(120, self._update)
@@ -402,10 +696,20 @@ def main():
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--stale", type=float, default=DEFAULT_STALE)
     parser.add_argument("--config", default=os.path.join(app_dir(), "lamps.cfg"))
+    parser.add_argument(
+        "--discovery-port",
+        type=int,
+        default=DEFAULT_DISCOVERY_PORT,
+        help="UDP port for PingPong-to-PingPong discovery (0 = off)",
+    )
+    parser.add_argument(
+        "--no-discovery", action="store_true", help="disable active discovery"
+    )
     args = parser.parse_args()
 
     root = tk.Tk()
-    DisplayApp(root, args.config, args.port, args.stale)
+    discovery_port = 0 if args.no_discovery else args.discovery_port
+    DisplayApp(root, args.config, args.port, args.stale, discovery_port)
     root.mainloop()
 
 

@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.4 · Made by **S55OO** with AI assistance.
+> **Version:** 1.5 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -37,6 +37,28 @@ Two tools are provided:
 > automatically** – no per-PC IP configuration is needed. It follows the
 > traffic that N1MM broadcasts, whether that arrives over your LAN or a
 > VPN link.
+
+### Network discovery (v1.5)
+
+- **All adapters are detected reliably.** The lamp reads every active IPv4
+  address of the PC (wired LAN, Wi-Fi, VPN) directly from Windows, so it
+  always recognises its *own* N1MM station, even with Ethernet and Wi-Fi
+  active at the same time. It re-checks every 30 s, so switching networks
+  is picked up while running.
+- **PingPong PCs find each other.** Every lamp broadcasts a small
+  `PingPongHello` packet every 3 s on each adapter, on UDP port **12070**
+  (separate from 12060, so N1MM and other loggers never see it). A PC that
+  runs PingPong but whose N1MM traffic does not reach you shows up in the
+  footer:
+
+  | Footer | Meaning |
+  |---|---|
+  | `RUN2: N1MM ne pride sem` | N1MM runs on RUN2 but its broadcast doesn't reach this PC – check the **Broadcast Address** in RUN2's N1MM |
+  | `RUN2: ni N1MM` | PingPong runs on RUN2, but N1MM there isn't broadcasting |
+
+- Change the port with `--discovery-port`, or turn it off with
+  `--no-discovery`. All PCs must use the same discovery port.
+- If Windows Firewall asks on first start, allow **private networks**.
 
 > N1MM only broadcasts the key **caption** (e.g. `F1 CQ`), not the
 > expanded CW/text. `Freq` in `RadioInfo` is in units of 10 Hz:
@@ -84,12 +106,16 @@ Arguments:
 
 ```bat
 python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
+                     [--discovery-port 12070] [--no-discovery]
 ```
 
 - `--port` – UDP port (default 12060).
 - `--stale` – safety fallback in seconds; if no packet arrives from the
   transmitting station within this time, the lamp turns off (default 5.0).
 - `--config` – path to `lamps.cfg`.
+- `--discovery-port` – UDP port for PingPong-to-PingPong discovery
+  (default 12070, `0` = off).
+- `--no-discovery` – don't send or listen for discovery hellos.
 
 ### lamps.cfg (optional)
 
