@@ -243,6 +243,18 @@ class Settings:
 
     def set(self, key, value):
         self.cfg.set("update", key, "yes" if value else "no")
+        self._save()
+
+    def get_text(self, section, key, default=""):
+        return self.cfg.get(section, key, fallback=default)
+
+    def set_text(self, section, key, value):
+        if not self.cfg.has_section(section):
+            self.cfg.add_section(section)
+        self.cfg.set(section, key, value)
+        self._save()
+
+    def _save(self):
         try:
             with open(self.path, "w", encoding="utf-8") as fh:
                 self.cfg.write(fh)

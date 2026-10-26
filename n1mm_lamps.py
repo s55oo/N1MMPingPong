@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.6
+Version: 1.7
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 12070] [--no-discovery]
 """
 
-__version__ = "1.6"
+__version__ = "1.7"
 
 import argparse
 import base64
@@ -332,7 +332,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
         pass
 
 
-def make_hello(node_id, host, ips, local_n1mm):
+def make_hello(node_id, host, ips, local_n1mm, color="", color_time=0.0):
     root = ET.Element("PingPongHello")
     for tag, value in (
         ("Id", node_id),
@@ -340,6 +340,8 @@ def make_hello(node_id, host, ips, local_n1mm):
         ("Version", __version__),
         ("Ips", ",".join(ips)),
         ("LocalN1MM", "true" if local_n1mm else "false"),
+        ("Color", color or ""),
+        ("ColorTime", "{:.3f}".format(color_time or 0.0)),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -365,7 +367,16 @@ def parse_hello(data):
         "version": get("Version"),
         "ips": [ip.strip() for ip in get("Ips").split(",") if ip.strip()],
         "local_n1mm": get("LocalN1MM").lower() == "true",
+        "color": get("Color"),
+        "color_time": _float(get("ColorTime")),
     }
+
+
+def _float(text):
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
 
 
 def _sender_socket(ip):
@@ -375,7 +386,7 @@ def _sender_socket(ip):
     return sock
 
 
-def discovery_loop(port, node_id, get_local_n1mm, on_networks, on_hello, stop):
+def discovery_loop(port, node_id, get_state, on_networks, on_hello, stop):
     """Active discovery between PCs running PingPong.
 
     Every HELLO_INTERVAL seconds a small PingPongHello packet is broadcast
@@ -414,7 +425,7 @@ def discovery_loop(port, node_id, get_local_n1mm, on_networks, on_hello, stop):
             next_refresh = now + NETWORK_REFRESH
         if now >= next_hello:
             payload = make_hello(
-                node_id, host, [ip for ip, _ in nets], get_local_n1mm()
+                node_id, host, [ip for ip, _ in nets], **get_state()
             )
             for ip, bcast in nets:
                 sock = senders.get(ip)
@@ -453,6 +464,8 @@ class Peer:
         self.version = ""
         self.ips = set()
         self.local_n1mm = False
+        self.color = ""
+        self.color_time = 0.0
         self.last_seen = 0.0
 
 
@@ -492,6 +505,11 @@ class DisplayApp:
         self.var_auto = tk.BooleanVar(
             value=self.settings.get("install_automatically", False)
         )
+        self.my_color = self.settings.get_text("station", "color", "")
+        self.my_color_time = _float(
+            self.settings.get_text("station", "color_time", "0")
+        )
+        self._color_dialog = None
         self._ui_calls = []
         self._busy = False
         self._status = ""
@@ -509,7 +527,7 @@ class DisplayApp:
                 args=(
                     discovery_port,
                     self.node_id,
-                    self._local_n1mm_active,
+                    self._hello_state,
                     self.on_networks,
                     self.on_hello,
                     self.stop,
@@ -540,6 +558,11 @@ class DisplayApp:
 
     def _show_options(self, event):
         menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(
+            label="My color…  ({})".format(self.my_color or "automatic"),
+            command=self._choose_color,
+        )
+        menu.add_separator()
         frozen = upd.is_frozen()
         state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
         menu.add_command(
@@ -836,7 +859,136 @@ class DisplayApp:
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         peer.local_n1mm = info["local_n1mm"]
+        peer.color = info.get("color", "")
+        peer.color_time = info.get("color_time", 0.0)
         peer.last_seen = time.time()
+
+    def _hello_state(self):
+        return {
+            "local_n1mm": self._local_n1mm_active(),
+            "color": self.my_color,
+            "color_time": self.my_color_time,
+        }
+
+    # ---------------------------------------------------------- colors
+
+    def _fresh_peers(self, now):
+        return [
+            p for p in list(self.peers.values())
+            if (now - p.last_seen) <= PEER_TIMEOUT
+        ]
+
+    def _color_owners(self, now):
+        """{color: owner} for chosen colors; owner is "me" or a Peer.
+
+        If two PCs chose the same color, the one that chose it first keeps
+        it (ties: host name), so every lamp reaches the same decision.
+        """
+        claims = []
+        if self.my_color:
+            claims.append((self.my_color_time, socket.gethostname(), "me", self.my_color))
+        for peer in self._fresh_peers(now):
+            if peer.color:
+                claims.append((peer.color_time, peer.host, peer, peer.color))
+        owners = {}
+        for _, _, owner, color in sorted(claims, key=lambda c: (c[0], c[1])):
+            owners.setdefault(color.lower(), owner)
+        return owners
+
+    def _color_for(self, station, owners, now):
+        if station.ip in self.local:
+            if self.my_color and owners.get(self.my_color.lower()) == "me":
+                return self.my_color
+        else:
+            for peer in self._fresh_peers(now):
+                if station.ip in peer.ips and peer.color:
+                    if owners.get(peer.color.lower()) is peer:
+                        return peer.color
+                    break
+        # Automatic / lamps.cfg color - but never one another PC has chosen.
+        if (station.color or "").lower() in owners:
+            taken = set(owners) | set(
+                (st.color or "").lower()
+                for st in list(self.stations.values())
+                if st is not station
+            )
+            free = [c for c in COLOR_PALETTE if c.lower() not in taken]
+            if free:
+                station.color = free[0]
+        return station.color
+
+    def _my_color_note(self, owners):
+        if not self.my_color:
+            return ""
+        owner = owners.get(self.my_color.lower())
+        if owner == "me" or owner is None:
+            return ""
+        return "barva {} je zasedena ({})".format(self.my_color, owner.host)
+
+    def _choose_color(self):
+        if self._color_dialog is not None:
+            try:
+                self._color_dialog.lift()
+                return
+            except tk.TclError:
+                self._color_dialog = None
+        now = time.time()
+        owners = self._color_owners(now)
+        dlg = tk.Toplevel(self.root)
+        self._color_dialog = dlg
+        dlg.title("My color")
+        dlg.attributes("-topmost", True)
+        dlg.transient(self.root)
+        dlg.resizable(False, False)
+
+        def closed():
+            self._color_dialog = None
+            dlg.destroy()
+
+        dlg.protocol("WM_DELETE_WINDOW", closed)
+        tk.Label(
+            dlg,
+            text="Color of this PC's station on every PingPong lamp.\n"
+            "Colors chosen by other PCs are not available.",
+            font=("Segoe UI", 9),
+            justify=tk.LEFT,
+        ).pack(padx=10, pady=(8, 6), anchor=tk.W)
+        grid = tk.Frame(dlg)
+        grid.pack(padx=10)
+
+        def pick(color):
+            if color != self.my_color:
+                self.my_color = color
+                self.my_color_time = time.time() if color else 0.0
+                self.settings.set_text("station", "color", color)
+                self.settings.set_text(
+                    "station", "color_time", "{:.3f}".format(self.my_color_time)
+                )
+            closed()
+
+        for i, color in enumerate(COLOR_PALETTE):
+            owner = owners.get(color.lower())
+            taken = owner is not None and owner != "me"
+            mine = color == self.my_color and not taken
+            text = owner.host if taken else ("✓ " + color if mine else color)
+            tk.Button(
+                grid,
+                text=text,
+                width=12,
+                bg=color,
+                activebackground=color,
+                relief=tk.SUNKEN if mine else tk.RAISED,
+                state=tk.DISABLED if taken else tk.NORMAL,
+                command=lambda c=color: pick(c),
+            ).grid(row=i // 5, column=i % 5, padx=2, pady=2)
+        buttons = tk.Frame(dlg)
+        buttons.pack(pady=8)
+        tk.Button(
+            buttons, text="Automatic", width=10, command=lambda: pick("")
+        ).pack(side=tk.LEFT, padx=4)
+        tk.Button(buttons, text="Close", width=10, command=closed).pack(
+            side=tk.LEFT, padx=4
+        )
 
     def _local_n1mm_active(self):
         now = time.time()
@@ -922,6 +1074,7 @@ class DisplayApp:
         while self._ui_calls:
             self.root.after(0, self._ui_calls.pop(0))
         now = time.time()
+        owners = self._color_owners(now)
         active = None
         latest = -1.0
         for station in list(self.stations.values()):
@@ -935,7 +1088,7 @@ class DisplayApp:
                 active = station
 
         if active is not None:
-            color = active.color or "red"
+            color = self._color_for(active, owners, now) or "red"
             shown = active.msg or "—"
             if self.canvas.cget("bg") != color:
                 self.canvas.configure(bg=color)
@@ -954,6 +1107,9 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
             header = "spremljam {} · ".format(group_label(self.tracked) or "nezano")
+            note = self._my_color_note(owners)
+            if note:
+                header = note + "  ·  " + header
             if self._status:
                 header = self._status + "  ·  " + header
             parts = [

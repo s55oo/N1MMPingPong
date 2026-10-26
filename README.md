@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.6 · Made by **S55OO** with AI assistance.
+> **Version:** 1.7 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -116,6 +116,24 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - `--discovery-port` – UDP port for PingPong-to-PingPong discovery
   (default 12070, `0` = off).
 - `--no-discovery` – don't send or listen for discovery hellos.
+
+### My color (Options menu, v1.7+)
+
+**Options ▾ → My color…** lets each PC choose the color its own station
+has on **every** PingPong lamp in the network.
+
+- Colors already chosen by other PCs running PingPong are greyed out and
+  show that PC's name, so two PCs can't pick the same one.
+- The choice is announced in the discovery hello (UDP 12070), so all lamps
+  use it – it overrides `lamps.cfg` and the order-of-appearance colors.
+- If two PCs end up with the same color anyway (e.g. one was offline when
+  the other chose), the PC that chose it **first** keeps it. The other
+  falls back to an automatic color and its footer shows
+  `barva <color> je zasedena (<PC>)` until you pick another one.
+- **Automatic** removes the choice. Stations without a chosen color still
+  get palette colors as before, but never a color another PC has chosen.
+- Saved per PC in `pingpong.ini`. Only PCs running v1.7 or newer can
+  choose a color; their choice is shown only on v1.7+ lamps.
 
 ### Updates and switching back (Options menu, v1.6+)
 
@@ -247,7 +265,7 @@ PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
 help.png         – help icon shown in the lamp window (embedded in the exe)
 pingpong_update.py – self-update / switch-version logic (built into the exe)
-pingpong.ini     – per-PC update settings (created when changed)
+pingpong.ini     – per-PC settings: chosen color, updates (created when changed)
 n1mm_lamps.vX.exe – backup kept by the updater for "Revert"
 n1mm_lamps.spec  – last PyInstaller build settings
 dist\            – PyInstaller output (current n1mm_lamps.exe)
