@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.5 · Made by **S55OO** with AI assistance.
+> **Version:** 1.6 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -117,6 +117,34 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
   (default 12070, `0` = off).
 - `--no-discovery` – don't send or listen for discovery hellos.
 
+### Updates and switching back (Options menu, v1.6+)
+
+Click **Options ▾** (top-right of the lamp window):
+
+| Item | What it does |
+|---|---|
+| **Check for updates** | Looks for a newer release on GitHub; offers to install it. |
+| **Switch version…** | Pick any released version (newer or older) and install it. |
+| **Revert to previous version (vX)** | Switches back to the version you had before the last switch – no download needed. Use this if a new version has a bug. |
+| **Check for updates at startup** | On by default. Checks GitHub ~3 s after the lamp starts. |
+| **Install updates automatically** | Off by default (you are asked first). When on, a newer release found at startup is installed without asking. |
+
+How it works: the new `n1mm_lamps.exe` is downloaded next to the current
+one and verified against the release's SHA-256 checksum. The running exe is
+renamed to `n1mm_lamps.v<old version>.exe` (the backup for **Revert**), the
+new one takes its place and the lamp restarts by itself. `lamps.cfg` is not
+touched. Only one backup is kept. Settings are stored per PC in
+`pingpong.ini` next to the exe.
+
+- Updating only works in the **exe**, not when running `n1mm_lamps.py`.
+- Updates are checked only at startup, never while running – the lamp
+  never restarts in the middle of operating.
+- Versions **before 1.6 have no Options menu.** If you switch back to one
+  of those, return by double-clicking the kept backup
+  (`n1mm_lamps.v1.6.exe` or newer) or by downloading the latest release.
+- The PC needs internet access to github.com for updates; without it the
+  lamp works normally and the check is silently skipped.
+
 ### lamps.cfg (optional)
 
 Automatic station detection works **even without** this file. Stations
@@ -218,6 +246,9 @@ n1mm_watch.py    – traffic watcher
 PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
 help.png         – help icon shown in the lamp window (embedded in the exe)
+pingpong_update.py – self-update / switch-version logic (built into the exe)
+pingpong.ini     – per-PC update settings (created when changed)
+n1mm_lamps.vX.exe – backup kept by the updater for "Revert"
 n1mm_lamps.spec  – last PyInstaller build settings
 dist\            – PyInstaller output (current n1mm_lamps.exe)
 ```

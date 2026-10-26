@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.5
+Version: 1.6
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 12070] [--no-discovery]
 """
 
-__version__ = "1.5"
+__version__ = "1.6"
 
 import argparse
 import base64
@@ -47,6 +47,9 @@ import time
 import tkinter as tk
 import webbrowser
 import xml.etree.ElementTree as ET
+from tkinter import messagebox
+
+import pingpong_update as upd
 
 DEFAULT_PORT = 12060
 DEFAULT_STALE = 5.0
@@ -482,6 +485,16 @@ class DisplayApp:
         self.node_id = base64.b16encode(os.urandom(6)).decode("ascii")
         self.used_colors = set(color for _, color in self.hints.values() if color)
         self.tracked = None
+        self.settings = upd.Settings(app_dir())
+        self.var_check = tk.BooleanVar(
+            value=self.settings.get("check_at_startup", True)
+        )
+        self.var_auto = tk.BooleanVar(
+            value=self.settings.get("install_automatically", False)
+        )
+        self._ui_calls = []
+        self._busy = False
+        self._status = ""
         self._build()
         self.stop = threading.Event()
         self.thread = threading.Thread(
@@ -506,6 +519,268 @@ class DisplayApp:
             self.discovery.start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
+        if upd.is_frozen():
+            upd.cleanup_leftovers(upd.exe_path())
+            if self.var_check.get():
+                self.root.after(3000, lambda: self._check_updates(manual=False))
+
+    # ---------------------------------------------------------- updates
+
+    def _run_bg(self, work, done):
+        """Run work() in a thread, then done(result, error) in the UI."""
+
+        def runner():
+            try:
+                result, error = work(), None
+            except Exception as exc:  # reported to the user in done()
+                result, error = None, exc
+            self._ui_calls.append(lambda: done(result, error))
+
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _show_options(self, event):
+        menu = tk.Menu(self.root, tearoff=0)
+        frozen = upd.is_frozen()
+        state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
+        menu.add_command(
+            label="Check for updates",
+            state=state,
+            command=lambda: self._check_updates(manual=True),
+        )
+        menu.add_command(
+            label="Switch version…", state=state, command=self._switch_version
+        )
+        backup = upd.find_backup(upd.exe_path()) if frozen else None
+        menu.add_command(
+            label="Revert to previous version"
+            + (" (v{})".format(backup[0]) if backup else ""),
+            state=state if backup else tk.DISABLED,
+            command=self._revert,
+        )
+        menu.add_separator()
+        menu.add_checkbutton(
+            label="Check for updates at startup",
+            variable=self.var_check,
+            command=lambda: self.settings.set(
+                "check_at_startup", self.var_check.get()
+            ),
+        )
+        menu.add_checkbutton(
+            label="Install updates automatically",
+            variable=self.var_auto,
+            command=lambda: self.settings.set(
+                "install_automatically", self.var_auto.get()
+            ),
+        )
+        menu.add_separator()
+        menu.add_command(
+            label="PingPong v{}{}".format(
+                __version__, "" if frozen else "  (source - updates only in exe)"
+            ),
+            state=tk.DISABLED,
+        )
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _check_updates(self, manual):
+        if self._busy:
+            return
+        self._busy = True
+        if manual:
+            self._status = "iščem posodobitve…"
+        self._run_bg(
+            upd.fetch_releases,
+            lambda rels, err: self._on_releases(rels, err, manual),
+        )
+
+    def _on_releases(self, releases, error, manual):
+        self._busy = False
+        self._status = ""
+        if error is not None:
+            if manual:
+                messagebox.showerror(
+                    "PingPong",
+                    "Could not check for updates:\n{}".format(error),
+                    parent=self.root,
+                )
+            return
+        new = upd.newer_release(releases, __version__)
+        if new is None:
+            if manual:
+                messagebox.showinfo(
+                    "PingPong",
+                    "You have the latest version (v{}).".format(__version__),
+                    parent=self.root,
+                )
+            return
+        if not manual and self.var_auto.get():
+            self._install(new)
+            return
+        if messagebox.askyesno(
+            "PingPong update",
+            "PingPong v{} is available (you have v{}).\n\n"
+            "Update now? PingPong will restart.\n"
+            "You can switch back any time under Options.".format(
+                new["version"], __version__
+            ),
+            parent=self.root,
+        ):
+            self._install(new)
+
+    def _old_version_note(self, version):
+        """Warning when going to a version without this Options menu."""
+        if upd.parse_version(version) >= (1, 6):
+            return ""
+        return (
+            "\n\nNote: v{} has no Options menu. To come back, double-click\n"
+            "{} in the PingPong folder\n"
+            "or download the newest release from GitHub.".format(
+                version,
+                os.path.basename(upd.backup_path(upd.exe_path(), __version__)),
+            )
+        )
+
+    def _install(self, release):
+        if self._busy:
+            return
+        self._busy = True
+        target = upd.exe_path()
+        self._status = "prenašam v{}…".format(release["version"])
+
+        def progress(done, total):
+            if total:
+                self._status = "prenašam v{}… {}%".format(
+                    release["version"], int(done * 100 / total)
+                )
+
+        def work():
+            new_file = upd.download(release, target, progress)
+            upd.swap_in(target, __version__, new_file)
+
+        def done(_, error):
+            self._busy = False
+            self._status = ""
+            if error is not None:
+                messagebox.showerror(
+                    "PingPong",
+                    "Update to v{} failed:\n{}\n\n"
+                    "Your current version v{} is unchanged.".format(
+                        release["version"], error, __version__
+                    ),
+                    parent=self.root,
+                )
+                return
+            self._restart(target)
+
+        self._run_bg(work, done)
+
+    def _switch_version(self):
+        if self._busy:
+            return
+        self._busy = True
+        self._status = "iščem verzije…"
+
+        def done(releases, error):
+            self._busy = False
+            self._status = ""
+            if error is not None:
+                messagebox.showerror(
+                    "PingPong",
+                    "Could not get the list of versions:\n{}".format(error),
+                    parent=self.root,
+                )
+                return
+            self._version_dialog(releases)
+
+        self._run_bg(upd.fetch_releases, done)
+
+    def _version_dialog(self, releases):
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Switch version")
+        dlg.attributes("-topmost", True)
+        dlg.transient(self.root)
+        dlg.resizable(False, False)
+        tk.Label(
+            dlg, text="Installed: v{}".format(__version__), font=("Segoe UI", 9)
+        ).pack(padx=10, pady=(8, 4), anchor=tk.W)
+        box = tk.Listbox(dlg, height=min(10, max(3, len(releases))), width=34)
+        for rel in releases:
+            mark = "   (installed)" if rel["version"] == __version__ else ""
+            box.insert(tk.END, "v{}   {}{}".format(rel["version"], rel["date"], mark))
+        box.pack(padx=10)
+        if releases:
+            box.selection_set(0)
+
+        def install():
+            sel = box.curselection()
+            if not sel:
+                return
+            rel = releases[sel[0]]
+            if rel["version"] == __version__:
+                messagebox.showinfo(
+                    "PingPong", "v{} is already installed.".format(__version__),
+                    parent=dlg,
+                )
+                return
+            if not messagebox.askyesno(
+                "PingPong",
+                "Install v{} now? PingPong will restart.{}".format(
+                    rel["version"], self._old_version_note(rel["version"])
+                ),
+                parent=dlg,
+            ):
+                return
+            dlg.destroy()
+            self._install(rel)
+
+        buttons = tk.Frame(dlg)
+        buttons.pack(pady=8)
+        tk.Button(buttons, text="Install", width=10, command=install).pack(
+            side=tk.LEFT, padx=4
+        )
+        tk.Button(buttons, text="Cancel", width=10, command=dlg.destroy).pack(
+            side=tk.LEFT, padx=4
+        )
+        box.bind("<Double-Button-1>", lambda e: install())
+
+    def _revert(self):
+        target = upd.exe_path()
+        backup = upd.find_backup(target)
+        if not backup or self._busy:
+            return
+        if not messagebox.askyesno(
+            "PingPong",
+            "Switch back to v{}? PingPong will restart.\n"
+            "(v{} is kept, so you can switch forward again.){}".format(
+                backup[0], __version__, self._old_version_note(backup[0])
+            ),
+            parent=self.root,
+        ):
+            return
+        try:
+            upd.revert(target, __version__)
+        except OSError as exc:
+            messagebox.showerror(
+                "PingPong", "Could not switch back:\n{}".format(exc), parent=self.root
+            )
+            return
+        self._restart(target)
+
+    def _restart(self, target):
+        try:
+            upd.relaunch(target, sys.argv[1:])
+        except OSError as exc:
+            messagebox.showerror(
+                "PingPong",
+                "Installed, but could not restart automatically:\n{}\n\n"
+                "Please start {} again.".format(exc, os.path.basename(target)),
+                parent=self.root,
+            )
+        self.on_close()
+
+    # ---------------------------------------------------------- stations
 
     def _station(self, src, station_name):
         ip = src
@@ -604,6 +879,11 @@ class DisplayApp:
         self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2")
         self.help_link.pack(side=tk.RIGHT)
         self.help_link.bind("<Button-1>", lambda e: self._open_help())
+        self.options_link = tk.Label(
+            top, text="Options ▾", font=("Segoe UI", 8), cursor="hand2"
+        )
+        self.options_link.pack(side=tk.RIGHT, padx=(0, 6))
+        self.options_link.bind("<Button-1>", self._show_options)
         self.canvas = tk.Canvas(
             frame,
             width=330,
@@ -637,6 +917,10 @@ class DisplayApp:
         return ("Segoe UI", 12, "bold")
 
     def _update(self):
+        # Run finished background work as separate events, so a dialog it
+        # opens never blocks this loop (the lamp keeps working meanwhile).
+        while self._ui_calls:
+            self.root.after(0, self._ui_calls.pop(0))
         now = time.time()
         active = None
         latest = -1.0
@@ -670,6 +954,8 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
             header = "spremljam {} · ".format(group_label(self.tracked) or "nezano")
+            if self._status:
+                header = self._status + "  ·  " + header
             parts = [
                 "{}: {}".format(st.label, st.count)
                 for st in list(self.stations.values())

@@ -9,3 +9,8 @@ n1mm_lamps.spec
 n1mm_pingpong.log
 __pycache__/
 *.pyc
+
+# Updater (per-PC settings and temp files)
+pingpong.ini
+*.download
+*.revert
