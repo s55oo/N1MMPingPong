@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.23
+Version: 1.24
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.23"
+__version__ = "1.24"
 
 import argparse
 import base64
@@ -1603,7 +1603,10 @@ class DisplayApp:
         never changes size; invisible when there is no call).
 
         - my own call on: border in my color, blinking;
-        - a call received here: border in the caller's color, steady.
+        - a call received here: border in the caller's color, steady;
+          while my F-keys are blocked (F12 lock) the lamp and the border
+          swap colors back and forth - lamp lit / border dark, then lamp
+          dark / border lit.
         """
         if self.alert_on:
             mine = self._local_station()
@@ -1612,6 +1615,9 @@ class DisplayApp:
             want = color if lit else self._window_bg
         elif calls:
             want = self._call_color(calls[-1], owners, now)
+            if self._block_active:
+                lit = int(now / BLINK_HALF) % 2 == 0
+                want = COLOR_IDLE if lit else want  # opposite of the lamp
         else:
             want = self._window_bg
         if self.canvas.cget("highlightbackground") != want:

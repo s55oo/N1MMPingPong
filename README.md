@@ -158,6 +158,8 @@ on the PCs that should be stopped (saved per PC, off by default).
 - While this PC's lamp blinks for an F12 call (same band, S&P), N1MM's
   function keys **F1–F11** are swallowed – only at that time. The lamp
   shows `BLOKIRANO · F1` and the footer `F-tipke blokirane še 35 s`.
+  While blocked, the lamp and its border swap colors back and forth
+  (lamp lit / border dark, then lamp dark / border lit).
 - All other keys work normally: **Esc**, Enter, letters, F12 and Alt
   combinations (Alt+F4…) are never blocked.
 - Blocking ends as soon as the caller presses F12 again, or when you
