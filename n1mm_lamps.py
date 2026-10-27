@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.28
+Version: 1.29
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.28"
+__version__ = "1.29"
 
 import argparse
 import base64
@@ -785,7 +785,7 @@ class DisplayApp:
             return
         self._busy = True
         if manual:
-            self._status = "iščem posodobitve…"
+            self._status = "checking for updates…"
         self._run_bg(
             upd.fetch_releases,
             lambda rels, err: self._on_releases(rels, err, manual),
@@ -843,11 +843,11 @@ class DisplayApp:
             return
         self._busy = True
         target = upd.exe_path()
-        self._status = "prenašam v{}…".format(release["version"])
+        self._status = "downloading v{}…".format(release["version"])
 
         def progress(done, total):
             if total:
-                self._status = "prenašam v{}… {}%".format(
+                self._status = "downloading v{}… {}%".format(
                     release["version"], int(done * 100 / total)
                 )
 
@@ -876,7 +876,7 @@ class DisplayApp:
         if self._busy:
             return
         self._busy = True
-        self._status = "iščem verzije…"
+        self._status = "getting versions…"
 
         def done(releases, error):
             self._busy = False
@@ -1148,7 +1148,7 @@ class DisplayApp:
         owner = owners.get(self.my_color.lower())
         if owner == "me" or owner is None:
             return ""
-        return "barva {} je zasedena ({})".format(self.my_color, owner.host)
+        return "color {} is taken ({})".format(self.my_color, owner.host)
 
     def _choose_color(self):
         if self._color_dialog is not None:
@@ -1274,9 +1274,9 @@ class DisplayApp:
             if peer.local_n1mm:
                 # Its N1MM runs, but the broadcast does not reach this PC:
                 # usually a wrong Broadcast Address in that PC's N1MM.
-                rows.append("{}: N1MM ne pride sem".format(peer.host))
+                rows.append("{}: N1MM not reaching here".format(peer.host))
             else:
-                rows.append("{}: ni N1MM".format(peer.host))
+                rows.append("{}: no N1MM".format(peer.host))
         return rows
 
     def _station_state(self, st):
@@ -1301,7 +1301,7 @@ class DisplayApp:
             (st for st in newest.values() if st.ip not in self.local),
             key=lambda st: st.label.lower(),
         )
-        rows = ["{} (ti)".format(self._station_state(st)) for st in mine[:1]]
+        rows = ["{} (me)".format(self._station_state(st)) for st in mine[:1]]
         rows += ["{} {}".format(st.label, self._station_state(st)) for st in others]
         return rows
 
@@ -1469,7 +1469,7 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text=shown)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
             self.info.configure(
-                text="{} oddaja  ·  {}".format(
+                text="{} transmitting  ·  {}".format(
                     active.label, self._station_state(active)
                 )
             )
@@ -1480,7 +1480,7 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
             header = ""
             if self.alert_on:
-                header = "F12 klic VKLOP ({} MHz) – F12 = izklop  ·  ".format(
+                header = "F12 call ON ({} MHz) – F12 = off  ·  ".format(
                     self._my_band() or "?"
                 ) + header
             note = self._my_color_note(owners)
@@ -1490,7 +1490,7 @@ class DisplayApp:
                 header = self._status + "  ·  " + header
             parts = self._station_rows(now)
             parts.extend(self._peer_rows(now))
-            rows = "  ·  ".join(parts) if parts else "čakam na N1MM…"
+            rows = "  ·  ".join(parts) if parts else "waiting for N1MM…"
             self.info.configure(text=header + rows)
 
         self.root.after(120, self._update)
@@ -1657,13 +1657,13 @@ class DisplayApp:
         shown = "F12 · {}".format(name)
         key, when = self._blocked_key
         if self._block_active and key and now - when <= 1.5:
-            shown = "BLOKIRANO · {}".format(key)
+            shown = "BLOCKED · {}".format(key)
         self._set_bg(bg)
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self.info.configure(
-            text="{} kliče (F12)  ·  {} MHz  ·  {}klik = utišaj".format(
+            text="{} calls (F12)  ·  {} MHz  ·  {}click = silence".format(
                 peer.host,
                 peer.alert_band,
                 self._block_note(peer, now),
@@ -1675,8 +1675,8 @@ class DisplayApp:
             return ""
         left = self._block_left(peer, now)
         if left > 0 and self._block_active:
-            return "F-tipke blokirane še {} s  ·  ".format(int(left + 0.999))
-        return "blokada potekla  ·  "
+            return "F-keys blocked {} s more  ·  ".format(int(left + 0.999))
+        return "block expired  ·  "
 
     def _call_color(self, peer, owners, now):
         station = self._peer_station(peer)

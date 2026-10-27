@@ -44,16 +44,16 @@ CANONICAL_TAGS = {
 
 TYPE_LABELS = {
     "RadioInfo": "Radio",
-    "ContactInfo": "Kontakt",
-    "Spot": "Spota",
-    "dynamicresults": "Dinamika",
-    "ScoreResults": "Tabela",
-    "Score": "Tabela",
-    "AppInfo": "Aplikacija",
+    "ContactInfo": "Contact",
+    "Spot": "Spot",
+    "dynamicresults": "Dynamic results",
+    "ScoreResults": "Score",
+    "Score": "Score",
+    "AppInfo": "Application",
     "LookupInfo": "Lookup",
-    "PossibleCall": "Klic",
+    "PossibleCall": "Possible call",
     "RotatorInfo": "Rotator",
-    "RAW": "Neznano",
+    "RAW": "Unknown",
 }
 
 TYPE_TAGS = {
@@ -168,14 +168,14 @@ class Receiver:
     def start(self):
         try:
             self.sock = open_socket(self.bind_ip, self.port)
-            self.mode = "skupna vezava 0.0.0.0"
+            self.mode = "shared bind 0.0.0.0"
         except OSError:
             bound = False
             for ip in local_interfaces():
                 try:
                     self.sock = open_socket(ip, self.port)
                     self.bind_ip = ip
-                    self.mode = "unicast vezava {}".format(ip)
+                    self.mode = "unicast bind {}".format(ip)
                     bound = True
                     break
                 except OSError:
@@ -243,33 +243,33 @@ class App:
 
         bar = ttk.Frame(root, padding=(6, 4))
         bar.pack(side=tk.TOP, fill=tk.X)
-        self.listen_btn = ttk.Button(bar, text="Ustavi", width=8, command=self.toggle_listening)
+        self.listen_btn = ttk.Button(bar, text="Stop", width=8, command=self.toggle_listening)
         self.listen_btn.pack(side=tk.LEFT)
-        ttk.Checkbutton(bar, text="Zamrzni", variable=self.paused).pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Checkbutton(bar, text="Avtopomik", variable=self.autoscroll).pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Checkbutton(bar, text="Hex/surovo", variable=self.raw).pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Checkbutton(bar, text="Zapisuj v datoteko", variable=self.saving).pack(side=tk.LEFT, padx=(10, 0))
-        ttk.Button(bar, text="Počisti", width=8, command=self.clear_traffic).pack(side=tk.RIGHT)
+        ttk.Checkbutton(bar, text="Freeze", variable=self.paused).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Checkbutton(bar, text="Autoscroll", variable=self.autoscroll).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Checkbutton(bar, text="Hex/raw", variable=self.raw).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Checkbutton(bar, text="Log to file", variable=self.saving).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Button(bar, text="Clear", width=8, command=self.clear_traffic).pack(side=tk.RIGHT)
 
         paned = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
         paned.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=6, pady=(2, 0))
 
         left = ttk.Frame(paned, width=300)
         paned.add(left, weight=1)
-        ttk.Label(left, text="Postaje").pack(anchor=tk.W)
+        ttk.Label(left, text="Stations").pack(anchor=tk.W)
         cols = ("station", "ip", "freq", "mode", "call", "lastcall", "packets", "last")
         self.stations_view = ttk.Treeview(
             left, columns=cols, show="headings", height=8
         )
         headings = {
-            "station": ("Postaja", 90),
+            "station": ("Station", 90),
             "ip": ("IP", 110),
-            "freq": ("Frekvenca", 95),
-            "mode": ("Mod", 50),
+            "freq": ("Frequency", 95),
+            "mode": ("Mode", 50),
             "call": ("Operator", 70),
-            "lastcall": ("Zadnji klic", 90),
-            "packets": ("Paketi", 60),
-            "last": ("Zadnje", 70),
+            "lastcall": ("Last call", 90),
+            "packets": ("Packets", 60),
+            "last": ("Last", 70),
         }
         for col, (text, width) in headings.items():
             self.stations_view.heading(col, text=text)
@@ -278,15 +278,15 @@ class App:
 
         right = ttk.Frame(paned)
         paned.add(right, weight=3)
-        ttk.Label(right, text="Promet").pack(anchor=tk.W)
+        ttk.Label(right, text="Traffic").pack(anchor=tk.W)
         tcols = ("time", "src", "station", "type", "summary")
         self.traffic = ttk.Treeview(right, columns=tcols, show="headings")
         thead = {
-            "time": ("Čas", 80),
-            "src": ("Vir", 115),
-            "station": ("Postaja", 90),
-            "type": ("Tip", 80),
-            "summary": ("Vsebina", 330),
+            "time": ("Time", 80),
+            "src": ("Source", 115),
+            "station": ("Station", 90),
+            "type": ("Type", 80),
+            "summary": ("Content", 330),
         }
         for col, (text, width) in thead.items():
             self.traffic.heading(col, text=text)
@@ -324,16 +324,16 @@ class App:
                 self.receiver = Receiver(self.bind_ip, self.port, self.q)
                 self.receiver.start()
             except OSError as exc:
-                self.status_var.set("NAPAKA: ni mogoče odpreti porta {} ({})".format(self.port, exc))
+                self.status_var.set("ERROR: cannot open port {} ({})".format(self.port, exc))
                 return
             self.listening = True
-            self.listen_btn.configure(text="Ustavi")
+            self.listen_btn.configure(text="Stop")
         else:
             if self.receiver is not None:
                 self.receiver.stop()
                 self.receiver = None
             self.listening = False
-            self.listen_btn.configure(text="Poslušaj")
+            self.listen_btn.configure(text="Listen")
 
     def clear_traffic(self):
         for iid in self.traffic.get_children():
@@ -471,7 +471,7 @@ class App:
                 body = minidom.parseString(rec["text"]).toprettyxml(indent="  ")
             except Exception:
                 body = rec["text"]
-        header = "[{}]  {}  Postaja: {}  Tip: {}\n".format(
+        header = "[{}]  {}  Station: {}  Type: {}\n".format(
             time_str, rec["src"], rec["station"], TYPE_LABELS.get(rec["tag"], rec["tag"])
         )
         self.detail.configure(state=tk.NORMAL)
@@ -482,20 +482,20 @@ class App:
     def _refresh_status(self):
         parts = []
         if self.listening:
-            parts.append("Poslušam UDP {}".format(self.port))
+            parts.append("Listening on UDP {}".format(self.port))
             if self.receiver is not None and self.receiver.mode:
                 parts.append(self.receiver.mode)
         else:
-            parts.append("Zaustavljeno")
-        parts.append("postaj: {}".format(len(self.stations)))
-        parts.append("paketov: {}".format(self.total))
+            parts.append("Stopped")
+        parts.append("stations: {}".format(len(self.stations)))
+        parts.append("packets: {}".format(self.total))
         counts = "  ".join("{}: {}".format(TYPE_LABELS.get(k, k), v) for k, v in self.counters.items())
         if counts:
             parts.append(counts)
         if not self.log_path or not self.saving.get():
             self.status_var.set("  |  ".join(parts))
         else:
-            self.status_var.set("  |  ".join(parts) + "  |  zapis: " + self.log_path)
+            self.status_var.set("  |  ".join(parts) + "  |  log: " + self.log_path)
 
     def on_close(self):
         self.set_listening(False)
@@ -537,7 +537,7 @@ def selftest():
         tag, fields, text = decode_packet(data)
         print("[{}] {}".format(tag, summarize(tag, fields)))
         if tag == "RadioInfo":
-            print("   frekvenca: {}".format(format_freq(fields.get("Freq", ""))))
+            print("   frequency: {}".format(format_freq(fields.get("Freq", ""))))
     print("selftest OK")
 
 

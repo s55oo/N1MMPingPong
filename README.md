@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.16 · Made by **S55OO** with AI assistance.
+> **Version:** 1.29 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -56,8 +56,8 @@ Two tools are provided:
 
   | Footer | Meaning |
   |---|---|
-  | `RUN2: N1MM ne pride sem` | N1MM runs on RUN2 but its broadcast doesn't reach this PC – check the **Broadcast Address** in RUN2's N1MM |
-  | `RUN2: ni N1MM` | PingPong runs on RUN2, but N1MM there isn't broadcasting |
+  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its broadcast doesn't reach this PC – check the **Broadcast Address** in RUN2's N1MM |
+  | `RUN2: no N1MM` | PingPong runs on RUN2, but N1MM there isn't broadcasting |
 
 - Change the port with `--discovery-port`, or turn it off with
   `--no-discovery`. All PCs must use the same discovery port.
@@ -100,8 +100,8 @@ vice versa.
 
 - The key follows the local station automatically when it changes band/mode.
 - The footer lists every station with band, mode and Run/S&P, this PC
-  first, e.g. `14 CW Run (ti) · OO840G3 14 CW S&P · OO840G5 7 SSB Run`.
-  While someone transmits it shows `OO840G3 oddaja · 14 CW S&P`.
+  first, e.g. `14 CW Run (me) · OO840G3 14 CW S&P · OO840G5 7 SSB Run`.
+  While someone transmits it shows `OO840G3 transmitting · 14 CW S&P`.
 - A station on none of these bands/modes is never displayed.
 
 ### Running
@@ -135,7 +135,7 @@ Signal the other operators on your band without transmitting. Turn on
 - Press **F12 while N1MM's window is active** → your call is **on**. Your
   lamp gets a wide (13 px) **blinking** border in your color and the
   footer shows
-  `F12 klic VKLOP (14 MHz) – F12 = izklop`.
+  `F12 call ON (14 MHz) – F12 = off`.
 - Every other PingPong PC that is **on the same band** and in **S&P**
   (N1MM's `IsRunning = False`) **blinks** in your color with
   `F12 · <your station>`, framed by a steady wide border in your color.
@@ -146,7 +146,7 @@ Signal the other operators on your band without transmitting. Turn on
   doesn't block it). F12 in other programs is ignored.
 - The call is sent immediately (normally within a fraction of a second).
 - On a blinking lamp, **click the lamp** to silence that call there
-  (footer: `klik = utišaj`). A new F12 call blinks again.
+  (footer: `click = silence`). A new F12 call blinks again.
 - Only **one lamp per PC** can run (v1.13+); starting a second one just
   says PingPong is already running.
 - Real transmissions still take priority on the lamp.
@@ -160,7 +160,7 @@ on the PCs that should be stopped (saved per PC, off by default).
 
 - While this PC's lamp blinks for an F12 call (same band, S&P), N1MM's
   function keys **F1–F11** are swallowed – only at that time. The lamp
-  shows `BLOKIRANO · F1` and the footer `F-tipke blokirane še 35 s`.
+  shows `BLOCKED · F1` and the footer `F-keys blocked 35 s more`.
   While blocked, the lamp and its border swap colors back and forth
   (lamp lit / border dark, then lamp dark / border lit).
 - All other keys work normally: **Esc**, Enter, letters, F12 and Alt
@@ -168,7 +168,7 @@ on the PCs that should be stopped (saved per PC, off by default).
 - Blocking ends as soon as the caller presses F12 again, or when you
   **click the lamp** (silence), change band, or go to Run – and **by
   itself after 40 s** if the caller forgets (the lamp keeps blinking,
-  footer `blokada potekla`).
+  footer `block expired`).
 - Only works while N1MM is the active window. It does **not** stop mouse
   clicks on N1MM's F-key buttons, microphone PTT, paddle or footswitch –
   it is a guard against accidental key presses, not a hardware
@@ -206,7 +206,7 @@ has on **every** PingPong lamp in the network.
 - If two PCs end up with the same color anyway (e.g. one was offline when
   the other chose), the PC that chose it **first** keeps it. The other
   falls back to an automatic color and its footer shows
-  `barva <color> je zasedena (<PC>)` until you pick another one.
+  `color <color> is taken (<PC>)` until you pick another one.
 - **Automatic** removes the choice. Stations without a chosen color still
   get palette colors as before, but never a color another PC has chosen.
 - Saved per PC in `pingpong.ini`. Only PCs running v1.7 or newer can
