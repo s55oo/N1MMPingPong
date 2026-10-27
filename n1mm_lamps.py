@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.17
+Version: 1.18
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.17"
+__version__ = "1.18"
 
 import argparse
 import base64
@@ -65,6 +65,9 @@ LOCAL_N1MM_RECENT = 10.0
 TEST_FLASH = 1.5
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
+# N1MM may also send its broadcasts to 127.0.0.1; such packets are
+# always from this PC's own N1MM.
+LOOPBACK = {"127.0.0.1"}
 BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets  # seconds on / off when a call (F12) blinks the lamp
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
@@ -354,7 +357,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
 
 def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
-    alert=False, alert_band="", alert_time=0.0,
+    alert=False, alert_band="", alert_time=0.0, status="",
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -368,6 +371,7 @@ def make_hello(
         ("Alert", "1" if alert else "0"),
         ("AlertBand", alert_band or ""),
         ("AlertTime", "{:.3f}".format(alert_time or 0.0)),
+        ("Status", status or ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -398,6 +402,7 @@ def parse_hello(data):
         "alert": get("Alert") == "1",
         "alert_band": get("AlertBand"),
         "alert_time": _float(get("AlertTime")),
+        "status": get("Status"),
     }
 
 
@@ -531,7 +536,7 @@ class DisplayApp:
         self.hints = read_config(config_path)
         self.local_nets = set(local_interfaces())
         self.self_seen = set()
-        self.local = set(self.local_nets)
+        self.local = set(self.local_nets) | LOOPBACK
         self.stations = {}
         self.peers = {}
         self.node_id = base64.b16encode(os.urandom(6)).decode("ascii")
@@ -925,14 +930,14 @@ class DisplayApp:
 
     def on_networks(self, nets):
         self.local_nets = set(ip for ip, _ in nets)
-        self.local = self.local_nets | self.self_seen
+        self.local = self.local_nets | self.self_seen | LOOPBACK
 
     def on_hello(self, src, info):
         if info["id"] == self.node_id:
             # Our own broadcast came back: src is certainly one of our IPs.
             if src not in self.local:
                 self.self_seen.add(src)
-                self.local = self.local_nets | self.self_seen
+                self.local = self.local_nets | self.self_seen | LOOPBACK
             return
         peer = self.peers.get(info["id"])
         if peer is None:
@@ -947,7 +952,39 @@ class DisplayApp:
         peer.alert = info.get("alert", False)
         peer.alert_band = info.get("alert_band", "")
         peer.alert_time = info.get("alert_time", 0.0)
+        status = info.get("status", "")
+        if status != getattr(peer, "status", None):
+            peer.status = status
+            if self.test_on:
+                self._test_write(
+                    "{}  peer {} ({} v{}): {}".format(
+                        time.strftime("%H:%M:%S"), peer.host, src,
+                        peer.version or "?", status or "no status (older than v1.18)",
+                    )
+                )
         peer.last_seen = time.time()
+
+    def _status_text(self):
+        """Short state report sent to the other lamps (for diagnosis)."""
+        mine = self._local_station()
+        if mine is None:
+            n1mm = "N1MM: not heard"
+        else:
+            n1mm = "N1MM {} from {}, {}".format(
+                group_label(mine.key) or "no band/mode",
+                mine.ip,
+                {True: "Run", False: "S&P", None: "Run/S&P unknown"}[mine.running],
+            )
+        calls = [p.host for p in self._incoming_calls(time.time())]
+        return "; ".join([
+            n1mm,
+            "F12 call option " + ("on" if self.f12_on else "off"),
+            "call " + ("ON" if self.alert_on else "off"),
+            "block option " + ("on" if self.block_on else "off"),
+            "keyboard watcher " + ("running" if self.key_watcher is not None else "off"),
+            "calls seen: " + (", ".join(calls) or "none"),
+            "F-keys " + ("BLOCKED" if self._block_active else "free"),
+        ])
 
     def _hello_state(self):
         return {
@@ -957,6 +994,7 @@ class DisplayApp:
             "alert": self.alert_on,
             "alert_band": self._my_band(),
             "alert_time": self.alert_time,
+            "status": self._status_text(),
         }
 
     # ---------------------------------------------------------- colors
