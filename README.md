@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.8 · Made by **S55OO** with AI assistance.
+> **Version:** 1.9 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -46,7 +46,10 @@ Two tools are provided:
   active at the same time. It re-checks every 30 s, so switching networks
   is picked up while running.
 - **PingPong PCs find each other.** Every lamp broadcasts a small
-  `PingPongHello` packet every 3 s on each adapter, on UDP port **12070**
+  `PingPongHello` packet every 3 s on each adapter, on UDP port **46070**
+  (v1.5–v1.8 used 12070, which collides with N1MM's own multi-computer
+  networking and can make N1MM show an `IndexOutOfRangeException` in
+  `MultiOpManager` – update all PCs to v1.9 or newer)
   (separate from 12060, so N1MM and other loggers never see it). A PC that
   runs PingPong but whose N1MM traffic does not reach you shows up in the
   footer:
@@ -106,7 +109,7 @@ Arguments:
 
 ```bat
 python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
-                     [--discovery-port 12070] [--no-discovery]
+                     [--discovery-port 46070] [--no-discovery]
 ```
 
 - `--port` – UDP port (default 12060).
@@ -114,7 +117,7 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
   transmitting station within this time, the lamp turns off (default 5.0).
 - `--config` – path to `lamps.cfg`.
 - `--discovery-port` – UDP port for PingPong-to-PingPong discovery
-  (default 12070, `0` = off).
+  (default 46070, `0` = off).
 - `--no-discovery` – don't send or listen for discovery hellos.
 
 ### Test mode (Options menu, v1.8+)
@@ -141,7 +144,7 @@ has on **every** PingPong lamp in the network.
 
 - Colors already chosen by other PCs running PingPong are greyed out and
   show that PC's name, so two PCs can't pick the same one.
-- The choice is announced in the discovery hello (UDP 12070), so all lamps
+- The choice is announced in the discovery hello (UDP 46070), so all lamps
   use it – it overrides `lamps.cfg` and the order-of-appearance colors.
 - If two PCs end up with the same color anyway (e.g. one was offline when
   the other chose), the PC that chose it **first** keeps it. The other

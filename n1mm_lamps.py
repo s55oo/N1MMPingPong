@@ -21,19 +21,19 @@ its packet and a color from the auto palette.
 Network discovery: all IPv4 adapters of this PC (LAN, Wi-Fi, VPN) are
 enumerated reliably, so the local station is always recognised. PCs
 running PingPong also announce themselves to each other with a small
-hello broadcast on a separate port (12070), so a PC whose N1MM
+hello broadcast on a separate port (46070), so a PC whose N1MM
 broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.8
+Version: 1.9
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
-                         [--discovery-port 12070] [--no-discovery]
+                         [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.8"
+__version__ = "1.9"
 
 import argparse
 import base64
@@ -53,7 +53,10 @@ import pingpong_update as upd
 
 DEFAULT_PORT = 12060
 DEFAULT_STALE = 5.0
-DEFAULT_DISCOVERY_PORT = 12070
+# Keep well away from N1MM's own ports (12060 external broadcast and
+# multi-computer networking, 12070 multi-computer UDP): N1MM tries to
+# parse anything arriving there and throws IndexOutOfRangeException.
+DEFAULT_DISCOVERY_PORT = 46070
 HELLO_INTERVAL = 3.0
 PEER_TIMEOUT = 12.0
 NETWORK_REFRESH = 30.0
