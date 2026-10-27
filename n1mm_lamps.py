@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.30
+Version: 1.31
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.30"
+__version__ = "1.31"
 
 import argparse
 import base64
@@ -1318,6 +1318,11 @@ class DisplayApp:
         frame.pack()
         top = tk.Frame(frame)
         top.pack(fill=tk.X)
+        self.frame, self.top = frame, top
+        self._compact = False
+        self._drag = None
+        # Shift+F: compact mode (no title bar / margins, info on the lamp).
+        self.root.bind("<Key-F>", self._toggle_compact)
         # Shows who is sending on this band right now (empty when idle -
         # the window title already says PingPong).
         self.who = tk.Label(top, text="", font=("Segoe UI", 9, "bold"))
@@ -1348,7 +1353,20 @@ class DisplayApp:
             165, 44, text="—", font=("Segoe UI", 26, "bold"), fill="white"
         )
         self.canvas.bind("<Configure>", self._recenter_text)
-        self.canvas.bind("<Button-1>", self._silence_call)
+        # Left click = silence a call; in compact mode dragging moves the
+        # window. Right click = Options menu.
+        self.canvas.bind("<ButtonPress-1>", self._press)
+        self.canvas.bind("<B1-Motion>", self._motion)
+        self.canvas.bind("<ButtonRelease-1>", self._release)
+        self.canvas.bind("<Button-3>", self._show_options)
+        # Small texts drawn on the lamp itself, used in compact mode.
+        self.c_who = self.canvas.create_text(
+            8, 5, text="", anchor="nw", font=("Segoe UI", 8, "bold"), fill="white"
+        )
+        self.c_info = self.canvas.create_text(
+            165, 84, text="", anchor="s", font=("Segoe UI", 7),
+            fill="white", width=320, justify="center",
+        )
         self.info = tk.Label(
             frame, text="", font=("Segoe UI", 8), justify=tk.CENTER, wraplength=340
         )
@@ -1393,8 +1411,73 @@ class DisplayApp:
                 return owner.host
         return None
 
-    def _recenter_text(self, event):
-        self.canvas.coords(self.text_id, event.width / 2.0, event.height / 2.0)
+    def _recenter_text(self, event=None):
+        w = event.width if event else self.canvas.winfo_width()
+        h = event.height if event else self.canvas.winfo_height()
+        # In compact mode the status line sits on the lamp: lift the text.
+        lift = 9 if self._compact else 0
+        self.canvas.coords(self.text_id, w / 2.0, h / 2.0 - lift)
+        event = event or type("E", (), {"width": w, "height": h})()
+        self.canvas.coords(self.c_info, event.width / 2.0, event.height - 3)
+        self.canvas.itemconfigure(self.c_info, width=max(50, event.width - 16))
+
+    # ---------------------------------------------------------- compact mode
+
+    def _toggle_compact(self, event=None):
+        """Shift+F: lamp only, no title bar or margins, info drawn on the
+        lamp; Shift+F again: normal window. Same size and place."""
+        x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
+        self._compact = not self._compact
+        if self._compact:
+            self.top.pack_forget()
+            self.info.pack_forget()
+            self.frame.configure(padx=0, pady=0)
+            self.root.overrideredirect(True)
+            self.root.geometry("+{}+{}".format(x, y))
+        else:
+            self.root.overrideredirect(False)
+            self.canvas.pack_forget()
+            self.frame.configure(padx=6, pady=4)
+            self.top.pack(fill=tk.X)
+            self.canvas.pack(fill=tk.X)
+            self.info.pack(fill=tk.X)
+            self.root.geometry("+{}+{}".format(x, y))
+        self.root.attributes("-topmost", True)
+        self.root.focus_force()
+        self._recenter_text()
+        self._sync_compact()
+        return "break"
+
+    def _sync_compact(self):
+        """Mirror the sender name and status line onto the lamp."""
+        who = self.who.cget("text") if self._compact else ""
+        info = self.info.cget("text") if self._compact else ""
+        fg = self.text_on(self.canvas.cget("bg"))
+        for item, text in ((self.c_who, who), (self.c_info, info)):
+            if self.canvas.itemcget(item, "text") != text:
+                self.canvas.itemconfigure(item, text=text)
+            if self.canvas.itemcget(item, "fill") != fg:
+                self.canvas.itemconfigure(item, fill=fg)
+
+    def _press(self, event):
+        self.root.focus_force()  # so Shift+F works after a click
+        self._drag = (event.x_root, event.y_root,
+                      self.root.winfo_x(), self.root.winfo_y(), False)
+
+    def _motion(self, event):
+        if not self._compact or self._drag is None:
+            return
+        x0, y0, wx, wy, _ = self._drag
+        dx, dy = event.x_root - x0, event.y_root - y0
+        if abs(dx) + abs(dy) > 3:
+            self._drag = (x0, y0, wx, wy, True)
+            self.root.geometry("+{}+{}".format(wx + dx, wy + dy))
+
+    def _release(self, event):
+        moved = self._drag is not None and self._drag[4]
+        self._drag = None
+        if not moved:
+            self._silence_call()
 
     def _open_help(self):
         try:
@@ -1489,6 +1572,7 @@ class DisplayApp:
             rows = "  ·  ".join(parts) if parts else "waiting for N1MM…"
             self.info.configure(text=header + rows)
 
+        self._sync_compact()
         self.root.after(120, self._update)
 
     def _local_station(self):

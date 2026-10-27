@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.30 · Made by **S55OO** with AI assistance.
+> **Version:** 1.31 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -79,6 +79,19 @@ What N1MM reports – and therefore what PingPong can show:
   a second one just says PingPong is already running.
 - **Options ▾** (top-right) holds all settings; the **help icon** next to
   it opens this page.
+- **Right-click the lamp** also opens the Options menu.
+
+### Compact mode (Shift+F)
+
+Click the lamp and press **Shift+F**: the title bar, the top row and the
+gray margins disappear – only the lamp is left, same size and place. The
+sender's name is shown small in the lamp's top-left corner and the status
+line along its bottom, so no information is lost.
+
+- **Drag the lamp** with the mouse to move it.
+- **Right-click** for the Options menu; a plain click still silences an
+  F12 call.
+- **Shift+F** again brings back the normal window.
 
 ### Band + mode group
 
