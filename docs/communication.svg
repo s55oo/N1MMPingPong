@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c07a00"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#777"/>
+    </marker>
+  </defs>
+  <rect width="960" height="500" fill="#ffffff"/>
+  <text x="480" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#222">PingPong – communication</text>
+
+  <!-- PC 1 -->
+  <rect x="20" y="52" width="330" height="352" rx="12" fill="#f5f7fb" stroke="#9aa6bd"/>
+  <text x="185" y="76" text-anchor="middle" font-size="14" font-weight="700" fill="#333">PC 1 · RUN1 (OO840G4)</text>
+  <rect x="120" y="92" width="190" height="52" rx="8" fill="#dbe8ff" stroke="#4a6fb5"/>
+  <text x="215" y="123" text-anchor="middle" font-size="14" font-weight="600">N1MM Logger+</text>
+  <rect x="120" y="196" width="190" height="88" rx="8" fill="#ffe7a8" stroke="#c07a00"/>
+  <text x="215" y="236" text-anchor="middle" font-size="14" font-weight="600">PingPong lamp</text>
+  <text x="215" y="256" text-anchor="middle" font-size="11" fill="#555">name · color · F12 call</text>
+  <rect x="120" y="336" width="190" height="44" rx="22" fill="#eeeeee" stroke="#888"/>
+  <text x="215" y="363" text-anchor="middle" font-size="13">Keyboard</text>
+  <line x1="215" y1="336" x2="215" y2="288" stroke="#333" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="222" y="316" font-size="11" fill="#333">F12, F-keys</text>
+  <line x1="150" y1="196" x2="150" y2="148" stroke="#777" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#g)"/>
+  <text x="44" y="168" font-size="11" fill="#555">keys passed on</text>
+  <text x="44" y="182" font-size="11" fill="#555">(F1–F11 blocked</text>
+  <text x="44" y="196" font-size="11" fill="#555"> during a call)</text>
+
+  <!-- PC 2 -->
+  <rect x="610" y="52" width="330" height="352" rx="12" fill="#f5f7fb" stroke="#9aa6bd"/>
+  <text x="775" y="76" text-anchor="middle" font-size="14" font-weight="700" fill="#333">PC 2 · RUN2 (OO840G3)</text>
+  <rect x="650" y="92" width="190" height="52" rx="8" fill="#dbe8ff" stroke="#4a6fb5"/>
+  <text x="745" y="123" text-anchor="middle" font-size="14" font-weight="600">N1MM Logger+</text>
+  <rect x="650" y="196" width="190" height="88" rx="8" fill="#ffe7a8" stroke="#c07a00"/>
+  <text x="745" y="236" text-anchor="middle" font-size="14" font-weight="600">PingPong lamp</text>
+  <text x="745" y="256" text-anchor="middle" font-size="11" fill="#555">name · color · F12 call</text>
+  <rect x="650" y="336" width="190" height="44" rx="22" fill="#eeeeee" stroke="#888"/>
+  <text x="745" y="363" text-anchor="middle" font-size="13">Keyboard</text>
+  <line x1="745" y1="336" x2="745" y2="288" stroke="#333" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="752" y="316" font-size="11" fill="#333">F12, F-keys</text>
+  <line x1="810" y1="196" x2="810" y2="148" stroke="#777" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#g)"/>
+  <text x="818" y="168" font-size="11" fill="#555">keys passed on</text>
+  <text x="818" y="182" font-size="11" fill="#555">(F1–F11 blocked</text>
+  <text x="818" y="196" font-size="11" fill="#555"> during a call)</text>
+
+  <!-- LAN bus -->
+  <rect x="440" y="88" width="80" height="300" rx="14" fill="#e3f4e3" stroke="#3d8b3d" stroke-width="1.5"/>
+  <text x="480" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#2c6e2c">LAN</text>
+  <text x="480" y="238" text-anchor="middle" font-size="11" fill="#2c6e2c">Wi-Fi / VPN</text>
+  <text x="480" y="262" text-anchor="middle" font-size="10" fill="#2c6e2c">broadcast</text>
+  <text x="480" y="276" text-anchor="middle" font-size="10" fill="#2c6e2c">x.x.x.255</text>
+
+  <!-- N1MM -> LAN (12060) -->
+  <line x1="310" y1="112" x2="438" y2="112" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
+  <text x="374" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="374" y="128" text-anchor="middle" font-size="10" fill="#555">RadioInfo …</text>
+  <line x1="650" y1="112" x2="522" y2="112" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
+  <text x="586" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="586" y="128" text-anchor="middle" font-size="10" fill="#555">RadioInfo …</text>
+
+  <!-- LAN -> lamps (12060) -->
+  <line x1="440" y1="214" x2="312" y2="214" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
+  <text x="374" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <line x1="520" y1="214" x2="648" y2="214" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
+  <text x="586" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+
+  <!-- lamps <-> LAN (46070) -->
+  <line x1="312" y1="266" x2="438" y2="266" stroke="#c07a00" stroke-width="2.4" marker-start="url(#b)" marker-end="url(#b)"/>
+  <text x="374" y="259" text-anchor="middle" font-size="11" font-weight="600" fill="#a06000">UDP 46070</text>
+  <text x="374" y="283" text-anchor="middle" font-size="10" fill="#a06000">PingPongHello</text>
+  <line x1="522" y1="266" x2="648" y2="266" stroke="#c07a00" stroke-width="2.4" marker-start="url(#b)" marker-end="url(#b)"/>
+  <text x="586" y="259" text-anchor="middle" font-size="11" font-weight="600" fill="#a06000">UDP 46070</text>
+  <text x="586" y="283" text-anchor="middle" font-size="10" fill="#a06000">PingPongHello</text>
+
+  <!-- GitHub -->
+  <rect x="390" y="430" width="180" height="50" rx="8" fill="#f0f0f0" stroke="#555"/>
+  <text x="480" y="452" text-anchor="middle" font-size="13" font-weight="600">GitHub releases</text>
+  <text x="480" y="469" text-anchor="middle" font-size="10" fill="#555">HTTPS · updates only</text>
+  <path d="M 260 284 Q 260 455 386 455" fill="none" stroke="#777" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#g)"/>
+  <path d="M 700 284 Q 700 455 574 455" fill="none" stroke="#777" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#g)"/>
+</svg>

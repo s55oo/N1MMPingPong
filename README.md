@@ -16,6 +16,12 @@ On top of that the lamps talk to each other, so operators can:
   and optionally **block their F-keys** while the call is on;
 - **update** all PCs from GitHub, and switch back to an older version.
 
+How the PCs, lamps and N1MM talk to each other – ports, messages, the
+F12 call step by step, updates – is described with diagrams in
+**[docs/COMMUNICATION.md](docs/COMMUNICATION.md)**.
+
+![PingPong communication overview](docs/communication.svg)
+
 Two tools are provided:
 
 | File | What it is |
@@ -353,6 +359,8 @@ help.png            – help icon (embedded in the lamp)
 PingPong.png        – screenshot
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
+docs/COMMUNICATION.md – how it communicates (diagrams)
+docs/communication.svg – overview diagram
 .github/workflows/build-exe.yml – automatic build and release
 ```
 

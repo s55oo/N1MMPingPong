@@ -54,12 +54,12 @@ DEFAULT_STALE = 5.0
 # multi-computer networking, 12070 multi-computer UDP): N1MM tries to
 # parse anything arriving there and throws IndexOutOfRangeException.
 DEFAULT_DISCOVERY_PORT = 46070
-HELLO_INTERVAL = 3.0
-PEER_TIMEOUT = 12.0
-NETWORK_REFRESH = 30.0
-LOCAL_N1MM_RECENT = 10.0
+HELLO_INTERVAL = 3.0  # s: lamp-to-lamp hello (sent at once on F12 / name change)
+PEER_TIMEOUT = 12.0  # s: a lamp not heard this long is gone
+NETWORK_REFRESH = 30.0  # s: re-read this PC's network adapters
+LOCAL_N1MM_RECENT = 10.0  # s: own N1MM counts as running if heard this recently
 TEST_LOG = "pingpong_test.log"
-BLINK_HALF = 0.4
+BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
 MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
@@ -67,7 +67,7 @@ STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
-BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets  # seconds on / off when a call (F12) blinks the lamp
+BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
