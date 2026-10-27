@@ -95,8 +95,10 @@ Example: PC1, PC2, PC3 on 14 MHz CW → colors alternate nicely. If PC4 is on
 e.g. 7 MHz CW, its transmissions are **never** shown in this window, and
 vice versa.
 
-- The key follows the local station automatically when it changes band/mode
-  (the footer shows `watching 14 CW`).
+- The key follows the local station automatically when it changes band/mode.
+- The footer lists every station with band, mode and Run/S&P, this PC
+  first, e.g. `14 CW Run (ti) · OO840G3 14 CW S&P · OO840G5 7 SSB Run`.
+  While someone transmits it shows `OO840G3 oddaja · 14 CW S&P`.
 - A station on none of these bands/modes is never displayed.
 
 ### Running

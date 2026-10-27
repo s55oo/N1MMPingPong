@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.20
+Version: 1.21
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.20"
+__version__ = "1.21"
 
 import argparse
 import base64
@@ -64,6 +64,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
+STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
@@ -1147,6 +1148,32 @@ class DisplayApp:
                 rows.append("{}: ni N1MM".format(peer.host))
         return rows
 
+    def _station_state(self, st):
+        """'14 CW Run' - band, mode and Run/S&P of a station."""
+        where = group_label(st.key) or (
+            "{} {}".format(band_of(st.freq) or "?", st.mode).strip() if st.mode else "?"
+        )
+        role = {True: "Run", False: "S&P"}.get(st.running, "")
+        return "{} {}".format(where, role).strip()
+
+    def _station_rows(self, now):
+        """One entry per station (newest per name), this PC's first."""
+        newest = {}
+        for st in list(self.stations.values()):
+            if now - st.last_seen > STATION_FORGET:
+                continue
+            name = (st.label or st.ip).lower()
+            if name not in newest or st.last_seen > newest[name].last_seen:
+                newest[name] = st
+        mine = [st for st in newest.values() if st.ip in self.local]
+        others = sorted(
+            (st for st in newest.values() if st.ip not in self.local),
+            key=lambda st: st.label.lower(),
+        )
+        rows = ["{} (ti)".format(self._station_state(st)) for st in mine[:1]]
+        rows += ["{} {}".format(st.label, self._station_state(st)) for st in others]
+        return rows
+
     def _is_tracked(self, station):
         return bool(self.tracked) and station.key == self.tracked
 
@@ -1183,7 +1210,9 @@ class DisplayApp:
         )
         self.canvas.bind("<Configure>", self._recenter_text)
         self.canvas.bind("<Button-1>", self._silence_call)
-        self.info = tk.Label(frame, text="", font=("Segoe UI", 8), justify=tk.CENTER)
+        self.info = tk.Label(
+            frame, text="", font=("Segoe UI", 8), justify=tk.CENTER, wraplength=340
+        )
         self.info.pack(fill=tk.X)
 
     def _recenter_text(self, event):
@@ -1251,8 +1280,8 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text=shown)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
             self.info.configure(
-                text="{}  ({})  oddaja  ·  {} paketov".format(
-                    active.label, active.ip, active.count
+                text="{} oddaja  ·  {}".format(
+                    active.label, self._station_state(active)
                 )
             )
         else:
@@ -1261,7 +1290,7 @@ class DisplayApp:
             if self.canvas.itemcget(self.text_id, "text") != "—":
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
-            header = "spremljam {} · ".format(group_label(self.tracked) or "nezano")
+            header = ""
             if self.alert_on:
                 header = "F12 klic VKLOP ({} MHz) – F12 = izklop  ·  ".format(
                     self._my_band() or "?"
@@ -1271,12 +1300,9 @@ class DisplayApp:
                 header = note + "  ·  " + header
             if self._status:
                 header = self._status + "  ·  " + header
-            parts = [
-                "{}: {}".format(st.label, st.count)
-                for st in list(self.stations.values())
-            ]
+            parts = self._station_rows(now)
             parts.extend(self._peer_rows(now))
-            rows = "  |  ".join(parts) if parts else "ni podatkov"
+            rows = "  ·  ".join(parts) if parts else "čakam na N1MM…"
             self.info.configure(text=header + rows)
 
         self.root.after(120, self._update)
