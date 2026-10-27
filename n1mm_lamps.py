@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.26
+Version: 1.27
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.26"
+__version__ = "1.27"
 
 import argparse
 import base64
@@ -1322,7 +1322,9 @@ class DisplayApp:
         frame.pack()
         top = tk.Frame(frame)
         top.pack(fill=tk.X)
-        tk.Label(top, text="PingPong", font=("Segoe UI", 8, "bold")).pack(side=tk.LEFT)
+        # Shows who is sending on this band right now ("PingPong" when idle).
+        self.who = tk.Label(top, text="PingPong", font=("Segoe UI", 9, "bold"))
+        self.who.pack(side=tk.LEFT)
         self.help_icon = tk.PhotoImage(
             data=base64.b64decode(HELP_ICON_B64.encode("ascii"))
         )
@@ -1370,6 +1372,10 @@ class DisplayApp:
             return "white"
         r, g, b = rgb
         return "black" if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else "white"
+
+    def _set_who(self, text):
+        if self.who.cget("text") != text:
+            self.who.configure(text=text)
 
     def _set_bg(self, bg):
         """Lamp background + matching text color."""
@@ -1444,6 +1450,14 @@ class DisplayApp:
 
         if not calls:
             self._shown_call = None
+        if calls:
+            caller = calls[-1]
+            st_ = self._peer_station(caller)
+            self._set_who("F12: " + (st_.label if st_ is not None else caller.host))
+        elif active is not None:
+            self._set_who(active.label)
+        else:
+            self._set_who("PingPong")
         if calls:
             self._show_call(calls[-1], owners, now)
         elif active is not None:

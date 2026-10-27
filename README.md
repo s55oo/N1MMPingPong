@@ -79,6 +79,9 @@ Two tools are provided:
 - The window shows the text of the last pressed function key (the `Fx`
   prefix is stripped).
 - The window is always on top (`topmost`).
+- The top-left corner shows **who is sending on this band right now**
+  (e.g. `OO840G3`), `F12: <PC>` during an F12 call, and `PingPong` when
+  nobody is sending.
 - A small **help icon** (top-right) opens this documentation in your default
   browser.
 
