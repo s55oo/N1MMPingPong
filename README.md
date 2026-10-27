@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.10 · Made by **S55OO** with AI assistance.
+> **Version:** 1.11 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -88,7 +88,8 @@ The window shows **only transmissions from stations on the same band and
 mode as the local computer** (the one running the window):
 
 - Bands: **1.8, 3.5, 7, 14, 21, 28** MHz
-- Modes: **CW, RTTY, USB, LSB**
+- Modes: **CW, RTTY, SSB** (N1MM may report phone as `SSB`, `USB` or
+  `LSB` – all count as SSB)
 
 Example: PC1, PC2, PC3 on 14 MHz CW → colors alternate nicely. If PC4 is on
 e.g. 7 MHz CW, its transmissions are **never** shown in this window, and

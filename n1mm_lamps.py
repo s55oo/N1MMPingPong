@@ -9,7 +9,7 @@ removed).
 
 Group key: only stations on the same band and mode as the local
 computer (running this window) are shown together. Bands 1.8, 3.5,
-7, 14, 21, 28 MHz; modes CW, RTTY, USB, LSB. A station on another
+7, 14, 21, 28 MHz; modes CW, RTTY, SSB (USB/LSB). A station on another
 band/mode is never shown in this window, so separate radios do not
 clash with each other.
 
@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.10
+Version: 1.11
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.10"
+__version__ = "1.11"
 
 import argparse
 import base64
@@ -89,7 +89,10 @@ BANDS = [
     (21.0, 21.45, "21"),
     (28.0, 29.7, "28"),
 ]
-MODES_ALLOWED = {"CW", "RTTY", "USB", "LSB"}
+MODES_ALLOWED = {"CW", "RTTY", "SSB"}
+# N1MM reports phone as "SSB" (seen in RadioInfo) or USB/LSB depending on
+# radio/setup; all of them are one group so stations always match.
+MODE_ALIASES = {"USB": "SSB", "LSB": "SSB"}
 
 FONT_SIZES = [(4, 26), (8, 22), (12, 18), (9999, 16)]
 
@@ -107,6 +110,7 @@ def band_of(freq_str):
 
 def group_of(freq, mode):
     band = band_of(freq)
+    mode = MODE_ALIASES.get(mode, mode)
     if not band or mode not in MODES_ALLOWED:
         return None
     return band, mode
