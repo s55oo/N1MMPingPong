@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.11 · Made by **S55OO** with AI assistance.
+> **Version:** 1.12 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -120,6 +120,28 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - `--discovery-port` – UDP port for PingPong-to-PingPong discovery
   (default 46070, `0` = off).
 - `--no-discovery` – don't send or listen for discovery hellos.
+
+### F12 call (Options menu, v1.12+)
+
+Signal the other operators on your band without transmitting. Turn on
+**Options ▾ → F12 call – blink S&P stations on my band** on every PC
+(saved per PC).
+
+- Press **F12 while N1MM's window is active** → your call is **on**. Your
+  lamp gets a thick border in your color and the footer shows
+  `F12 klic VKLOP (14 MHz) – F12 = izklop`.
+- Every other PingPong PC that is **on the same band** and in **S&P**
+  (N1MM's `IsRunning = False`) **blinks** in your color with
+  `F12 · <your station>`.
+- Press **F12 again** → the call is off and the blinking stops. It also
+  stops if your lamp closes, or when the other PC changes band or goes
+  to Run.
+- N1MM still receives F12 normally (PingPong only watches the key; it
+  doesn't block it). F12 in other programs is ignored.
+- The call is sent immediately (normally within a fraction of a second).
+- Real transmissions still take priority on the lamp.
+- If N1MM runs **as administrator**, PingPong must too (Windows hides
+  key presses of elevated programs from normal ones).
 
 ### Test mode (Options menu, v1.8+)
 
@@ -289,6 +311,7 @@ PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
 help.png         – help icon shown in the lamp window (embedded in the exe)
 pingpong_update.py – self-update / switch-version logic (built into the exe)
+pingpong_keys.py – F12 key watcher for the F12 call (built into the exe)
 pingpong.ini     – per-PC settings: chosen color, updates (created when changed)
 n1mm_lamps.vX.exe – backup kept by the updater for "Revert"
 n1mm_lamps.spec  – last PyInstaller build settings

@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.11
+Version: 1.12
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.11"
+__version__ = "1.12"
 
 import argparse
 import base64
@@ -49,6 +49,7 @@ import webbrowser
 import xml.etree.ElementTree as ET
 from tkinter import messagebox
 
+import pingpong_keys as keys
 import pingpong_update as upd
 
 DEFAULT_PORT = 12060
@@ -63,6 +64,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_FLASH = 1.5
 TEST_LOG = "pingpong_test.log"
+BLINK_HALF = 0.4  # seconds on / off when a call (F12) blinks the lamp
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -126,6 +128,14 @@ def clean_caption(caption):
     caption = caption.strip()
     cleaned = re.sub(r"^\s*F\d+\s*", "", caption).strip()
     return cleaned or caption
+
+
+def radio_running(data):
+    """IsRunning from a RadioInfo packet: True = Run, False = S&P, None = n/a."""
+    m = re.search(rb"<IsRunning>\s*(\w+)\s*</IsRunning>", data)
+    if not m:
+        return None
+    return m.group(1).lower() == b"true"
 
 
 def packet_info(data):
@@ -341,7 +351,10 @@ def listener_loop(bind_ip, port, on_packet, stop):
         pass
 
 
-def make_hello(node_id, host, ips, local_n1mm, color="", color_time=0.0):
+def make_hello(
+    node_id, host, ips, local_n1mm, color="", color_time=0.0,
+    alert=False, alert_band="", alert_time=0.0,
+):
     root = ET.Element("PingPongHello")
     for tag, value in (
         ("Id", node_id),
@@ -351,6 +364,9 @@ def make_hello(node_id, host, ips, local_n1mm, color="", color_time=0.0):
         ("LocalN1MM", "true" if local_n1mm else "false"),
         ("Color", color or ""),
         ("ColorTime", "{:.3f}".format(color_time or 0.0)),
+        ("Alert", "1" if alert else "0"),
+        ("AlertBand", alert_band or ""),
+        ("AlertTime", "{:.3f}".format(alert_time or 0.0)),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -378,6 +394,9 @@ def parse_hello(data):
         "local_n1mm": get("LocalN1MM").lower() == "true",
         "color": get("Color"),
         "color_time": _float(get("ColorTime")),
+        "alert": get("Alert") == "1",
+        "alert_band": get("AlertBand"),
+        "alert_time": _float(get("AlertTime")),
     }
 
 
@@ -395,7 +414,9 @@ def _sender_socket(ip):
     return sock
 
 
-def discovery_loop(port, node_id, get_state, on_networks, on_hello, stop):
+def discovery_loop(
+    port, node_id, get_state, on_networks, on_hello, stop, hello_now=None
+):
     """Active discovery between PCs running PingPong.
 
     Every HELLO_INTERVAL seconds a small PingPongHello packet is broadcast
@@ -432,6 +453,9 @@ def discovery_loop(port, node_id, get_state, on_networks, on_hello, stop):
                         pass
             on_networks(nets)
             next_refresh = now + NETWORK_REFRESH
+        if hello_now is not None and hello_now.is_set():
+            hello_now.clear()  # e.g. F12 pressed: announce right away
+            next_hello = 0.0
         if now >= next_hello:
             payload = make_hello(
                 node_id, host, [ip for ip, _ in nets], **get_state()
@@ -475,6 +499,9 @@ class Peer:
         self.local_n1mm = False
         self.color = ""
         self.color_time = 0.0
+        self.alert = False
+        self.alert_band = ""
+        self.alert_time = 0.0
         self.last_seen = 0.0
 
 
@@ -491,6 +518,7 @@ class Station:
         self.freq = ""
         self.mode = ""
         self.key = None
+        self.running = None  # True = Run, False = S&P, None = unknown
 
 
 class DisplayApp:
@@ -517,6 +545,11 @@ class DisplayApp:
         )
         # Test mode is deliberately not saved: it always starts off.
         self.var_test = tk.BooleanVar(value=False)
+        self.var_keys = tk.BooleanVar(value=self.settings.get("f12_call", False))
+        self.key_watcher = None
+        self.alert_on = False
+        self.alert_time = 0.0
+        self.hello_now = threading.Event()
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
         self.my_color = self.settings.get_text("station", "color", "")
@@ -545,12 +578,15 @@ class DisplayApp:
                     self.on_networks,
                     self.on_hello,
                     self.stop,
+                    self.hello_now,
                 ),
                 daemon=True,
             )
             self.discovery.start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
+        if self.var_keys.get() and keys.supported():
+            self.root.after(500, self._keys_toggled)
         if upd.is_frozen():
             upd.cleanup_leftovers(upd.exe_path())
             if self.var_check.get():
@@ -580,6 +616,11 @@ class DisplayApp:
             label="Test mode – show my button presses",
             variable=self.var_test,
             command=self._test_toggled,
+        )
+        menu.add_checkbutton(
+            label="F12 call – blink S&P stations on my band",
+            variable=self.var_keys,
+            command=self._keys_toggled,
         )
         menu.add_separator()
         frozen = upd.is_frozen()
@@ -849,6 +890,9 @@ class DisplayApp:
         if not station.label or station.label == station.ip:
             station.label = station_name or station.label
         if is_radio:
+            running = radio_running(data)
+            if running is not None:
+                station.running = running
             station.tx = is_tx
             station.last_seen = time.time()
             if caption:
@@ -884,6 +928,9 @@ class DisplayApp:
         peer.local_n1mm = info["local_n1mm"]
         peer.color = info.get("color", "")
         peer.color_time = info.get("color_time", 0.0)
+        peer.alert = info.get("alert", False)
+        peer.alert_band = info.get("alert_band", "")
+        peer.alert_time = info.get("alert_time", 0.0)
         peer.last_seen = time.time()
 
     def _hello_state(self):
@@ -891,6 +938,9 @@ class DisplayApp:
             "local_n1mm": self._local_n1mm_active(),
             "color": self.my_color,
             "color_time": self.my_color_time,
+            "alert": self.alert_on,
+            "alert_band": self._my_band(),
+            "alert_time": self.alert_time,
         }
 
     # ---------------------------------------------------------- colors
@@ -1110,11 +1160,15 @@ class DisplayApp:
                 latest = station.last_seen
                 active = station
 
+        calls = self._incoming_calls(now) if active is None else []
         test = None
-        if active is None and self.var_test.get():
+        if active is None and not calls and self.var_test.get():
             test = self._local_station()
+        self._show_my_call(owners, now)
 
-        if test is not None:
+        if calls:
+            self._show_call(calls[-1], owners, now)
+        elif test is not None:
             self._show_test(test, owners, now)
         elif active is not None:
             color = self._color_for(active, owners, now) or "red"
@@ -1136,6 +1190,10 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
             header = "spremljam {} · ".format(group_label(self.tracked) or "nezano")
+            if self.alert_on:
+                header = "F12 klic VKLOP ({} MHz) – F12 = izklop  ·  ".format(
+                    self._my_band() or "?"
+                ) + header
             note = self._my_color_note(owners)
             if note:
                 header = note + "  ·  " + header
@@ -1230,7 +1288,111 @@ class DisplayApp:
             )
         )
 
+    # ---------------------------------------------------------- F12 call
+
+    def _start_keys(self):
+        if self.key_watcher is not None:
+            return True
+        watcher = keys.KeyWatcher(self._f12_pressed)
+        if not watcher.start():
+            messagebox.showerror(
+                "PingPong",
+                "F12 call is not available:\n{}".format(watcher.error),
+                parent=self.root,
+            )
+            return False
+        self.key_watcher = watcher
+        return True
+
+    def _keys_toggled(self):
+        on = bool(self.var_keys.get())
+        if on and not self._start_keys():
+            self.var_keys.set(False)
+            on = False
+        if not on:
+            if self.key_watcher is not None:
+                self.key_watcher.stop()
+                self.key_watcher = None
+            if self.alert_on:
+                self.alert_on = False
+                self.alert_time = time.time()
+                self.hello_now.set()
+        self.settings.set("f12_call", on)
+
+    def _f12_pressed(self):
+        """Keyboard thread: F12 in N1MM toggles this PC's call."""
+        self.alert_on = not self.alert_on
+        self.alert_time = time.time()
+        self.hello_now.set()
+        if self.test_on:
+            self._test_write(
+                "{}  F12 key  call {}".format(
+                    time.strftime("%H:%M:%S"), "ON" if self.alert_on else "OFF"
+                )
+            )
+
+    def _my_band(self):
+        mine = self._local_station()
+        return mine.key[0] if mine is not None and mine.key else ""
+
+    def _incoming_calls(self, now):
+        """Peers calling (F12) on this PC's band while this PC is in S&P."""
+        mine = self._local_station()
+        if mine is None or not mine.key or mine.running is True:
+            return []
+        band = mine.key[0]
+        calls = [
+            p for p in self._fresh_peers(now)
+            if p.alert and p.alert_band == band
+        ]
+        return sorted(calls, key=lambda p: p.alert_time)
+
+    def _peer_station(self, peer):
+        for st in list(self.stations.values()):
+            if st.ip in peer.ips:
+                return st
+        return None
+
+    def _show_call(self, peer, owners, now):
+        station = self._peer_station(peer)
+        if peer.color and owners.get(peer.color.lower()) is peer:
+            color = peer.color
+        elif station is not None:
+            color = self._color_for(station, owners, now) or "red"
+        else:
+            color = "red"
+        name = station.label if station is not None else peer.host
+        lit = int(now / BLINK_HALF) % 2 == 0
+        bg = color if lit else COLOR_IDLE
+        shown = "F12 · {}".format(name)
+        if self.canvas.cget("bg") != bg:
+            self.canvas.configure(bg=bg)
+        if self.canvas.itemcget(self.text_id, "text") != shown:
+            self.canvas.itemconfigure(self.text_id, text=shown)
+            self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
+        self.info.configure(
+            text="{} kliče (F12)  ·  {} MHz  ·  S&P".format(peer.host, peer.alert_band)
+        )
+
+    def _show_my_call(self, owners, now):
+        """Own feedback while my call is on: thick border in my color."""
+        if self.alert_on:
+            mine = self._local_station()
+            color = (self._color_for(mine, owners, now) if mine else "") or "red"
+            want = (color, "4")
+        else:
+            want = ("#888888", "1")
+        if (
+            self.canvas.cget("highlightbackground") != want[0]
+            or str(self.canvas.cget("highlightthickness")) != want[1]
+        ):
+            self.canvas.configure(
+                highlightbackground=want[0], highlightthickness=int(want[1])
+            )
+
     def on_close(self):
+        if self.key_watcher is not None:
+            self.key_watcher.stop()
         self.stop.set()
         self.root.destroy()
 
