@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.21
+Version: 1.22
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.21"
+__version__ = "1.22"
 
 import argparse
 import base64
@@ -64,6 +64,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
+CALL_BORDER = 10  # px: width of the F12 call border around the lamp
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
@@ -1201,9 +1202,11 @@ class DisplayApp:
             width=330,
             height=88,
             bg=COLOR_IDLE,
-            highlightthickness=1,
-            highlightbackground="#888888",
+            highlightthickness=CALL_BORDER,
+            highlightbackground=self.root.cget("bg"),
+            highlightcolor=self.root.cget("bg"),
         )
+        self._window_bg = self.root.cget("bg") or "SystemButtonFace"
         self.canvas.pack(fill=tk.X)
         self.text_id = self.canvas.create_text(
             165, 44, text="—", font=("Segoe UI", 20, "bold"), fill="white"
@@ -1265,7 +1268,7 @@ class DisplayApp:
         self._block_active = block
         self._had_calls = bool(all_calls)
         calls = all_calls if active is None else []
-        self._show_my_call(owners, now)
+        self._show_border(owners, now, all_calls)
 
         if not calls:
             self._shown_call = None
@@ -1462,12 +1465,7 @@ class DisplayApp:
     def _show_call(self, peer, owners, now):
         self._shown_call = peer
         station = self._peer_station(peer)
-        if peer.color and owners.get(peer.color.lower()) is peer:
-            color = peer.color
-        elif station is not None:
-            color = self._color_for(station, owners, now) or "red"
-        else:
-            color = "red"
+        color = self._call_color(peer, owners, now)
         name = station.label if station is not None else peer.host
         lit = int(now / BLINK_HALF) % 2 == 0
         bg = color if lit else COLOR_IDLE
@@ -1496,21 +1494,32 @@ class DisplayApp:
             return "F-tipke blokirane še {} s  ·  ".format(int(left + 0.999))
         return "blokada potekla  ·  "
 
-    def _show_my_call(self, owners, now):
-        """Own feedback while my call is on: thick border in my color."""
+    def _call_color(self, peer, owners, now):
+        station = self._peer_station(peer)
+        if peer.color and owners.get(peer.color.lower()) is peer:
+            return peer.color
+        if station is not None:
+            return self._color_for(station, owners, now) or "red"
+        return "red"
+
+    def _show_border(self, owners, now, calls):
+        """Wide border for F12 calls (same width always, so the window
+        never changes size; invisible when there is no call).
+
+        - my own call on: border in my color, blinking;
+        - a call received here: border in the caller's color, steady.
+        """
         if self.alert_on:
             mine = self._local_station()
             color = (self._color_for(mine, owners, now) if mine else "") or "red"
-            want = (color, "4")
+            lit = int(now / BLINK_HALF) % 2 == 0
+            want = color if lit else self._window_bg
+        elif calls:
+            want = self._call_color(calls[-1], owners, now)
         else:
-            want = ("#888888", "1")
-        if (
-            self.canvas.cget("highlightbackground") != want[0]
-            or str(self.canvas.cget("highlightthickness")) != want[1]
-        ):
-            self.canvas.configure(
-                highlightbackground=want[0], highlightthickness=int(want[1])
-            )
+            want = self._window_bg
+        if self.canvas.cget("highlightbackground") != want:
+            self.canvas.configure(highlightbackground=want, highlightcolor=want)
 
     def on_close(self):
         if self.key_watcher is not None:
