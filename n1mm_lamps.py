@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.29
+Version: 1.30
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.29"
+__version__ = "1.30"
 
 import argparse
 import base64
@@ -191,7 +191,7 @@ MODES_ALLOWED = {"CW", "RTTY", "SSB"}
 # radio/setup; all of them are one group so stations always match.
 MODE_ALIASES = {"USB": "SSB", "LSB": "SSB"}
 
-FONT_SIZES = [(4, 26), (8, 22), (12, 18), (9999, 16)]
+FONT_SIZES = [(4, 34), (8, 29), (12, 23), (9999, 21)]  # +30 % (v1.30)
 
 
 def band_of(freq_str):
@@ -1349,7 +1349,7 @@ class DisplayApp:
         self._window_bg = self.root.cget("bg") or "SystemButtonFace"
         self.canvas.pack(fill=tk.X)
         self.text_id = self.canvas.create_text(
-            165, 44, text="—", font=("Segoe UI", 20, "bold"), fill="white"
+            165, 44, text="—", font=("Segoe UI", 26, "bold"), fill="white"
         )
         self.canvas.bind("<Configure>", self._recenter_text)
         self.canvas.bind("<Button-1>", self._silence_call)
@@ -1411,7 +1411,7 @@ class DisplayApp:
         for limit, size in FONT_SIZES:
             if length <= limit:
                 return ("Segoe UI", size, "bold")
-        return ("Segoe UI", 12, "bold")
+        return ("Segoe UI", 16, "bold")
 
     def _update(self):
         # Run finished background work as separate events, so a dialog it
