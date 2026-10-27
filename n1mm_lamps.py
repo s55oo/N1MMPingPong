@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.33
+Version: 1.34
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.33"
+__version__ = "1.34"
 
 import argparse
 import base64
@@ -43,7 +43,7 @@ import time
 import tkinter as tk
 import webbrowser
 import xml.etree.ElementTree as ET
-from tkinter import colorchooser, messagebox
+from tkinter import colorchooser, messagebox, simpledialog
 
 import pingpong_keys as keys
 import pingpong_update as upd
@@ -60,6 +60,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
+MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
@@ -452,7 +453,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
 
 def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
-    alert=False, alert_band="", alert_time=0.0, status="",
+    alert=False, alert_band="", alert_time=0.0, status="", alias="",
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -467,6 +468,7 @@ def make_hello(
         ("AlertBand", alert_band or ""),
         ("AlertTime", "{:.3f}".format(alert_time or 0.0)),
         ("Status", status or ""),
+        ("Alias", alias or ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -498,6 +500,7 @@ def parse_hello(data):
         "alert_band": get("AlertBand"),
         "alert_time": _float(get("AlertTime")),
         "status": get("Status"),
+        "alias": get("Alias"),
     }
 
 
@@ -598,6 +601,7 @@ class Peer:
         self.version = ""
         self.ips = set()
         self.local_n1mm = False
+        self.alias = ""
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -663,6 +667,7 @@ class DisplayApp:
         self.hello_now = threading.Event()
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
+        self.my_alias = self.settings.get_text("station", "alias", "")[:MAX_ALIAS]
         self.my_color = self.settings.get_text("station", "color", "")
         self.my_color_time = _float(
             self.settings.get_text("station", "color_time", "0")
@@ -719,6 +724,10 @@ class DisplayApp:
 
     def _show_options(self, event):
         menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(
+            label="My name…  ({})".format(self.my_alias or "PC name"),
+            command=self._choose_alias,
+        )
         menu.add_command(
             label="My color…  ({})".format(self.my_color or "automatic"),
             command=self._choose_color,
@@ -1040,6 +1049,7 @@ class DisplayApp:
             peer = Peer(info["id"])
             self.peers[info["id"]] = peer
         peer.host = info["host"] or src
+        peer.alias = (info.get("alias") or "")[:MAX_ALIAS]
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1097,6 +1107,7 @@ class DisplayApp:
             "alert_band": self._my_band(),
             "alert_time": self.alert_time,
             "status": self._status_text(),
+            "alias": self.my_alias,
         }
 
     # ---------------------------------------------------------- colors
@@ -1152,7 +1163,7 @@ class DisplayApp:
         owner = owners.get(self.my_color.lower())
         if owner == "me" or owner is None:
             return ""
-        return "color {} is taken ({})".format(self.my_color, owner.host)
+        return "color {} is taken ({})".format(self.my_color, self.peer_name(owner))
 
     def _choose_color(self):
         if self._color_dialog is not None:
@@ -1199,7 +1210,7 @@ class DisplayApp:
             owner = owners.get(color.lower())
             taken = owner is not None and owner != "me"
             mine = color == self.my_color and not taken
-            text = owner.host if taken else ("✓ " + color if mine else color)
+            text = self.peer_name(owner) if taken else ("✓ " + color if mine else color)
             tk.Button(
                 grid,
                 text=text,
@@ -1278,10 +1289,51 @@ class DisplayApp:
             if peer.local_n1mm:
                 # Its N1MM runs, but the broadcast does not reach this PC:
                 # usually a wrong Broadcast Address in that PC's N1MM.
-                rows.append("{}: N1MM not reaching here".format(peer.host))
+                rows.append("{}: N1MM not reaching here".format(self.peer_name(peer)))
             else:
-                rows.append("{}: no N1MM".format(peer.host))
+                rows.append("{}: no N1MM".format(self.peer_name(peer)))
         return rows
+
+    def peer_name(self, peer):
+        """Name to show for a PingPong PC: its alias, else its PC name."""
+        return peer.alias or peer.host
+
+    def station_name(self, st):
+        """Name to show for an N1MM station: the alias its PC announced
+        (or this PC's own alias), else N1MM's StationName."""
+        if st.ip in self.local:
+            return self.my_alias or st.label
+        now = time.time()
+        for peer in self._fresh_peers(now):
+            if st.ip in peer.ips and peer.alias:
+                return peer.alias
+        return st.label
+
+    def _choose_alias(self):
+        current = self.my_alias
+        text = simpledialog.askstring(
+            "PingPong - my name",
+            "Short name for this PC on every lamp (e.g. RUN1).\n"
+            "Max {} characters; empty = use the N1MM computer name.".format(MAX_ALIAS),
+            initialvalue=current,
+            parent=self.root,
+        )
+        if text is None:
+            return
+        text = " ".join(text.split())[:MAX_ALIAS]
+        if text:
+            for peer in self._fresh_peers(time.time()):
+                if peer.alias.lower() == text.lower() and not getattr(peer, "same_pc", False):
+                    messagebox.showwarning(
+                        "PingPong",
+                        "The name {} is already used by {}.\n"
+                        "Please choose a different one.".format(text, peer.host),
+                        parent=self.root,
+                    )
+                    return
+        self.my_alias = text
+        self.settings.set_text("station", "alias", text)
+        self.hello_now.set()  # tell the other lamps right away
 
     def _station_state(self, st):
         """'14 CW Run' - band, mode and Run/S&P of a station."""
@@ -1303,10 +1355,17 @@ class DisplayApp:
         mine = [st for st in newest.values() if st.ip in self.local]
         others = sorted(
             (st for st in newest.values() if st.ip not in self.local),
-            key=lambda st: st.label.lower(),
+            key=lambda st: self.station_name(st).lower(),
         )
-        rows = ["{} (me)".format(self._station_state(st)) for st in mine[:1]]
-        rows += ["{} {}".format(st.label, self._station_state(st)) for st in others]
+        rows = [
+            "{}{} (me)".format(
+                (self.my_alias + " ") if self.my_alias else "", self._station_state(st)
+            )
+            for st in mine[:1]
+        ]
+        rows += [
+            "{} {}".format(self.station_name(st), self._station_state(st)) for st in others
+        ]
         return rows
 
     def _is_tracked(self, station):
@@ -1421,7 +1480,7 @@ class DisplayApp:
                 continue
             orgb = self._rgb(other)
             if orgb and sum((a - b) ** 2 for a, b in zip(rgb, orgb)) ** 0.5 < SIMILAR_COLOR:
-                return owner.host
+                return self.peer_name(owner)
         return None
 
     def _recenter_text(self, event=None):
@@ -1551,10 +1610,10 @@ class DisplayApp:
         if calls:
             caller = calls[-1]
             st_ = self._peer_station(caller)
-            self._set_who("F12: " + (st_.label if st_ is not None else caller.host))
+            self._set_who("F12: " + self.peer_name(caller))
             self._freq_text = freq_khz(st_.freq) if st_ is not None else ""
         elif active is not None:
-            self._set_who(active.label)
+            self._set_who(self.station_name(active))
             self._freq_text = freq_khz(active.freq)
         else:
             self._set_who("")
@@ -1570,7 +1629,7 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
             self.info.configure(
                 text="{} transmitting  ·  {}".format(
-                    active.label, self._station_state(active)
+                    self.station_name(active), self._station_state(active)
                 )
             )
         else:
@@ -1752,7 +1811,7 @@ class DisplayApp:
         self._shown_call = peer
         station = self._peer_station(peer)
         color = self._call_color(peer, owners, now)
-        name = station.label if station is not None else peer.host
+        name = self.peer_name(peer) if peer.alias or station is None else self.station_name(station)
         lit = int(now / BLINK_HALF) % 2 == 0
         bg = color if lit else COLOR_IDLE
         shown = "F12 · {}".format(name)
@@ -1765,7 +1824,7 @@ class DisplayApp:
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self.info.configure(
             text="{} calls (F12)  ·  {} MHz  ·  {}click = silence".format(
-                peer.host,
+                self.peer_name(peer),
                 peer.alert_band,
                 self._block_note(peer, now),
             )

@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.33 · Made by **S55OO** with AI assistance.
+> **Version:** 1.34 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -11,7 +11,7 @@ transmission.
 
 On top of that the lamps talk to each other, so operators can:
 
-- give every PC its **own color**, the same on all lamps;
+- give every PC its **own name and color**, the same on all lamps;
 - send an **F12 call** that makes the S&P stations on the same band blink,
   and optionally **block their F-keys** while the call is on;
 - **update** all PCs from GitHub, and switch back to an older version.
@@ -109,6 +109,17 @@ Example: PC1, PC2, PC3 on 14 MHz CW share one lamp picture; PC4 on 7 MHz
 CW is never shown on their lamps, and vice versa. The group follows this
 PC automatically when it changes band or mode. Stations outside these
 bands/modes are never shown.
+
+### My name (Options ▾ → My name…)
+
+Give this PC a short name, e.g. `RUN1` or `RUN2` (max 12 characters).
+
+- The name is sent to all lamps, like the color: **every lamp shows
+  `RUN1` instead of the N1MM computer name** – in the lamp corner, the
+  line under the lamp and for F12 calls.
+- A name already used by another PC is refused.
+- Empty = use the N1MM computer name again. Saved per PC in
+  `pingpong.ini`.
 
 ### My color (Options ▾ → My color…)
 
@@ -258,8 +269,8 @@ to the file automatically with its palette color. A color chosen with
 
 Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
-`block_keys`. `[station]`: `color`, `color_time` (when the color was
-chosen – the earliest choice wins a conflict).
+`block_keys`. `[station]`: `alias` (My name), `color`, `color_time` (when the
+color was chosen – the earliest choice wins a conflict).
 
 ---
 
