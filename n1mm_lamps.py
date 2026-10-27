@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.27
+Version: 1.28
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.27"
+__version__ = "1.28"
 
 import argparse
 import base64
@@ -1322,8 +1322,9 @@ class DisplayApp:
         frame.pack()
         top = tk.Frame(frame)
         top.pack(fill=tk.X)
-        # Shows who is sending on this band right now ("PingPong" when idle).
-        self.who = tk.Label(top, text="PingPong", font=("Segoe UI", 9, "bold"))
+        # Shows who is sending on this band right now (empty when idle -
+        # the window title already says PingPong).
+        self.who = tk.Label(top, text="", font=("Segoe UI", 9, "bold"))
         self.who.pack(side=tk.LEFT)
         self.help_icon = tk.PhotoImage(
             data=base64.b64decode(HELP_ICON_B64.encode("ascii"))
@@ -1457,7 +1458,7 @@ class DisplayApp:
         elif active is not None:
             self._set_who(active.label)
         else:
-            self._set_who("PingPong")
+            self._set_who("")
         if calls:
             self._show_call(calls[-1], owners, now)
         elif active is not None:

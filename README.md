@@ -80,7 +80,7 @@ Two tools are provided:
   prefix is stripped).
 - The window is always on top (`topmost`).
 - The top-left corner shows **who is sending on this band right now**
-  (e.g. `OO840G3`), `F12: <PC>` during an F12 call, and `PingPong` when
+  (e.g. `OO840G3`) and `F12: <PC>` during an F12 call; it is empty when
   nobody is sending.
 - A small **help icon** (top-right) opens this documentation in your default
   browser.
