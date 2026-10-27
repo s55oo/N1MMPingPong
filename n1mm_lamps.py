@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.16
+Version: 1.17
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.16"
+__version__ = "1.17"
 
 import argparse
 import base64
@@ -554,6 +554,7 @@ class DisplayApp:
         self._block_active = False
         self._blocked_key = ("", 0.0)
         self._call_seen = {}  # (peer id, call time) -> local time first seen
+        self._had_calls = False
         self.key_watcher = None
         self.alert_on = False
         self.alert_time = 0.0
@@ -1177,9 +1178,19 @@ class DisplayApp:
                 active = station
 
         all_calls = self._incoming_calls(now)
-        self._block_active = self.block_on and any(
+        block = self.block_on and any(
             self._block_left(p, now) > 0 for p in all_calls
         )
+        if block != self._block_active or bool(all_calls) != self._had_calls:
+            self._key_event(
+                "incoming call: {} · F-key block: {}{}".format(
+                    ", ".join(p.host for p in all_calls) or "none",
+                    "ON" if block else "off",
+                    "" if self.key_watcher is not None else " (watcher NOT running)",
+                )
+            )
+        self._block_active = block
+        self._had_calls = bool(all_calls)
         calls = all_calls if active is None else []
         test = None
         if active is None and not calls and self.var_test.get():
@@ -1319,6 +1330,7 @@ class DisplayApp:
             self._f12_pressed,
             should_block=lambda: self._block_active,
             on_blocked=self._key_blocked,
+            on_event=self._key_event,
         )
         if not watcher.start():
             messagebox.showerror(
@@ -1348,6 +1360,10 @@ class DisplayApp:
             self._block_active = False
         self.settings.set("f12_call", call)
         self.settings.set("block_keys", block)
+
+    def _key_event(self, text):
+        if self.test_on:
+            self._test_write("{}  keys: {}".format(time.strftime("%H:%M:%S"), text))
 
     def _key_blocked(self, name):
         """Keyboard thread: a send key was swallowed during a call."""
