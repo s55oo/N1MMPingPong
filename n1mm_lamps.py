@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.32
+Version: 1.33
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.32"
+__version__ = "1.33"
 
 import argparse
 import base64
@@ -1331,10 +1331,9 @@ class DisplayApp:
         self._drag = None
         # Shift+F: compact mode (no title bar / margins, info on the lamp).
         self.root.bind("<Key-F>", self._toggle_compact)
-        # Shows who is sending on this band right now (empty when idle -
-        # the window title already says PingPong).
-        self.who = tk.Label(top, text="", font=("Segoe UI", 9, "bold"))
-        self.who.pack(side=tk.LEFT)
+        # Who is sending on this band right now - drawn on the lamp's
+        # top-left corner (see c_who), opposite the frequency.
+        self._who_text = ""
         self.help_icon = tk.PhotoImage(
             data=base64.b64decode(HELP_ICON_B64.encode("ascii"))
         )
@@ -1404,8 +1403,7 @@ class DisplayApp:
         return "black" if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else "white"
 
     def _set_who(self, text):
-        if self.who.cget("text") != text:
-            self.who.configure(text=text)
+        self._who_text = text
 
     def _set_bg(self, bg):
         """Lamp background + matching text color."""
@@ -1466,9 +1464,9 @@ class DisplayApp:
         return "break"
 
     def _sync_compact(self):
-        """Texts drawn on the lamp: frequency (always, top-right); sender
-        name and status line in compact mode."""
-        who = self.who.cget("text") if self._compact else ""
+        """Texts drawn on the lamp: sender name (top-left) and frequency
+        (top-right) always; the status line in compact mode."""
+        who = self._who_text
         info = self.info.cget("text") if self._compact else ""
         fg = self.text_on(self.canvas.cget("bg"))
         for item, text in (

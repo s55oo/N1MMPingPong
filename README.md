@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.32 · Made by **S55OO** with AI assistance.
+> **Version:** 1.33 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -71,8 +71,9 @@ What N1MM reports – and therefore what PingPong can show:
 - The lamp's top-right corner shows the **frequency of the transmitting
   station in kHz** (e.g. `14025.00 kHz`; also the caller's frequency
   during an F12 call).
-- The top-left corner shows **who is sending on this band right now**
-  (e.g. `OO840G3`), or `F12: <PC>` during an F12 call; empty when idle.
+- The lamp's top-left corner shows **who is sending on this band right
+  now** (e.g. `OO840G3`), or `F12: <PC>` during an F12 call; empty when
+  idle.
 - The line under the lamp lists every station with band, mode and
   Run/S&P, this PC first, e.g.
   `14 CW Run (me) · OO840G3 14 CW S&P · OO840G5 7 SSB Run`.
@@ -88,9 +89,8 @@ What N1MM reports – and therefore what PingPong can show:
 
 Click the lamp and press **Shift+F**: the title bar, the top row and the
 gray margins disappear – only the lamp is left, same size and place. The
-sender's name is shown small in the lamp's top-left corner, the frequency
-in the top-right corner and the status line along its bottom, so no
-information is lost.
+status line moves onto the lamp's bottom edge (the sender's name and the
+frequency are on the lamp anyway), so no information is lost.
 
 - **Drag the lamp** with the mouse to move it.
 - **Right-click** for the Options menu; a plain click still silences an
