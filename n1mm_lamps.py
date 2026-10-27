@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.7
+Version: 1.8
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 12070] [--no-discovery]
 """
 
-__version__ = "1.7"
+__version__ = "1.8"
 
 import argparse
 import base64
@@ -58,6 +58,7 @@ HELLO_INTERVAL = 3.0
 PEER_TIMEOUT = 12.0
 NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
+TEST_FLASH = 1.5
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -476,6 +477,7 @@ class Station:
         self.color = color
         self.count = 0
         self.msg = ""
+        self.msg_time = 0.0
         self.tx = False
         self.last_seen = 0.0
         self.freq = ""
@@ -505,6 +507,8 @@ class DisplayApp:
         self.var_auto = tk.BooleanVar(
             value=self.settings.get("install_automatically", False)
         )
+        # Test mode is deliberately not saved: it always starts off.
+        self.var_test = tk.BooleanVar(value=False)
         self.my_color = self.settings.get_text("station", "color", "")
         self.my_color_time = _float(
             self.settings.get_text("station", "color_time", "0")
@@ -561,6 +565,10 @@ class DisplayApp:
         menu.add_command(
             label="My color…  ({})".format(self.my_color or "automatic"),
             command=self._choose_color,
+        )
+        menu.add_checkbutton(
+            label="Test mode – show my button presses",
+            variable=self.var_test,
         )
         menu.add_separator()
         frozen = upd.is_frozen()
@@ -831,6 +839,8 @@ class DisplayApp:
             station.tx = is_tx
             station.last_seen = time.time()
             if caption:
+                if caption != station.msg:
+                    station.msg_time = time.time()
                 station.msg = caption
             if freq:
                 station.freq = freq
@@ -1087,7 +1097,13 @@ class DisplayApp:
                 latest = station.last_seen
                 active = station
 
-        if active is not None:
+        test = None
+        if active is None and self.var_test.get():
+            test = self._local_station()
+
+        if test is not None:
+            self._show_test(test, owners, now)
+        elif active is not None:
             color = self._color_for(active, owners, now) or "red"
             shown = active.msg or "—"
             if self.canvas.cget("bg") != color:
@@ -1121,6 +1137,47 @@ class DisplayApp:
             self.info.configure(text=header + rows)
 
         self.root.after(120, self._update)
+
+    def _local_station(self):
+        """This PC's own N1MM station (most recently heard), or None."""
+        mine = [st for st in list(self.stations.values()) if st.ip in self.local]
+        if not mine:
+            return None
+        return max(mine, key=lambda st: st.last_seen)
+
+    def _dim(self, color, amount=0.35):
+        """color blended towards the idle grey (amount = share of color)."""
+        try:
+            r, g, b = (v // 256 for v in self.root.winfo_rgb(color))
+            ir, ig, ib = (v // 256 for v in self.root.winfo_rgb(COLOR_IDLE))
+        except tk.TclError:
+            return COLOR_IDLE
+        mix = lambda c, i: int(i + (c - i) * amount)
+        return "#{:02x}{:02x}{:02x}".format(mix(r, ir), mix(g, ig), mix(b, ib))
+
+    def _show_test(self, station, owners, now):
+        """Test mode: show this PC's last button even without transmitting.
+
+        Bright for TEST_FLASH seconds after the caption changes (or while
+        N1MM reports transmitting), dimmed otherwise.
+        """
+        color = self._color_for(station, owners, now) or "red"
+        fresh = (now - station.msg_time) <= TEST_FLASH
+        tx = station.tx and (now - station.last_seen) <= self.stale
+        bg = color if (fresh or tx) else self._dim(color)
+        shown = station.msg or "—"
+        if self.canvas.cget("bg") != bg:
+            self.canvas.configure(bg=bg)
+        if self.canvas.itemcget(self.text_id, "text") != shown:
+            self.canvas.itemconfigure(self.text_id, text=shown)
+            self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
+        self.info.configure(
+            text="TEST  ·  {}  ·  {}  ·  {}".format(
+                station.label,
+                "oddaja" if tx else "ne oddaja",
+                group_label(station.key) or "ni pasu/načina",
+            )
+        )
 
     def on_close(self):
         self.stop.set()

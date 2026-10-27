@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.7 · Made by **S55OO** with AI assistance.
+> **Version:** 1.8 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -116,6 +116,23 @@ python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - `--discovery-port` – UDP port for PingPong-to-PingPong discovery
   (default 12070, `0` = off).
 - `--no-discovery` – don't send or listen for discovery hellos.
+
+### Test mode (Options menu, v1.8+)
+
+Normally the lamp lights only while N1MM reports **IsTransmitting**, and
+only on the listed bands/modes. When you test your function keys on one
+PC without a radio keying, nothing would show. Turn on
+**Options ▾ → Test mode – show my button presses**:
+
+- The lamp shows **this PC's** last pressed button, whether or not it
+  transmits and on any band/mode.
+- It lights brightly for 1.5 s when a new button is pressed (and while
+  transmitting), then stays dimmed with the caption visible.
+- The footer shows `TEST · <station> · oddaja / ne oddaja · <band mode>`.
+- Real transmissions from other stations still take priority.
+- Test mode is not saved – it is always off when the lamp starts.
+- N1MM only sends the button caption, so pressing the **same** button
+  twice in a row shows no new flash.
 
 ### My color (Options menu, v1.7+)
 
