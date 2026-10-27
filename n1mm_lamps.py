@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.24
+Version: 1.25
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.24"
+__version__ = "1.25"
 
 import argparse
 import base64
@@ -64,7 +64,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
-CALL_BORDER = 10  # px: width of the F12 call border around the lamp
+CALL_BORDER = 13  # px: width of the F12 call border around the lamp
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.

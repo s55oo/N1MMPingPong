@@ -130,7 +130,7 @@ Signal the other operators on your band without transmitting. Turn on
 (saved per PC).
 
 - Press **F12 while N1MM's window is active** → your call is **on**. Your
-  lamp gets a wide (10 px) **blinking** border in your color and the
+  lamp gets a wide (13 px) **blinking** border in your color and the
   footer shows
   `F12 klic VKLOP (14 MHz) – F12 = izklop`.
 - Every other PingPong PC that is **on the same band** and in **S&P**
