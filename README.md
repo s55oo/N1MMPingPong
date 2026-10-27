@@ -194,6 +194,10 @@ has on **every** PingPong lamp in the network.
 
 - Colors already chosen by other PCs running PingPong are greyed out and
   show that PC's name, so two PCs can't pick the same one.
+- **More colors…** opens the Windows color picker for any color. A color
+  too similar to one another PC has chosen is refused.
+- Text on the lamp adapts automatically: **black on light colors**,
+  white on dark ones.
 - The choice is announced in the discovery hello (UDP 46070), so all lamps
   use it – it overrides `lamps.cfg` and the order-of-appearance colors.
 - If two PCs end up with the same color anyway (e.g. one was offline when

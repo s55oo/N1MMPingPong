@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.25
+Version: 1.26
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.25"
+__version__ = "1.26"
 
 import argparse
 import base64
@@ -47,7 +47,7 @@ import time
 import tkinter as tk
 import webbrowser
 import xml.etree.ElementTree as ET
-from tkinter import messagebox
+from tkinter import colorchooser, messagebox
 
 import pingpong_keys as keys
 import pingpong_update as upd
@@ -64,6 +64,7 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
+SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
@@ -1201,12 +1202,52 @@ class DisplayApp:
                 width=12,
                 bg=color,
                 activebackground=color,
+                fg=self.text_on(color),
+                activeforeground=self.text_on(color),
+                disabledforeground=self.text_on(color),
                 relief=tk.SUNKEN if mine else tk.RAISED,
                 state=tk.DISABLED if taken else tk.NORMAL,
                 command=lambda c=color: pick(c),
             ).grid(row=i // 5, column=i % 5, padx=2, pady=2)
+        if self.my_color and self.my_color not in COLOR_PALETTE:
+            tk.Label(
+                dlg,
+                text="✓ my color  {}".format(self.my_color),
+                bg=self.my_color,
+                fg=self.text_on(self.my_color),
+                font=("Segoe UI", 9, "bold"),
+                padx=8,
+                pady=3,
+            ).pack(pady=(6, 0))
+
+        def more():
+            try:
+                _, chosen = colorchooser.askcolor(
+                    color=self.my_color or "#ff0000",
+                    title="PingPong - my color",
+                    parent=dlg,
+                )
+            except tk.TclError:
+                chosen = None
+            if not chosen:
+                return
+            chosen = chosen.lower()
+            clash = self._too_similar(chosen, self._color_owners(time.time()))
+            if clash:
+                messagebox.showwarning(
+                    "PingPong",
+                    "This color is too similar to the color of {}.\n"
+                    "Please choose a different one.".format(clash),
+                    parent=dlg,
+                )
+                return
+            pick(chosen)
+
         buttons = tk.Frame(dlg)
         buttons.pack(pady=8)
+        tk.Button(
+            buttons, text="More colors…", width=12, command=more
+        ).pack(side=tk.LEFT, padx=4)
         tk.Button(
             buttons, text="Automatic", width=10, command=lambda: pick("")
         ).pack(side=tk.LEFT, padx=4)
@@ -1314,6 +1355,41 @@ class DisplayApp:
         )
         self.info.pack(fill=tk.X)
 
+    def _rgb(self, color):
+        """(r, g, b) 0-255 of any Tk color name or #rrggbb, or None."""
+        try:
+            return tuple(v // 256 for v in self.root.winfo_rgb(color))
+        except (tk.TclError, TypeError, ValueError):
+            return None
+
+    def text_on(self, color):
+        """Readable text color on this background: black on light colors,
+        white on dark ones."""
+        rgb = self._rgb(color)
+        if rgb is None:
+            return "white"
+        r, g, b = rgb
+        return "black" if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else "white"
+
+    def _set_bg(self, bg):
+        """Lamp background + matching text color."""
+        if self.canvas.cget("bg") != bg:
+            self.canvas.configure(bg=bg)
+            self.canvas.itemconfigure(self.text_id, fill=self.text_on(bg))
+
+    def _too_similar(self, color, owners):
+        """Host of another PC whose chosen color looks like `color`."""
+        rgb = self._rgb(color)
+        if rgb is None:
+            return None
+        for other, owner in owners.items():
+            if owner == "me":
+                continue
+            orgb = self._rgb(other)
+            if orgb and sum((a - b) ** 2 for a, b in zip(rgb, orgb)) ** 0.5 < SIMILAR_COLOR:
+                return owner.host
+        return None
+
     def _recenter_text(self, event):
         self.canvas.coords(self.text_id, event.width / 2.0, event.height / 2.0)
 
@@ -1373,8 +1449,7 @@ class DisplayApp:
         elif active is not None:
             color = self._color_for(active, owners, now) or "red"
             shown = active.msg or "—"
-            if self.canvas.cget("bg") != color:
-                self.canvas.configure(bg=color)
+            self._set_bg(color)
             if self.canvas.itemcget(self.text_id, "text") != shown:
                 self.canvas.itemconfigure(self.text_id, text=shown)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
@@ -1384,8 +1459,7 @@ class DisplayApp:
                 )
             )
         else:
-            if self.canvas.cget("bg") != COLOR_IDLE:
-                self.canvas.configure(bg=COLOR_IDLE)
+            self._set_bg(COLOR_IDLE)
             if self.canvas.itemcget(self.text_id, "text") != "—":
                 self.canvas.itemconfigure(self.text_id, text="—")
                 self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
@@ -1569,8 +1643,7 @@ class DisplayApp:
         key, when = self._blocked_key
         if self._block_active and key and now - when <= 1.5:
             shown = "BLOKIRANO · {}".format(key)
-        if self.canvas.cget("bg") != bg:
-            self.canvas.configure(bg=bg)
+        self._set_bg(bg)
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
