@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.13
+Version: 1.14
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.13"
+__version__ = "1.14"
 
 import argparse
 import base64
@@ -546,6 +546,12 @@ class DisplayApp:
         # Test mode is deliberately not saved: it always starts off.
         self.var_test = tk.BooleanVar(value=False)
         self.var_keys = tk.BooleanVar(value=self.settings.get("f12_call", False))
+        self.var_block = tk.BooleanVar(value=self.settings.get("block_keys", False))
+        # Plain copies, read from the keyboard thread.
+        self.f12_on = bool(self.var_keys.get())
+        self.block_on = bool(self.var_block.get())
+        self._block_active = False
+        self._blocked_key = ("", 0.0)
         self.key_watcher = None
         self.alert_on = False
         self.alert_time = 0.0
@@ -587,7 +593,7 @@ class DisplayApp:
             self.discovery.start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
-        if self.var_keys.get() and keys.supported():
+        if (self.var_keys.get() or self.var_block.get()) and keys.supported():
             self.root.after(500, self._keys_toggled)
         if upd.is_frozen():
             upd.cleanup_leftovers(upd.exe_path())
@@ -622,6 +628,11 @@ class DisplayApp:
         menu.add_checkbutton(
             label="F12 call – blink S&P stations on my band",
             variable=self.var_keys,
+            command=self._keys_toggled,
+        )
+        menu.add_checkbutton(
+            label="Block my F-keys while another station calls (F12)",
+            variable=self.var_block,
             command=self._keys_toggled,
         )
         menu.add_separator()
@@ -1163,7 +1174,9 @@ class DisplayApp:
                 latest = station.last_seen
                 active = station
 
-        calls = self._incoming_calls(now) if active is None else []
+        all_calls = self._incoming_calls(now)
+        self._block_active = self.block_on and bool(all_calls)
+        calls = all_calls if active is None else []
         test = None
         if active is None and not calls and self.var_test.get():
             test = self._local_station()
@@ -1298,7 +1311,11 @@ class DisplayApp:
     def _start_keys(self):
         if self.key_watcher is not None:
             return True
-        watcher = keys.KeyWatcher(self._f12_pressed)
+        watcher = keys.KeyWatcher(
+            self._f12_pressed,
+            should_block=lambda: self._block_active,
+            on_blocked=self._key_blocked,
+        )
         if not watcher.start():
             messagebox.showerror(
                 "PingPong",
@@ -1310,22 +1327,36 @@ class DisplayApp:
         return True
 
     def _keys_toggled(self):
-        on = bool(self.var_keys.get())
-        if on and not self._start_keys():
+        call, block = bool(self.var_keys.get()), bool(self.var_block.get())
+        if (call or block) and not self._start_keys():
             self.var_keys.set(False)
-            on = False
-        if not on:
-            if self.key_watcher is not None:
-                self.key_watcher.stop()
-                self.key_watcher = None
-            if self.alert_on:
-                self.alert_on = False
-                self.alert_time = time.time()
-                self.hello_now.set()
-        self.settings.set("f12_call", on)
+            self.var_block.set(False)
+            call = block = False
+        if not (call or block) and self.key_watcher is not None:
+            self.key_watcher.stop()
+            self.key_watcher = None
+        if not call and self.alert_on:
+            self.alert_on = False
+            self.alert_time = time.time()
+            self.hello_now.set()
+        self.f12_on, self.block_on = call, block
+        if not block:
+            self._block_active = False
+        self.settings.set("f12_call", call)
+        self.settings.set("block_keys", block)
+
+    def _key_blocked(self, name):
+        """Keyboard thread: a send key was swallowed during a call."""
+        self._blocked_key = (name, time.time())
+        if self.test_on:
+            self._test_write(
+                "{}  {} key  BLOCKED (call active)".format(time.strftime("%H:%M:%S"), name)
+            )
 
     def _f12_pressed(self):
         """Keyboard thread: F12 in N1MM toggles this PC's call."""
+        if not self.f12_on:
+            return
         self.alert_on = not self.alert_on
         self.alert_time = time.time()
         self.hello_now.set()
@@ -1381,14 +1412,19 @@ class DisplayApp:
         lit = int(now / BLINK_HALF) % 2 == 0
         bg = color if lit else COLOR_IDLE
         shown = "F12 · {}".format(name)
+        key, when = self._blocked_key
+        if self._block_active and key and now - when <= 1.5:
+            shown = "BLOKIRANO · {}".format(key)
         if self.canvas.cget("bg") != bg:
             self.canvas.configure(bg=bg)
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self.info.configure(
-            text="{} kliče (F12)  ·  {} MHz  ·  klik = utišaj".format(
-                peer.host, peer.alert_band
+            text="{} kliče (F12)  ·  {} MHz  ·  {}klik = utišaj".format(
+                peer.host,
+                peer.alert_band,
+                "tipke blokirane  ·  " if self._block_active else "",
             )
         )
 

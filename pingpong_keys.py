@@ -16,6 +16,13 @@ import threading
 VK_F12 = 0x7B
 N1MM_EXE = "n1mmlogger.net.exe"
 
+# Keys that make N1MM send a message: F1-F11, plus Enter (Enter Sends
+# Messages), Insert, ';' and "'" (N1MM's send / TU keys). Esc is never
+# blocked, so an operator can always stop a transmission.
+SEND_KEYS = {vk: "F{}".format(vk - 0x6F) for vk in range(0x70, 0x7B)}
+SEND_KEYS.update({0x0D: "Enter", 0x2D: "Insert", 0xBA: ";", 0xDE: "'"})
+LLKHF_ALTDOWN = 0x20
+
 WH_KEYBOARD_LL = 13
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
@@ -70,10 +77,20 @@ def foreground_exe():
 
 
 class KeyWatcher:
-    """Calls on_press() (in its own thread) when vk goes down in N1MM."""
+    """Watches the keyboard while N1MM is the active window.
 
-    def __init__(self, on_press, vk=VK_F12, only_exe=N1MM_EXE):
+    on_press() is called when vk (F12) goes down. When should_block()
+    returns True, the SEND_KEYS are swallowed (N1MM never gets them) and
+    on_blocked(name) is called. Alt combinations are never touched.
+    """
+
+    def __init__(
+        self, on_press, vk=VK_F12, only_exe=N1MM_EXE,
+        should_block=None, on_blocked=None,
+    ):
         self.on_press = on_press
+        self.should_block = should_block
+        self.on_blocked = on_blocked
         self.vk = vk
         self.only_exe = only_exe
         self.error = None
@@ -100,6 +117,36 @@ class KeyWatcher:
 
             ctypes.WinDLL("user32").PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
             self._thread_id = 0
+
+    def decide(self, vk, flags, wparam, foreground=None):
+        """What to do with one key event: "block", "press" or None.
+
+        Called for every key; must be quick. foreground() is only asked
+        for the keys we care about (default: real foreground program).
+        """
+        fg = foreground or foreground_exe
+        down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
+        if (
+            vk in SEND_KEYS
+            and not (flags & LLKHF_ALTDOWN)
+            and self.should_block is not None
+            and self.should_block()
+            and (not self.only_exe or fg() == self.only_exe)
+        ):
+            # F10 alone arrives as WM_SYSKEYDOWN, Alt is not down then.
+            if down and self.on_blocked:
+                self.on_blocked(SEND_KEYS[vk])
+            return "block"
+        if vk == self.vk:
+            if down:
+                if not self._down:  # ignore auto-repeat
+                    self._down = True
+                    if not self.only_exe or fg() == self.only_exe:
+                        self.on_press()
+                        return "press"
+            elif wparam in (WM_KEYUP, WM_SYSKEYUP):
+                self._down = False
+        return None
 
     def _run(self):
         import ctypes
@@ -147,14 +194,8 @@ class KeyWatcher:
             if code == 0:
                 try:
                     kb = ctypes.cast(lparam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                    if kb.vkCode == self.vk:
-                        if wparam in (WM_KEYDOWN, WM_SYSKEYDOWN):
-                            if not self._down:  # ignore auto-repeat
-                                self._down = True
-                                if not self.only_exe or foreground_exe() == self.only_exe:
-                                    self.on_press()
-                        elif wparam in (WM_KEYUP, WM_SYSKEYUP):
-                            self._down = False
+                    if self.decide(kb.vkCode, kb.flags, wparam) == "block":
+                        return 1  # swallowed: N1MM never sees this key
                 except Exception:
                     pass
             return user32.CallNextHookEx(None, code, wparam, lparam)
