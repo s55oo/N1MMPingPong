@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.18
+Version: 1.19
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.18"
+__version__ = "1.19"
 
 import argparse
 import base64
@@ -946,6 +946,12 @@ class DisplayApp:
         peer.host = info["host"] or src
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
+        # Same PC only if the hello came from one of our own addresses or
+        # carries our PC name. Comparing all addresses is wrong: virtual
+        # adapters (VirtualBox 192.168.56.1, VPNs) repeat on every PC.
+        peer.same_pc = src in self.local or (
+            (info["host"] or "").lower() == socket.gethostname().lower()
+        )
         peer.local_n1mm = info["local_n1mm"]
         peer.color = info.get("color", "")
         peer.color_time = info.get("color_time", 0.0)
@@ -1439,7 +1445,7 @@ class DisplayApp:
             p for p in self._fresh_peers(now)
             if p.alert
             and p.alert_band == band
-            and not (p.ips & self.local)  # never "call" ourselves
+            and not getattr(p, "same_pc", False)  # never "call" ourselves
             and (p.id, p.alert_time) not in self.silenced
         ]
         return sorted(calls, key=lambda p: p.alert_time)
