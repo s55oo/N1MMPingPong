@@ -165,27 +165,22 @@ on the PCs that should be stopped (saved per PC, off by default).
   clicks on N1MM's F-key buttons, microphone PTT, paddle or footswitch –
   it is a guard against accidental key presses, not a hardware
   interlock.
-- With Test mode on, each blocked key is written to `pingpong_test.log`.
+- With Diagnostics on, each blocked key is written to `pingpong_test.log`.
 
-### Test mode (Options menu, v1.8+)
+### Diagnostics (Options menu)
 
-Normally the lamp lights only while N1MM reports **IsTransmitting**, and
-only on the listed bands/modes. When you test your function keys on one
-PC without a radio keying, nothing would show. Turn on
-**Options ▾ → Test mode – show my button presses**:
+**Options ▾ → Diagnostics (log to file)** writes what the lamp sees to
+`pingpong_test.log` next to the exe. Use it when something doesn't work
+as expected; it changes nothing on the lamp display.
 
-- The lamp shows **this PC's** last pressed button, whether or not it
-  transmits and on any band/mode.
-- It lights brightly for 1.5 s when a new button is pressed (and while
-  transmitting), then stays dimmed with the caption visible.
-- The footer shows `TEST · <station> · oddaja / ne oddaja · <band mode>`.
-- Real transmissions from other stations still take priority.
-- Test mode is not saved – it is always off when the lamp starts.
-- N1MM only sends the button caption, so pressing the **same** button
-  twice in a row shows no new flash.
-- While test mode is on, every packet from this PC's N1MM is written to
-  `pingpong_test.log` next to the exe (time, key caption, transmit state,
-  frequency, mode), so you can check exactly what N1MM sent for each key.
+- Every packet from this PC's N1MM: time, key caption, transmit state,
+  frequency, mode.
+- The state each other PingPong PC reports (band, Run/S&P, F12 call and
+  blocking options, calls it sees, whether its F-keys are blocked).
+- F12 presses, blocked keys and keyboard-watcher events.
+- Off by default and not saved – it is always off when the lamp starts,
+  so the log only grows while you are diagnosing. Delete the file any
+  time.
 
 ### My color (Options menu, v1.7+)
 

@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.19
+Version: 1.20
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.19"
+__version__ = "1.20"
 
 import argparse
 import base64
@@ -62,7 +62,6 @@ HELLO_INTERVAL = 3.0
 PEER_TIMEOUT = 12.0
 NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
-TEST_FLASH = 1.5
 TEST_LOG = "pingpong_test.log"
 BLINK_HALF = 0.4
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
@@ -549,7 +548,7 @@ class DisplayApp:
         self.var_auto = tk.BooleanVar(
             value=self.settings.get("install_automatically", False)
         )
-        # Test mode is deliberately not saved: it always starts off.
+        # Diagnostics (log) is deliberately not saved: it always starts off.
         self.var_test = tk.BooleanVar(value=False)
         self.var_keys = tk.BooleanVar(value=self.settings.get("f12_call", False))
         self.var_block = tk.BooleanVar(value=self.settings.get("block_keys", False))
@@ -629,11 +628,6 @@ class DisplayApp:
             command=self._choose_color,
         )
         menu.add_checkbutton(
-            label="Test mode – show my button presses",
-            variable=self.var_test,
-            command=self._test_toggled,
-        )
-        menu.add_checkbutton(
             label="F12 call – blink S&P stations on my band",
             variable=self.var_keys,
             command=self._keys_toggled,
@@ -675,6 +669,12 @@ class DisplayApp:
             command=lambda: self.settings.set(
                 "install_automatically", self.var_auto.get()
             ),
+        )
+        menu.add_separator()
+        menu.add_checkbutton(
+            label="Diagnostics (log to file)",
+            variable=self.var_test,
+            command=self._test_toggled,
         )
         menu.add_separator()
         menu.add_command(
@@ -1236,17 +1236,12 @@ class DisplayApp:
         self._block_active = block
         self._had_calls = bool(all_calls)
         calls = all_calls if active is None else []
-        test = None
-        if active is None and not calls and self.var_test.get():
-            test = self._local_station()
         self._show_my_call(owners, now)
 
         if not calls:
             self._shown_call = None
         if calls:
             self._show_call(calls[-1], owners, now)
-        elif test is not None:
-            self._show_test(test, owners, now)
         elif active is not None:
             color = self._color_for(active, owners, now) or "red"
             shown = active.msg or "—"
@@ -1293,20 +1288,10 @@ class DisplayApp:
             return None
         return max(mine, key=lambda st: st.last_seen)
 
-    def _dim(self, color, amount=0.35):
-        """color blended towards the idle grey (amount = share of color)."""
-        try:
-            r, g, b = (v // 256 for v in self.root.winfo_rgb(color))
-            ir, ig, ib = (v // 256 for v in self.root.winfo_rgb(COLOR_IDLE))
-        except tk.TclError:
-            return COLOR_IDLE
-        mix = lambda c, i: int(i + (c - i) * amount)
-        return "#{:02x}{:02x}{:02x}".format(mix(r, ir), mix(g, ig), mix(b, ib))
-
     def _test_toggled(self):
         self.test_on = bool(self.var_test.get())
         self._test_write(
-            "=== test mode {} · PingPong v{} · local IPs {} ===".format(
+            "=== diagnostics {} · PingPong v{} · local IPs {} ===".format(
                 "ON" if self.test_on else "OFF",
                 __version__,
                 ", ".join(sorted(self.local)) or "?",
@@ -1321,7 +1306,7 @@ class DisplayApp:
             pass
 
     def _test_log(self, src, data):
-        """Test mode: one line per packet from this PC's N1MM."""
+        """Diagnostics: one line per packet from this PC's N1MM."""
         raw = data.decode("utf-8", errors="replace")
         tag = re.search(r"<(?![?!])([A-Za-z]\w*)", raw)
 
@@ -1340,30 +1325,6 @@ class DisplayApp:
             )
         else:
             self._test_write("{}  {}  {}  ({} bytes)".format(stamp, src, kind, len(data)))
-
-    def _show_test(self, station, owners, now):
-        """Test mode: show this PC's last button even without transmitting.
-
-        Bright for TEST_FLASH seconds after the caption changes (or while
-        N1MM reports transmitting), dimmed otherwise.
-        """
-        color = self._color_for(station, owners, now) or "red"
-        fresh = (now - station.msg_time) <= TEST_FLASH
-        tx = station.tx and (now - station.last_seen) <= self.stale
-        bg = color if (fresh or tx) else self._dim(color)
-        shown = station.msg or "—"
-        if self.canvas.cget("bg") != bg:
-            self.canvas.configure(bg=bg)
-        if self.canvas.itemcget(self.text_id, "text") != shown:
-            self.canvas.itemconfigure(self.text_id, text=shown)
-            self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
-        self.info.configure(
-            text="TEST  ·  {}  ·  {}  ·  {}".format(
-                station.label,
-                "oddaja" if tx else "ne oddaja",
-                group_label(station.key) or "ni pasu/načina",
-            )
-        )
 
     # ---------------------------------------------------------- F12 call
 
