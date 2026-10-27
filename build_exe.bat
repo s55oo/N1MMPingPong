@@ -11,7 +11,7 @@ if errorlevel 1 (
 )
 
 echo Building n1mm_lamps.exe ...
-python -m PyInstaller --noconfirm --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
+python -m PyInstaller --noconfirm --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
 if errorlevel 1 goto :error
 
 copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe >nul

@@ -293,7 +293,7 @@ Requires Python + PyInstaller:
 
 ```bat
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
+python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
 copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
 ```
 
@@ -332,6 +332,7 @@ n1mm_watch.py    – traffic watcher
 PingPong.bat     – watcher launcher
 manifest.xml     – PyInstaller manifest (common controls)
 help.png         – help icon shown in the lamp window (embedded in the exe)
+pingpong.ico     – app icon (exe file, window title bar and taskbar)
 pingpong_update.py – self-update / switch-version logic (built into the exe)
 pingpong_keys.py – F12 key watcher for the F12 call (built into the exe)
 pingpong.ini     – per-PC settings: chosen color, updates (created when changed)

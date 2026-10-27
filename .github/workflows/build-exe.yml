@@ -44,7 +44,7 @@ jobs:
           python -m PyInstaller --version
 
       - name: Build
-        run: python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml n1mm_lamps.py
+        run: python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
 
       - name: SHA-256
         run: |
