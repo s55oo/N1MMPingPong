@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.12 · Made by **S55OO** with AI assistance.
+> **Version:** 1.13 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -139,6 +139,10 @@ Signal the other operators on your band without transmitting. Turn on
 - N1MM still receives F12 normally (PingPong only watches the key; it
   doesn't block it). F12 in other programs is ignored.
 - The call is sent immediately (normally within a fraction of a second).
+- On a blinking lamp, **click the lamp** to silence that call there
+  (footer: `klik = utišaj`). A new F12 call blinks again.
+- Only **one lamp per PC** can run (v1.13+); starting a second one just
+  says PingPong is already running.
 - Real transmissions still take priority on the lamp.
 - If N1MM runs **as administrator**, PingPong must too (Windows hides
   key presses of elevated programs from normal ones).

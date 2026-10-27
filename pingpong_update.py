@@ -216,6 +216,9 @@ def relaunch(target_exe, args):
     # PyInstaller >= 6.9: make the child unpack itself instead of reusing
     # this (soon deleted) process's temp folder.
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    # Tells the new lamp to wait for this one to close (single instance).
+    # An environment variable, so older versions simply ignore it.
+    env["PINGPONG_AFTER_UPDATE"] = "1"
     for key in list(env):
         if key.startswith("_PYI_") or key == "_MEIPASS2":
             env.pop(key)

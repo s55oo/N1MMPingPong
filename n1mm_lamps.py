@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.12
+Version: 1.13
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.12"
+__version__ = "1.13"
 
 import argparse
 import base64
@@ -549,6 +549,8 @@ class DisplayApp:
         self.key_watcher = None
         self.alert_on = False
         self.alert_time = 0.0
+        self.silenced = set()  # (peer id, call time) clicked away here
+        self._shown_call = None
         self.hello_now = threading.Event()
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
@@ -1122,6 +1124,7 @@ class DisplayApp:
             165, 44, text="—", font=("Segoe UI", 20, "bold"), fill="white"
         )
         self.canvas.bind("<Configure>", self._recenter_text)
+        self.canvas.bind("<Button-1>", self._silence_call)
         self.info = tk.Label(frame, text="", font=("Segoe UI", 8), justify=tk.CENTER)
         self.info.pack(fill=tk.X)
 
@@ -1166,6 +1169,8 @@ class DisplayApp:
             test = self._local_station()
         self._show_my_call(owners, now)
 
+        if not calls:
+            self._shown_call = None
         if calls:
             self._show_call(calls[-1], owners, now)
         elif test is not None:
@@ -1343,7 +1348,10 @@ class DisplayApp:
         band = mine.key[0]
         calls = [
             p for p in self._fresh_peers(now)
-            if p.alert and p.alert_band == band
+            if p.alert
+            and p.alert_band == band
+            and not (p.ips & self.local)  # never "call" ourselves
+            and (p.id, p.alert_time) not in self.silenced
         ]
         return sorted(calls, key=lambda p: p.alert_time)
 
@@ -1353,7 +1361,15 @@ class DisplayApp:
                 return st
         return None
 
+    def _silence_call(self, event=None):
+        """Click on a blinking lamp: stop blinking for this call here."""
+        peer = self._shown_call
+        if peer is not None:
+            self.silenced.add((peer.id, peer.alert_time))
+            self._shown_call = None
+
     def _show_call(self, peer, owners, now):
+        self._shown_call = peer
         station = self._peer_station(peer)
         if peer.color and owners.get(peer.color.lower()) is peer:
             color = peer.color
@@ -1371,7 +1387,9 @@ class DisplayApp:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self.info.configure(
-            text="{} kliče (F12)  ·  {} MHz  ·  S&P".format(peer.host, peer.alert_band)
+            text="{} kliče (F12)  ·  {} MHz  ·  klik = utišaj".format(
+                peer.host, peer.alert_band
+            )
         )
 
     def _show_my_call(self, owners, now):
@@ -1403,6 +1421,32 @@ def app_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+_instance_mutex = None
+
+
+def claim_single_instance(wait):
+    """Only one lamp per PC. Waits up to `wait` s for an old one to exit
+    (after an update the old lamp closes a moment after starting us)."""
+    global _instance_mutex
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    deadline = time.time() + wait
+    while True:
+        handle = kernel32.CreateMutexW(None, False, "Local\\PingPongLamp")
+        if handle and ctypes.get_last_error() != 183:  # ERROR_ALREADY_EXISTS
+            _instance_mutex = handle  # held until this process exits
+            return True
+        if handle:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.25)
+
+
 def main():
     parser = argparse.ArgumentParser(description="N1MM UDP 12060 display")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -1418,6 +1462,19 @@ def main():
         "--no-discovery", action="store_true", help="disable active discovery"
     )
     args = parser.parse_args()
+
+    after_update = os.environ.pop("PINGPONG_AFTER_UPDATE", "") == "1"
+    if not claim_single_instance(15.0 if after_update else 3.0):
+        hidden = tk.Tk()
+        hidden.withdraw()
+        messagebox.showinfo(
+            "PingPong",
+            "PingPong is already running on this PC.\n\n"
+            "Only one lamp per PC is allowed - use the window that is open.",
+            parent=hidden,
+        )
+        hidden.destroy()
+        return
 
     root = tk.Tk()
     discovery_port = 0 if args.no_discovery else args.discovery_port
