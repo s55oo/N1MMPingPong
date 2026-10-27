@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.31
+Version: 1.32
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.31"
+__version__ = "1.32"
 
 import argparse
 import base64
@@ -199,6 +199,14 @@ def band_of(freq_str):
         if lo <= mhz < hi:
             return name
     return None
+
+
+def freq_khz(freq):
+    """N1MM Freq (10 Hz units) as kHz text: '1402500' -> '14025.00 kHz'."""
+    try:
+        return "{:.2f} kHz".format(float(freq) / 100.0)
+    except (TypeError, ValueError):
+        return ""
 
 
 def group_of(freq, mode):
@@ -1360,9 +1368,16 @@ class DisplayApp:
         self.canvas.bind("<ButtonRelease-1>", self._release)
         self.canvas.bind("<Button-3>", self._show_options)
         # Small texts drawn on the lamp itself, used in compact mode.
+        # (Canvas coordinates include the call border, so stay inside it.)
         self.c_who = self.canvas.create_text(
-            8, 5, text="", anchor="nw", font=("Segoe UI", 8, "bold"), fill="white"
+            CALL_BORDER + 6, CALL_BORDER + 3, text="", anchor="nw",
+            font=("Segoe UI", 8, "bold"), fill="white",
         )
+        self.c_freq = self.canvas.create_text(
+            330 - 6, CALL_BORDER + 3, text="", anchor="ne",
+            font=("Segoe UI", 8, "bold"), fill="white",
+        )
+        self._freq_text = ""
         self.c_info = self.canvas.create_text(
             165, 84, text="", anchor="s", font=("Segoe UI", 7),
             fill="white", width=320, justify="center",
@@ -1417,9 +1432,11 @@ class DisplayApp:
         # In compact mode the status line sits on the lamp: lift the text.
         lift = 9 if self._compact else 0
         self.canvas.coords(self.text_id, w / 2.0, h / 2.0 - lift)
-        event = event or type("E", (), {"width": w, "height": h})()
-        self.canvas.coords(self.c_info, event.width / 2.0, event.height - 3)
-        self.canvas.itemconfigure(self.c_info, width=max(50, event.width - 16))
+        inset = CALL_BORDER
+        self.canvas.coords(self.c_who, inset + 6, inset + 3)
+        self.canvas.coords(self.c_freq, w - inset - 6, inset + 3)
+        self.canvas.coords(self.c_info, w / 2.0, h - inset - 2)
+        self.canvas.itemconfigure(self.c_info, width=max(50, w - 2 * inset - 12))
 
     # ---------------------------------------------------------- compact mode
 
@@ -1449,11 +1466,14 @@ class DisplayApp:
         return "break"
 
     def _sync_compact(self):
-        """Mirror the sender name and status line onto the lamp."""
+        """Texts drawn on the lamp: frequency (always, top-right); sender
+        name and status line in compact mode."""
         who = self.who.cget("text") if self._compact else ""
         info = self.info.cget("text") if self._compact else ""
         fg = self.text_on(self.canvas.cget("bg"))
-        for item, text in ((self.c_who, who), (self.c_info, info)):
+        for item, text in (
+            (self.c_who, who), (self.c_info, info), (self.c_freq, self._freq_text)
+        ):
             if self.canvas.itemcget(item, "text") != text:
                 self.canvas.itemconfigure(item, text=text)
             if self.canvas.itemcget(item, "fill") != fg:
@@ -1534,10 +1554,13 @@ class DisplayApp:
             caller = calls[-1]
             st_ = self._peer_station(caller)
             self._set_who("F12: " + (st_.label if st_ is not None else caller.host))
+            self._freq_text = freq_khz(st_.freq) if st_ is not None else ""
         elif active is not None:
             self._set_who(active.label)
+            self._freq_text = freq_khz(active.freq)
         else:
             self._set_who("")
+            self._freq_text = ""
         if calls:
             self._show_call(calls[-1], owners, now)
         elif active is not None:
