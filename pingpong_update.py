@@ -34,7 +34,15 @@ def is_frozen():
 
 
 def exe_path():
-    return os.path.abspath(sys.executable)
+    """The exe to update: always the main name, e.g. n1mm_lamps.exe.
+
+    If the lamp was started from a kept backup (n1mm_lamps.v1.6.exe), the
+    update must still go into n1mm_lamps.exe, not into the backup.
+    """
+    path = os.path.abspath(sys.executable)
+    folder, name = os.path.split(path)
+    main = re.sub(r"(\.v\d+(\.\d+)*)+\.exe$", ".exe", name, flags=re.IGNORECASE)
+    return os.path.join(folder, main)
 
 
 def parse_version(text):
@@ -166,6 +174,10 @@ def swap_in(target_exe, current_version, new_file):
 
     Works while target_exe is running. new_file is consumed (moved).
     """
+    if not os.path.exists(target_exe):
+        # Nothing to back up (e.g. started from a backup copy only).
+        os.replace(new_file, target_exe)
+        return None
     backup = backup_path(target_exe, current_version)
     _drop_old_backups(target_exe)
     os.replace(target_exe, backup)

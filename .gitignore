@@ -14,3 +14,4 @@ __pycache__/
 pingpong.ini
 *.download
 *.revert
+pingpong_test.log

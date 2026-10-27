@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.9
+Version: 1.10
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.9"
+__version__ = "1.10"
 
 import argparse
 import base64
@@ -62,6 +62,7 @@ PEER_TIMEOUT = 12.0
 NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_FLASH = 1.5
+TEST_LOG = "pingpong_test.log"
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -512,6 +513,8 @@ class DisplayApp:
         )
         # Test mode is deliberately not saved: it always starts off.
         self.var_test = tk.BooleanVar(value=False)
+        self.test_on = False  # plain copy, safe to read from the UDP thread
+        self.test_log_path = os.path.join(app_dir(), TEST_LOG)
         self.my_color = self.settings.get_text("station", "color", "")
         self.my_color_time = _float(
             self.settings.get_text("station", "color_time", "0")
@@ -572,6 +575,7 @@ class DisplayApp:
         menu.add_checkbutton(
             label="Test mode – show my button presses",
             variable=self.var_test,
+            command=self._test_toggled,
         )
         menu.add_separator()
         frozen = upd.is_frozen()
@@ -834,6 +838,8 @@ class DisplayApp:
 
     def on_packet(self, src, data):
         is_radio, caption, station_name, is_tx, freq, mode = packet_info(data)
+        if self.test_on and src in self.local:
+            self._test_log(src, data)
         station = self._station(src, station_name)
         station.count += 1
         if not station.label or station.label == station.ip:
@@ -1157,6 +1163,44 @@ class DisplayApp:
             return COLOR_IDLE
         mix = lambda c, i: int(i + (c - i) * amount)
         return "#{:02x}{:02x}{:02x}".format(mix(r, ir), mix(g, ig), mix(b, ib))
+
+    def _test_toggled(self):
+        self.test_on = bool(self.var_test.get())
+        self._test_write(
+            "=== test mode {} · PingPong v{} · local IPs {} ===".format(
+                "ON" if self.test_on else "OFF",
+                __version__,
+                ", ".join(sorted(self.local)) or "?",
+            )
+        )
+
+    def _test_write(self, line):
+        try:
+            with open(self.test_log_path, "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+        except OSError:
+            pass
+
+    def _test_log(self, src, data):
+        """Test mode: one line per packet from this PC's N1MM."""
+        raw = data.decode("utf-8", errors="replace")
+        tag = re.search(r"<(?![?!])([A-Za-z]\w*)", raw)
+
+        def field(name):
+            m = re.search(r"<{0}>(.*?)</{0}>".format(name), raw, re.S)
+            return m.group(1).strip() if m else "-"
+
+        stamp = time.strftime("%H:%M:%S") + ".{:03d}".format(int(time.time() * 1000) % 1000)
+        kind = tag.group(1) if tag else "?"
+        if kind == "RadioInfo":
+            self._test_write(
+                "{}  {}  RadioInfo  key='{}'  tx={}  freq={}  mode={}".format(
+                    stamp, src, field("FunctionKeyCaption"),
+                    field("IsTransmitting"), field("Freq"), field("Mode"),
+                )
+            )
+        else:
+            self._test_write("{}  {}  {}  ({} bytes)".format(stamp, src, kind, len(data)))
 
     def _show_test(self, station, owners, now):
         """Test mode: show this PC's last button even without transmitting.

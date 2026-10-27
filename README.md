@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.9 · Made by **S55OO** with AI assistance.
+> **Version:** 1.10 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -136,6 +136,9 @@ PC without a radio keying, nothing would show. Turn on
 - Test mode is not saved – it is always off when the lamp starts.
 - N1MM only sends the button caption, so pressing the **same** button
   twice in a row shows no new flash.
+- While test mode is on, every packet from this PC's N1MM is written to
+  `pingpong_test.log` next to the exe (time, key caption, transmit state,
+  frequency, mode), so you can check exactly what N1MM sent for each key.
 
 ### My color (Options menu, v1.7+)
 
