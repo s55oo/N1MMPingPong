@@ -1,28 +1,24 @@
-"""N1MM Logger+ UDP 12060 station display.
+"""PingPong - N1MM Logger+ UDP 12060 station lamp.
 
 One compact always-on-top window that shows which station is
 currently transmitting. The lamp lights up in the station's color
-exactly while RadioInfo reports IsTransmitting=true, and goes off as
-soon as the transmission ends, matching N1MM. It shows the text of
-the last function key press (FunctionKeyCaption, "Fx" prefix
-removed).
+exactly while RadioInfo reports IsTransmitting=true and shows the
+caption of the key that started the transmission ("Fx" prefix removed).
 
-Group key: only stations on the same band and mode as the local
-computer (running this window) are shown together. Bands 1.8, 3.5,
-7, 14, 21, 28 MHz; modes CW, RTTY, SSB (USB/LSB). A station on another
-band/mode is never shown in this window, so separate radios do not
-clash with each other.
+Group: only stations on the same band and mode as this PC's N1MM are
+shown (bands 1.8, 3.5, 7, 14, 21, 28 MHz; modes CW, RTTY, SSB with
+USB/LSB counted as SSB), so separate radios never clash.
 
-Stations are detected automatically from the traffic. Optional hints
-in lamps.cfg ("IP,label,color" per line, '#' ignored) assign a wanted
-label/color to known computers; any new station gets a label from
-its packet and a color from the auto palette.
+Lamps talk to each other with a small hello broadcast on UDP 46070
+(never on N1MM's ports): each PC can choose its own color (unique in
+the network), send an F12 call that makes S&P stations on the same
+band blink and optionally blocks their F1-F11, and report its state
+for Diagnostics. The Options menu also updates the exe from GitHub
+releases and can switch back to an older version.
 
-Network discovery: all IPv4 adapters of this PC (LAN, Wi-Fi, VPN) are
-enumerated reliably, so the local station is always recognised. PCs
-running PingPong also announce themselves to each other with a small
-hello broadcast on a separate port (46070), so a PC whose N1MM
-broadcast does not arrive here is still listed in the footer.
+Stations are detected automatically; optional lamps.cfg
+("IP,label,color" per line) gives fixed labels/colors. Per-PC settings
+are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 

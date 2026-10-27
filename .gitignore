@@ -3,7 +3,6 @@ dist/
 build/
 n1mm_lamps.spec
 *.exe
-!n1mm_lamps.exe
 
 # Logs & cache
 n1mm_pingpong.log
@@ -15,3 +14,6 @@ pingpong.ini
 *.download
 *.revert
 pingpong_test.log
+
+# Per-PC station file (see lamps.example.cfg)
+lamps.cfg
