@@ -16,11 +16,10 @@ import threading
 VK_F12 = 0x7B
 N1MM_EXE = "n1mmlogger.net.exe"
 
-# Keys that make N1MM send a message: F1-F11, plus Enter (Enter Sends
-# Messages), Insert, ';' and "'" (N1MM's send / TU keys). Esc is never
-# blocked, so an operator can always stop a transmission.
+# Keys blocked during an incoming call: only N1MM's function keys F1-F11
+# (F12 stays free - it is the call key). Esc, Enter and all other keys
+# are never blocked, so an operator can always stop a transmission.
 SEND_KEYS = {vk: "F{}".format(vk - 0x6F) for vk in range(0x70, 0x7B)}
-SEND_KEYS.update({0x0D: "Enter", 0x2D: "Insert", 0xBA: ";", 0xDE: "'"})
 LLKHF_ALTDOWN = 0x20
 
 WH_KEYBOARD_LL = 13

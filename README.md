@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.14 · Made by **S55OO** with AI assistance.
+> **Version:** 1.15 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -152,12 +152,11 @@ Signal the other operators on your band without transmitting. Turn on
 **Options ▾ → Block my F-keys while another station calls (F12)** – set
 on the PCs that should be stopped (saved per PC, off by default).
 
-- While this PC's lamp blinks for an F12 call (same band, S&P), the keys
-  that make N1MM send are swallowed: **F1–F11, Enter, Insert, `;` and
-  `'`**. The lamp shows `BLOKIRANO · F1` and the footer
-  `tipke blokirane`.
-- **Esc is never blocked**, and neither are Alt combinations (Alt+F4…),
-  letters or F12.
+- While this PC's lamp blinks for an F12 call (same band, S&P), N1MM's
+  function keys **F1–F11** are swallowed – only at that time. The lamp
+  shows `BLOKIRANO · F1` and the footer `tipke blokirane`.
+- All other keys work normally: **Esc**, Enter, letters, F12 and Alt
+  combinations (Alt+F4…) are never blocked.
 - Blocking ends as soon as the caller presses F12 again, or when you
   **click the lamp** (silence), change band, or go to Run.
 - Only works while N1MM is the active window. It does **not** stop mouse
