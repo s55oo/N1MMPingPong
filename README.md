@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.15 · Made by **S55OO** with AI assistance.
+> **Version:** 1.16 · Made by **S55OO** with AI assistance.
 
 Shows which computer/station on the network is currently **transmitting**.
 It listens to the N1MM Logger+ external UDP broadcast (XML) on port **12060**
@@ -154,11 +154,13 @@ on the PCs that should be stopped (saved per PC, off by default).
 
 - While this PC's lamp blinks for an F12 call (same band, S&P), N1MM's
   function keys **F1–F11** are swallowed – only at that time. The lamp
-  shows `BLOKIRANO · F1` and the footer `tipke blokirane`.
+  shows `BLOKIRANO · F1` and the footer `F-tipke blokirane še 35 s`.
 - All other keys work normally: **Esc**, Enter, letters, F12 and Alt
   combinations (Alt+F4…) are never blocked.
 - Blocking ends as soon as the caller presses F12 again, or when you
-  **click the lamp** (silence), change band, or go to Run.
+  **click the lamp** (silence), change band, or go to Run – and **by
+  itself after 40 s** if the caller forgets (the lamp keeps blinking,
+  footer `blokada potekla`).
 - Only works while N1MM is the active window. It does **not** stop mouse
   clicks on N1MM's F-key buttons, microphone PTT, paddle or footswitch –
   it is a guard against accidental key presses, not a hardware

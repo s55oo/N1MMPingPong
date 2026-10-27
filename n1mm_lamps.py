@@ -26,14 +26,14 @@ broadcast does not arrive here is still listed in the footer.
 
 Made by S55OO with AI assistance.
 
-Version: 1.15
+Version: 1.16
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.15"
+__version__ = "1.16"
 
 import argparse
 import base64
@@ -64,7 +64,8 @@ NETWORK_REFRESH = 30.0
 LOCAL_N1MM_RECENT = 10.0
 TEST_FLASH = 1.5
 TEST_LOG = "pingpong_test.log"
-BLINK_HALF = 0.4  # seconds on / off when a call (F12) blinks the lamp
+BLINK_HALF = 0.4
+BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets  # seconds on / off when a call (F12) blinks the lamp
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -552,6 +553,7 @@ class DisplayApp:
         self.block_on = bool(self.var_block.get())
         self._block_active = False
         self._blocked_key = ("", 0.0)
+        self._call_seen = {}  # (peer id, call time) -> local time first seen
         self.key_watcher = None
         self.alert_on = False
         self.alert_time = 0.0
@@ -1175,7 +1177,9 @@ class DisplayApp:
                 active = station
 
         all_calls = self._incoming_calls(now)
-        self._block_active = self.block_on and bool(all_calls)
+        self._block_active = self.block_on and any(
+            self._block_left(p, now) > 0 for p in all_calls
+        )
         calls = all_calls if active is None else []
         test = None
         if active is None and not calls and self.var_test.get():
@@ -1386,6 +1390,15 @@ class DisplayApp:
         ]
         return sorted(calls, key=lambda p: p.alert_time)
 
+    def _block_left(self, peer, now):
+        """Seconds of F-key blocking left for this call (local clock)."""
+        key = (peer.id, peer.alert_time)
+        start = self._call_seen.setdefault(key, now)
+        if len(self._call_seen) > 50:  # forget old calls
+            for old in sorted(self._call_seen, key=self._call_seen.get)[:-20]:
+                self._call_seen.pop(old, None)
+        return BLOCK_LIMIT - (now - start)
+
     def _peer_station(self, peer):
         for st in list(self.stations.values()):
             if st.ip in peer.ips:
@@ -1424,9 +1437,17 @@ class DisplayApp:
             text="{} kliče (F12)  ·  {} MHz  ·  {}klik = utišaj".format(
                 peer.host,
                 peer.alert_band,
-                "tipke blokirane  ·  " if self._block_active else "",
+                self._block_note(peer, now),
             )
         )
+
+    def _block_note(self, peer, now):
+        if not self.block_on:
+            return ""
+        left = self._block_left(peer, now)
+        if left > 0 and self._block_active:
+            return "F-tipke blokirane še {} s  ·  ".format(int(left + 0.999))
+        return "blokada potekla  ·  "
 
     def _show_my_call(self, owners, now):
         """Own feedback while my call is on: thick border in my color."""
