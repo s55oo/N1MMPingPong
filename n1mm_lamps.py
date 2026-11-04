@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.51
+Version: 1.52
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.51"
+__version__ = "1.52"
 
 import argparse
 import base64
@@ -90,6 +90,8 @@ BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
 MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
+URGENT_LIMIT = 30.0  # s: an urgent call (Shift+F4) ends by itself
+URGENT_HALF = 0.15  # s: fast flash of an urgent call
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
@@ -496,6 +498,7 @@ def make_hello(
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
     n1mm_master="", started=0.0, colors="", block_time=0.0,
     alert_run=False, block_time_run=0.0,
+    urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0,
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -518,6 +521,10 @@ def make_hello(
         ("BlockTime", "{:g}".format(block_time) if block_time else ""),
         ("AlertRun", "1" if alert_run else "0"),
         ("BlockTimeRun", "{:g}".format(block_time_run) if block_time_run else ""),
+        ("Urgent", "1" if urgent else "0"),
+        ("UrgentBand", urgent_band or ""),
+        ("UrgentMode", urgent_mode or ""),
+        ("UrgentTime", "{:.3f}".format(urgent_time or 0.0)),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -557,6 +564,10 @@ def parse_hello(data):
         "block_time": _float(get("BlockTime")),
         "alert_run": get("AlertRun") == "1",
         "block_time_run": _float(get("BlockTimeRun")),
+        "urgent": get("Urgent") == "1",
+        "urgent_band": get("UrgentBand"),
+        "urgent_mode": get("UrgentMode"),
+        "urgent_time": _float(get("UrgentTime")),
     }
 
 
@@ -753,6 +764,10 @@ class Peer:
         self.block_time = 0.0
         self.block_time_run = 0.0
         self.alert_run = False
+        self.urgent = False
+        self.urgent_band = ""
+        self.urgent_mode = ""
+        self.urgent_time = 0.0
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -819,6 +834,10 @@ class DisplayApp:
         self.key_watcher = None
         self.alert_on = False
         self.alert_run = False  # my call was started in Run (blocks every station)
+        self.urgent_on = False  # my urgent call (Shift+F4)
+        self.urgent_time = 0.0
+        self.urgent_key = ("", "")  # (band, mode) of my urgent call
+        self._shown_urgent = None
         self.alert_time = 0.0
         self.silenced = set()  # (peer id, call time) clicked away here
         self._shown_call = None
@@ -949,7 +968,7 @@ class DisplayApp:
             command=self._choose_color,
         )
         menu.add_checkbutton(
-            label="F12 call – blink stations on my band",
+            label="F12 call – blink stations on my band (Shift+F4 = urgent)",
             variable=self.var_keys,
             command=self._keys_toggled,
         )
@@ -1339,6 +1358,10 @@ class DisplayApp:
         peer.block_time = info.get("block_time", 0.0) or 0.0
         peer.block_time_run = info.get("block_time_run", 0.0) or 0.0
         peer.alert_run = info.get("alert_run", False)
+        peer.urgent = info.get("urgent", False)
+        peer.urgent_band = info.get("urgent_band", "")
+        peer.urgent_mode = info.get("urgent_mode", "")
+        peer.urgent_time = info.get("urgent_time", 0.0)
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1418,6 +1441,10 @@ class DisplayApp:
             "block_time": self.block_limit if self._i_am_master else 0.0,
             "alert_run": self.alert_on and self.alert_run,
             "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
+            "urgent": self.urgent_on,
+            "urgent_band": self.urgent_key[0],
+            "urgent_mode": self.urgent_key[1],
+            "urgent_time": self.urgent_time,
         }
 
     # ---------------------------------------------------------- colors
@@ -1875,6 +1902,99 @@ class DisplayApp:
             "Run" if run else "S&P", value))
         self.hello_now.set()  # tell all lamps right away
 
+    def _urgent_pressed(self):
+        """Keyboard thread: Shift+F4 in N1MM toggles this PC's urgent call."""
+        if not self.f12_on:
+            return
+        mine = self._local_station()
+        if not self.urgent_on and (mine is None or not mine.key):
+            self._key_event("Shift+F4 ignored - this PC's band/mode unknown")
+            return
+        self.urgent_on = not self.urgent_on
+        if self.urgent_on:
+            self.urgent_key = (mine.key[0], mine.key[1])
+        self.urgent_time = time.time()
+        self.hello_now.set()
+        if self.test_on:
+            self._test_write("{}  Shift+F4  urgent call {}".format(
+                time.strftime("%H:%M:%S"),
+                "ON ({} {})".format(*self.urgent_key) if self.urgent_on else "OFF",
+            ))
+
+    def _my_urgent_left(self, now):
+        return max(0, int(URGENT_LIMIT - (now - self.urgent_time) + 0.999))
+
+    def _urgent_left(self, peer, now):
+        """Seconds an urgent call still runs here (local clock)."""
+        key = ("urgent", peer.id, peer.urgent_time)
+        start = self._call_seen.setdefault(key, now)
+        return URGENT_LIMIT - (now - start)
+
+    def _incoming_urgent(self, now):
+        """Urgent calls (Shift+F4) from other PCs on this PC's band and
+        mode - Run or S&P, every station is called."""
+        mine = self._local_station()
+        if mine is None or not mine.key:
+            return []
+        band, mode = mine.key[0], mine.key[1]
+        calls = [
+            p for p in self._fresh_peers(now)
+            if getattr(p, "urgent", False)
+            and p.urgent_band == band
+            and p.urgent_mode == mode
+            and not getattr(p, "same_pc", False)
+            and ("urgent", p.id, p.urgent_time) not in self.silenced
+            and self._urgent_left(p, now) > 0
+        ]
+        return sorted(calls, key=lambda p: p.urgent_time)
+
+    def _show_urgent(self, peer, owners, now):
+        """Intense flash: lamp and border swap caller color / white fast."""
+        self._shown_urgent = peer
+        station = self._peer_station(peer)
+        color = self._call_color(peer, owners, now)
+        name = self.peer_name(peer) if peer.alias or station is None else self.station_name(station)
+        lit = int(now / URGENT_HALF) % 2 == 0
+        self._set_bg(color if lit else "white")
+        want = "white" if lit else color
+        if self.canvas.cget("highlightbackground") != want:
+            self.canvas.configure(highlightbackground=want, highlightcolor=want)
+        shown = "!! {} !!".format(name)
+        if self.canvas.itemcget(self.text_id, "text") != shown:
+            self.canvas.itemconfigure(self.text_id, text=shown)
+            self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
+        self._set_who("URGENT: " + self.peer_name(peer))
+        self._freq_text = freq_khz(station.freq) if station is not None else ""
+        left = max(0, int(self._urgent_left(peer, now) + 0.999))
+        self.info.configure(
+            text="URGENT call from {}  ·  {} {}  ·  {} s left  ·  click = silence".format(
+                self.peer_name(peer), peer.urgent_band, peer.urgent_mode, left,
+            )
+        )
+        self._urgent_sound(peer)
+
+    def _urgent_sound(self, peer):
+        """Three high beeps once per urgent call (if sound is on)."""
+        key = ("urgent", peer.id, peer.urgent_time)
+        if key in self._beeped:
+            return
+        self._beeped.add(key)
+        if not self.var_sound.get():
+            return
+        self._key_event("urgent sound for {}".format(self.peer_name(peer)))
+
+        def beep():
+            try:
+                import winsound
+
+                for _ in range(3):
+                    winsound.Beep(1600, 180)
+                    time.sleep(0.06)
+            except Exception:
+                pass
+
+        threading.Thread(target=beep, daemon=True).start()
+
     def _my_limit(self):
         return self.block_limit_run if self.alert_run else self.block_limit
 
@@ -2240,6 +2360,11 @@ class DisplayApp:
         if warn != self._master_warn:
             self._key_event("master warning: {}".format(warn or "cleared"))
             self._master_warn = warn
+        if self.urgent_on and now - self.urgent_time > URGENT_LIMIT:
+            self.urgent_on = False  # urgent call ends by itself
+            self.urgent_time = now
+            self._key_event("urgent call ended after {:g} s".format(URGENT_LIMIT))
+            self.hello_now.set()
         if self.alert_on and now - self.alert_time > self._my_limit():
             self.alert_on = False  # call time over: end my F12 call
             self.alert_time = now
@@ -2282,6 +2407,12 @@ class DisplayApp:
         calls = all_calls if active is None else []
         self._show_border(owners, now, all_calls)
 
+        urgent = self._incoming_urgent(now)
+        if urgent:
+            self._show_urgent(urgent[-1], owners, now)
+            self._update_tail()
+            return
+        self._shown_urgent = None
         if not calls:
             self._shown_call = None
         if calls:
@@ -2327,6 +2458,8 @@ class DisplayApp:
                         self._pp_left,
                     )
                 )
+            elif self.urgent_on:
+                idle = "URGENT · {} s".format(self._my_urgent_left(now))
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
             if now - self._f12_refused <= 2.0 and self._band_busy is not None:
@@ -2340,6 +2473,10 @@ class DisplayApp:
                     self._my_band() or "?",
                     "Run call – all stations" if self.alert_run else "S&P stations",
                     self._my_call_left(now),
+                ) + header
+            if self.urgent_on:
+                header = "URGENT call ON ({} {}) · {} s left – Shift+F4 = off  ·  ".format(
+                    self.urgent_key[0] or "?", self.urgent_key[1], self._my_urgent_left(now)
                 ) + header
             note = self._my_color_note(owners)
             if note:
@@ -2359,7 +2496,9 @@ class DisplayApp:
             parts.extend(self._peer_rows(now))
             rows = "  ·  ".join(parts) if parts else "waiting for N1MM…"
             self.info.configure(text=header + rows)
+        self._update_tail()
 
+    def _update_tail(self):
         if self._master_warn:
             self.info.configure(
                 text="⚠ " + self._master_warn + "  ·  " + self.info.cget("text"),
@@ -2441,6 +2580,7 @@ class DisplayApp:
             should_block=self._keys_to_block,
             on_blocked=self._key_blocked,
             on_event=self._key_event,
+            on_urgent=self._urgent_pressed,
         )
         if not watcher.start():
             messagebox.showerror(
@@ -2667,6 +2807,11 @@ class DisplayApp:
 
     def _silence_call(self, event=None):
         """Click on a blinking lamp: stop blinking for this call here."""
+        if self._shown_urgent is not None:
+            peer = self._shown_urgent
+            self.silenced.add(("urgent", peer.id, peer.urgent_time))
+            self._shown_urgent = None
+            return
         peer = self._shown_call
         if peer is not None:
             self.silenced.add((peer.id, peer.alert_time))
@@ -2753,7 +2898,12 @@ class DisplayApp:
           swap colors back and forth - lamp lit / border dark, then lamp
           dark / border lit.
         """
-        if self.alert_on:
+        if self.urgent_on:
+            mine = self._local_station()
+            color = (self._color_for(mine, owners, now) if mine else "") or "red"
+            lit = int(now / URGENT_HALF) % 2 == 0
+            want = color if lit else "white"
+        elif self.alert_on:
             mine = self._local_station()
             color = (self._color_for(mine, owners, now) if mine else "") or "red"
             lit = int(now / BLINK_HALF) % 2 == 0

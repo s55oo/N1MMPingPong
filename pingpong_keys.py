@@ -15,6 +15,8 @@ import sys
 import threading
 
 VK_F12 = 0x7B
+VK_F4 = 0x73
+VK_SHIFT = 0x10
 N1MM_EXE = "n1mmlogger.net.exe"
 
 # Keys blocked during an incoming call: only N1MM's function keys F1-F11
@@ -69,8 +71,14 @@ def _winapi():
             ctypes.POINTER(wintypes.DWORD),
         ]
         kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        user32.GetAsyncKeyState.restype = ctypes.c_short
         _api = (ctypes, wintypes, user32, kernel32, {})
     return _api
+
+
+def shift_down():
+    """Is a Shift key held right now?"""
+    return bool(_winapi()[2].GetAsyncKeyState(VK_SHIFT) & 0x8000)
 
 
 def foreground_exe():
@@ -110,12 +118,14 @@ class KeyWatcher:
 
     def __init__(
         self, on_press, vk=VK_F12, only_exe=N1MM_EXE,
-        should_block=None, on_blocked=None, on_event=None,
+        should_block=None, on_blocked=None, on_event=None, on_urgent=None,
     ):
         self.on_press = on_press
         self.on_event = on_event or (lambda text: None)
         self.should_block = should_block
         self.on_blocked = on_blocked
+        self.on_urgent = on_urgent  # Shift+F4: urgent call
+        self._u_down = False
         self.vk = vk
         self.only_exe = only_exe
         self.error = None
@@ -143,7 +153,7 @@ class KeyWatcher:
             ctypes.WinDLL("user32").PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
             self._thread_id = 0
 
-    def decide(self, vk, flags, wparam, foreground=None):
+    def decide(self, vk, flags, wparam, foreground=None, shift=None):
         """What to do with one key event: "block", "press" or None.
 
         Called for every key; must be quick. foreground() is only asked
@@ -151,6 +161,17 @@ class KeyWatcher:
         """
         fg = foreground or foreground_exe
         down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
+        if vk == VK_F4 and self.on_urgent is not None and not (flags & LLKHF_ALTDOWN):
+            # Shift+F4 starts PingPong's urgent call. The key is only
+            # watched: N1MM still gets it and fires F4 at the same time
+            # (unless F-keys are blocked right now, see below).
+            if down:
+                if not self._u_down and (shift or shift_down)():
+                    self._u_down = True  # ignore auto-repeat
+                    if not self.only_exe or fg() == self.only_exe:
+                        self.on_urgent()
+            elif wparam in (WM_KEYUP, WM_SYSKEYUP):
+                self._u_down = False
         blocked = None
         if vk in KEY_NAMES and self.should_block is not None:
             # should_block() returns the keys to block now: a set of

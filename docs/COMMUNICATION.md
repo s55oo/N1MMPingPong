@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.51</Version>
+  <Version>1.52</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -97,6 +97,10 @@ from.
   <BlockTime>30</BlockTime>        <!-- S&P-call block time in s (1-30), only from the master -->
   <AlertRun>0</AlertRun>           <!-- 1 = the call was started in Run: reaches all stations -->
   <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
+  <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F4) on -->
+  <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
+  <UrgentMode>CW</UrgentMode>
+  <UrgentTime>1793127941.120</UrgentTime>
 </PingPongHello>
 ```
 
@@ -194,6 +198,15 @@ lamp**, changes band or (S&P call) switches to Run, when the calling lamp
 has not been heard for 12 s, and in any case after the call's **block
 time** (1–30 s each, set on the master): then blinking and block stop
 everywhere and the caller's call switches itself off.
+
+### Urgent call (Shift+F4)
+
+Shift+F4 in N1MM is passed on to N1MM (F4 fires as usual) **and** turns
+on `<Urgent>` with this PC's band and mode. Every lamp on the **same band
+and mode** – Run or S&P – flashes fast (0.15 s, caller color ↔ white),
+shows `!! caller !!`, beeps three times and puts this above everything
+else on the lamp. No keys are blocked. It ends with Shift+F4 again, after
+30 s (counted on each lamp's own clock), or on one PC with a click.
 
 ---
 
@@ -340,7 +353,8 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Lamp considered gone | 12 s without a hello |
 | Network adapters re-read | every 30 s |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
-| Blink rhythm | 0.4 s on / 0.4 s off |
+| Blink rhythm | 0.4 s on / 0.4 s off; urgent call 0.15 s |
+| Urgent call time | 30 s |
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
 | F12 call time | S&P call: 1–30 s, default 30 (`<BlockTime>`); Run call: 1–30 s, default 5 (`<BlockTimeRun>`); both set on the master. Then blinking and block end on the receivers and the caller's call switches off |

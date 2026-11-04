@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.51 · Made by **S55OO** with AI assistance.
+> **Version:** 1.52 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -18,6 +18,8 @@ On top of that the lamps talk to each other, so operators can:
   and optionally **block their F-keys** – a call from a **Run** station
   reaches **all** stations on the band, with its own, shorter block time
   (both set on the master);
+- send an **urgent call** with **Shift+F4**: every station on the same
+  band and mode flashes fast, Run or S&P;
 - use the **ping-pong lock**: RUN and inband stations (INB) on one band
   take turns, like with an interlock box;
 - see every station also when N1MM only sends to `127.0.0.1` or the PCs
@@ -188,7 +190,7 @@ stations, and every other lamp uses its list.
   | `⚠ TWO MASTERS: RUN1, RUN2 – …` | two lamps both act as master: they don't hear each other (one-way firewall – **Allow PingPong in Windows Firewall…** on both), or one runs an old version. Colors and block times can differ until it's fixed. |
   | `⚠ N1MM master on RUN1 and RUN2 – …` | two N1MMs say they are network master. PingPong still picks one, but check N1MM's **Network Status** window. |
 
-### F12 call (Options ▾ → F12 call – blink stations on my band)
+### F12 call (Options ▾ → F12 call – blink stations on my band (Shift+F4 = urgent))
 
 Warn the other operators on your band without transmitting.
 
@@ -225,6 +227,26 @@ Warn the other operators on your band without transmitting.
   it. F12 in other programs is ignored by PingPong.
 - Real transmissions on the band still take priority on the lamp.
 
+### Urgent call (Shift+F4)
+
+For when everybody on the band must look **now**.
+
+- Works on PCs with **F12 call** turned on in Options.
+- Press **Shift+F4 while N1MM is the active window** → urgent call **on**.
+  N1MM still gets the key and fires **F4 at the same time**, as usual.
+- **Every** other PingPong PC on the **same band and mode**, Run or S&P,
+  **flashes fast**: the lamp and its border swap between your color and
+  white, it shows `!! <your station> !!` and gives **three high beeps**
+  (if **Sound on F12 call** is on). It takes over the lamp, even over a
+  transmission or an F12 call. The line under it says
+  `URGENT call from RUN1 · 14 CW · 25 s left · click = silence`.
+- Your own lamp's border flashes and counts down: `URGENT · 25 s`.
+- Ends with **Shift+F4 again**, by itself after **30 s**, or – on one
+  PC – with a **click on the lamp** there.
+- It does **not** block any keys. While your own F-keys are blocked (F12
+  call or ping-pong lock), the urgent call still goes out, but N1MM
+  doesn't get F4.
+
 ### Block my F-keys (Options ▾ → Block my F-keys while another station calls (F12))
 
 Turn this on on the PCs that should be **stopped** during a call (saved
@@ -234,7 +256,8 @@ per PC, off by default).
   **F1–F11** are swallowed. The lamp shows `BLOCKED · F1` when a key is
   stopped, the line under it `RUN1 calls (F12) · 14 MHz · 15 s left ·
   F-keys blocked`, and lamp and border **swap colors** back and forth.
-- **Esc**, Enter, letters, F12 and Alt combinations always work.
+- **Esc**, Enter, letters, F12 and Alt combinations always work;
+  Shift+F4 still starts an urgent call.
 - A **Run call** also blocks Run stations – tick this option on the Run
   PCs too if they should be stopped.
 - The block ends when the caller presses F12 again, when you click the
