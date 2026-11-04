@@ -14,6 +14,11 @@ echo Building n1mm_lamps.exe ...
 python -m PyInstaller --noconfirm --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
 if errorlevel 1 goto :error
 
+echo Building pingpong_overview.exe ...
+python -m PyInstaller --noconfirm --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
+if errorlevel 1 goto :error
+copy /Y dist\pingpong_overview.exe pingpong_overview.exe >nul
+
 copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe >nul
 if errorlevel 1 (
     echo.

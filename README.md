@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.57 · Made by **S55OO** with AI assistance.
+> **Version:** 1.58 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -35,11 +35,12 @@ F12 call step by step, updates – is described with diagrams in
 
 ![PingPong communication overview](docs/communication.svg)
 
-Two tools are provided:
+Three tools are provided:
 
 | File | What it is |
 |---|---|
 | `n1mm_lamps.exe` / `n1mm_lamps.py` | **Lamp** – small window that lights up in the color of the station on transmit |
+| `pingpong_overview.exe` / `pingpong_overview.py` | **Overview** – live table of all stations, in a window and as a web page for any browser (for the master PC) |
 | `PingPong.bat` / `n1mm_watch.py` | **Watcher** – detailed list of all N1MM packets (debug/analysis, needs Python) |
 
 ---
@@ -465,7 +466,48 @@ PC, kept by updates.
 
 ---
 
-## 3. Troubleshooting
+## 3. Overview (pingpong_overview.exe)
+
+A separate program for the **master PC** (or the captain's PC): one live
+table of every PingPong station. Download `pingpong_overview.exe` from
+the [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest),
+put it anywhere and start it – no setup.
+
+| Column | Shows |
+|---|---|
+| Station | name (My name, else PC name); **★** = master |
+| PC, Version | Windows name and PingPong version |
+| Band, Mode, Frequency, Run/S&P | from that PC's N1MM |
+| Role | ping-pong role (RUN / INB / –) |
+| Now | `TX <message> (time)` while it transmits – the row is in the station's color |
+| Last TX | last message and how long ago |
+| Calls | `F12 S&P call` / `F12 Run call` (row yellow), `URGENT` (row flashes red) |
+| Keys | `F-keys blocked`, `ping-pong WAIT`, `holds slot` |
+| Seen | time since that lamp was last heard (grey after 12 s) |
+
+Above the table: number of lamps, the master and both F12 block times – or
+a red `⚠ TWO MASTERS`. Below it: different versions, who holds the
+ping-pong slot per band, and lamps whose N1MM data doesn't arrive.
+
+**Web page.** The same table is served at `http://<master PC>:8046` –
+open it in any browser on the network, also on a **phone or tablet**
+(nothing to install; it updates every second). The addresses are shown at
+the bottom of the window. Other devices can open it once Windows allows
+it: click **Allow web page in firewall…** in the window (asks for
+administrator rights; rule `PingPong Overview web page`, TCP 8046).
+
+- It only **listens** to the lamps (UDP 46070) and sends nothing to
+  them. It never opens N1MM's port 12060, so it can run next to the
+  master's lamp without taking N1MM's packets away.
+- It shows stations whose PC runs a PingPong lamp with **Share my N1MM
+  with other lamps** on (the default).
+- `pingpong_overview.exe [--discovery-port 46070] [--web-port 8046]`
+  (`--web-port 0` = no web page). Window place and **Always on top** are
+  kept in `pingpong_overview.ini` next to the exe.
+
+---
+
+## 4. Troubleshooting
 
 | Problem | What to check |
 |---|---|
@@ -482,7 +524,7 @@ PC, kept by updates.
 
 ---
 
-## 4. Watcher (PingPong.bat / n1mm_watch.py)
+## 5. Watcher (PingPong.bat / n1mm_watch.py)
 
 Detailed view of all UDP traffic: station table on the left, traffic on the
 right, details of the selected packet at the bottom. Needs Python.
@@ -503,7 +545,7 @@ right, details of the selected packet at the bottom. Needs Python.
 
 ---
 
-## 5. Building the EXE
+## 6. Building the EXEs
 
 Normally you don't need to: every release is built automatically (see
 below). To build locally, with Python installed, double-click
@@ -513,6 +555,8 @@ below). To build locally, with Python installed, double-click
 python -m pip install pyinstaller
 python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
 copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
+python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
+copy /Y dist\pingpong_overview.exe pingpong_overview.exe
 ```
 
 **Antivirus false positives:** a locally built EXE can be flagged by
@@ -526,18 +570,21 @@ Prefer the release download if AV flags a local build.
 **Releases are automatic.** On every push to `main` the workflow reads
 `__version__` from `n1mm_lamps.py`. If release `v<version>` doesn't exist
 yet, it creates the tag and the release, with notes from
-`releases/v<version>.md`, and attaches the freshly built EXE. To publish a
+`releases/v<version>.md`, and attaches both freshly built EXEs
+(`n1mm_lamps.exe`, `pingpong_overview.exe`; the lamp's updater only
+uses `n1mm_lamps.exe`). To publish a
 new version: bump `__version__`, add `releases/vX.Y.md`, push to `main`.
 Existing releases are never overwritten.
 
 ---
 
-## 6. Files
+## 7. Files
 
 ```
 n1mm_lamps.py       – lamp (source)
 pingpong_update.py  – self-update / switch-version logic (built into the exe)
 pingpong_keys.py    – F12 key watcher and F-key block (built into the exe)
+pingpong_overview.py – overview window + web page (source)
 n1mm_watch.py       – traffic watcher (source)
 PingPong.bat        – watcher launcher
 build_exe.bat       – local one-click EXE build
@@ -561,4 +608,5 @@ pingpong.ini        – per-PC settings from the Options menu
 pingpong_test.log   – Diagnostics log (only while Diagnostics is on)
 pingpong_error.log  – unexpected errors (only if one happens)
 n1mm_lamps.vX.exe   – backup kept by the updater for "Revert"
+pingpong_overview.exe / .ini – Overview program and its window settings (master PC)
 ```

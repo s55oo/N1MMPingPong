@@ -44,26 +44,34 @@ jobs:
           python -m PyInstaller --version
 
       - name: Build
-        run: python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
+        run: |
+          python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: SHA-256
         run: |
-          $h = (Get-FileHash dist\n1mm_lamps.exe -Algorithm SHA256).Hash
-          "SHA-256 $h"
-          "**n1mm_lamps.exe** SHA-256: ``$h``" >> $env:GITHUB_STEP_SUMMARY
+          foreach ($f in "n1mm_lamps.exe", "pingpong_overview.exe") {
+            $h = (Get-FileHash "dist\$f" -Algorithm SHA256).Hash
+            "$f SHA-256 $h"
+            "**$f** SHA-256: ``$h``" >> $env:GITHUB_STEP_SUMMARY
+          }
 
       # Informational: does Defender flag the fresh build? Never fails the job.
       - name: Defender scan
         continue-on-error: true
         run: |
-          Start-MpScan -ScanType CustomScan -ScanPath "$PWD\dist\n1mm_lamps.exe"
+          Start-MpScan -ScanType CustomScan -ScanPath "$PWD\dist"
           $t = Get-MpThreatDetection
           if ($t) { $t | Format-List ThreatID, Resources; "Defender flagged the build" } else { "Defender: clean" }
 
       - uses: actions/upload-artifact@v6
         with:
-          name: n1mm_lamps.exe
-          path: dist/n1mm_lamps.exe
+          name: pingpong-exes
+          path: |
+            dist/n1mm_lamps.exe
+            dist/pingpong_overview.exe
           if-no-files-found: error
 
       - name: Release
@@ -92,6 +100,6 @@ jobs:
             }
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          gh release upload $tag dist/n1mm_lamps.exe --repo $env:GITHUB_REPOSITORY --clobber
+          gh release upload $tag dist/n1mm_lamps.exe dist/pingpong_overview.exe --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { exit 1 }
           "Released $tag" >> $env:GITHUB_STEP_SUMMARY

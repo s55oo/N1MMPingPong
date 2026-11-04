@@ -31,6 +31,11 @@ are three kinds of traffic:
    network the lamps share (LAN, ZeroTier, VPN), even if N1MM only sends to
    `127.0.0.1`.
 3. **Lamp → GitHub** (HTTPS): only to check for and download updates.
+4. **Overview** (optional, on the master PC): `pingpong_overview.exe`
+   only **listens** on UDP 46070 – hellos and relays – and shows all
+   stations in a window and as a web page on **TCP 8046**
+   (`http://<master PC>:8046`) for any browser. It sends nothing to the
+   lamps and never opens 12060.
 
 On its own PC the lamp also **watches the keyboard** while N1MM is the
 active window: F12 starts or ends a call, during a call it can swallow
@@ -53,6 +58,7 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
 | **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay) |
 | HTTPS 443 | lamp → `api.github.com`, `github.com` | PingPong | release list, exe download |
+| TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
 
 Port 46070 is deliberately far away from N1MM's ports: N1MM parses
 anything that arrives on its multi-computer port (12070), and older
@@ -80,7 +86,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.57</Version>
+  <Version>1.58</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
