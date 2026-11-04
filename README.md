@@ -35,8 +35,7 @@ Two tools are provided:
 
 ![PingPong lamp](PingPong.png)
 
-*(Screenshot of an earlier version; the current lamp also has the
-**Options ▾** menu and shows the sending PC's name in the top-left corner.)*
+*RUN1 (PC OO840G4, role RUN) is transmitting `CQ` on 7016.00 kHz CW.*
 
 ---
 
