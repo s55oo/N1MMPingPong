@@ -30,7 +30,7 @@ import threading
 import time
 import tkinter as tk
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 import n1mm_lamps as pp
 
@@ -42,6 +42,10 @@ FORGET_AFTER = 120.0  # s: lamp removed from the table
 PP_LIMIT = pp.PP_LIMIT  # s: ping-pong slot frees itself
 REFRESH_MS = 250
 FIREWALL_RULE = "PingPong Overview web page"
+STATS_FILE = "pingpong_stats.json"  # function key counts, kept over restarts
+STATS_SAVE = 30.0  # s
+FKEYS = ["F{}".format(n) for n in range(1, 13)]
+CAPTION_KEY = re.compile(rb"<FunctionKeyCaption>\s*(F\d{1,2})\b", re.IGNORECASE)
 
 STATUS_N1MM = re.compile(r"N1MM (\S+) (\S+) from [^,]*, (Run|S&P)")
 
@@ -90,6 +94,12 @@ def ago(seconds):
     return "{} h".format(seconds // 3600)
 
 
+def ago_long(seconds):
+    """Total time as h:mm:ss."""
+    seconds = int(seconds)
+    return "{}:{:02d}:{:02d}".format(seconds // 3600, seconds // 60 % 60, seconds % 60)
+
+
 def band_sort(band):
     try:
         return float(band)
@@ -120,6 +130,11 @@ class Lamp:
         self.last_caption = ""
         self.last_tx_end = 0.0
         self.n1mm_name = ""
+
+    def stats_key(self):
+        """Stats belong to the PC (the lamp id changes at every restart)."""
+        host = (self.hello.get("host") or "").lower()
+        return "pc:" + host if host else "n1mm:" + self.n1mm_name.lower()
 
     def name(self):
         return self.hello.get("alias") or self.hello.get("host") or self.n1mm_name or self.id
@@ -155,6 +170,11 @@ class Overview:
         self.error = ""
         self.web_error = ""
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
+        self.stats_path = os.path.join(app_dir(), STATS_FILE)
+        self.stats = {}  # stats key -> {"name", "keys": {F1: n}, "other", "tx_time"}
+        self.stats_since = time.time()
+        self._load_stats()
+        self._stats_saved = time.time()
         self._hex = {}
         self.stop = threading.Event()
         self.cfg = configparser.ConfigParser()
@@ -223,8 +243,10 @@ class Overview:
                 if is_tx and not lamp.tx:
                     lamp.tx_start = now
                     self._pingpong_tx(lamp, now)
+                    self._count_key(lamp, payload, caption)
                 if not is_tx and lamp.tx:
                     lamp.last_tx_end = now
+                    self._stat(lamp)["tx_time"] += min(now - lamp.tx_start, 600.0)
                 if is_tx and caption:
                     lamp.caption = caption
                     lamp.last_caption = caption
@@ -237,6 +259,99 @@ class Overview:
                 lamp.hello = info
                 lamp.hello_seen = now
                 lamp.src = src
+
+    # ------------------------------------------------------------ statistics
+
+    def _stat(self, lamp):
+        key = lamp.stats_key()
+        st = self.stats.get(key)
+        if st is None:
+            st = self.stats[key] = {"name": lamp.name(), "keys": {}, "other": 0, "tx_time": 0.0}
+        st["name"] = lamp.name()  # keep the newest name (My name may change)
+        return st
+
+    def _count_key(self, lamp, payload, caption):
+        """One transmission started: count the function key that started it."""
+        st = self._stat(lamp)
+        m = CAPTION_KEY.search(payload)
+        if m and m.group(1).upper().decode() in FKEYS:
+            fkey = m.group(1).upper().decode()
+            st["keys"][fkey] = st["keys"].get(fkey, 0) + 1
+        else:
+            st["other"] += 1  # caption without an F-key number
+
+    def _load_stats(self):
+        try:
+            with open(self.stats_path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            self.stats = data.get("stations", {})
+            self.stats_since = float(data.get("since", time.time()))
+        except (OSError, ValueError, AttributeError):
+            self.stats, self.stats_since = {}, time.time()
+
+    def _save_stats(self):
+        with self.lock:
+            data = {"since": self.stats_since, "stations": self.stats}
+            text = json.dumps(data, indent=1)
+        try:
+            with open(self.stats_path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+        except OSError:
+            pass
+        self._stats_saved = time.time()
+
+    def _stats_table(self):
+        """(columns, rows) for the window and the web page."""
+        cols = ["Station"] + FKEYS + ["Other", "Total", "TX time"]
+        rows = []
+        with self.lock:
+            items = sorted(self.stats.values(), key=lambda s: s["name"].lower())
+            totals = dict.fromkeys(FKEYS + ["other"], 0)
+            tx_all = 0.0
+            for st in items:
+                counts = [st["keys"].get(k, 0) for k in FKEYS]
+                total = sum(counts) + st["other"]
+                for k, n in zip(FKEYS, counts):
+                    totals[k] += n
+                totals["other"] += st["other"]
+                tx_all += st["tx_time"]
+                rows.append([st["name"]] + [n or "" for n in counts]
+                            + [st["other"] or "", total, ago_long(st["tx_time"])])
+        if len(rows) > 1:
+            counts = [totals[k] for k in FKEYS]
+            rows.append(["All"] + [n or "" for n in counts]
+                        + [totals["other"] or "", sum(counts) + totals["other"], ago_long(tx_all)])
+        return cols, rows
+
+    def _export_csv(self):
+        path = filedialog.asksaveasfilename(
+            parent=self.root, title="Save function key statistics",
+            defaultextension=".csv", initialfile="pingpong_stats.csv",
+            filetypes=[("CSV", "*.csv")],
+        )
+        if not path:
+            return
+        import csv
+
+        cols, rows = self._stats_table()
+        try:
+            with open(path, "w", encoding="utf-8-sig", newline="") as fh:
+                writer = csv.writer(fh, delimiter=";")
+                writer.writerow(["since", time.strftime("%Y-%m-%d %H:%M", time.localtime(self.stats_since))])
+                writer.writerow(cols)
+                writer.writerows(rows)
+        except OSError as exc:
+            messagebox.showerror(TITLE, "Could not save:\n{}".format(exc), parent=self.root)
+
+    def _reset_stats(self):
+        if not messagebox.askyesno(
+            TITLE, "Reset all function key statistics to zero?", parent=self.root
+        ):
+            return
+        with self.lock:
+            self.stats = {}
+            self.stats_since = time.time()
+        self._save_stats()
 
     def _pingpong_tx(self, lamp, now):
         """Same slot rule as the lamps: RUN frees the band, the first INB
@@ -383,8 +498,10 @@ class Overview:
         style = ttk.Style(self.root)
         style.configure("Treeview", rowheight=24, font=("Segoe UI", 10))
         style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
-        frame = tk.Frame(self.root, padx=8)
-        frame.pack(fill=tk.BOTH, expand=True)
+        self.book = ttk.Notebook(self.root)
+        self.book.pack(fill=tk.BOTH, expand=True, padx=8)
+        frame = tk.Frame(self.book)
+        self.book.add(frame, text="Stations")
         self.tree = ttk.Treeview(frame, columns=[c[0] for c in COLUMNS], show="headings",
                                  selectmode="none")
         for cid, text, width, anchor in COLUMNS:
@@ -395,6 +512,22 @@ class Overview:
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        sframe = tk.Frame(self.book)
+        self.book.add(sframe, text="Function keys")
+        bar = tk.Frame(sframe, pady=4)
+        bar.pack(fill=tk.X)
+        self.stats_label = tk.Label(bar, text="", anchor="w")
+        self.stats_label.pack(side=tk.LEFT)
+        tk.Button(bar, text="Reset…", command=self._reset_stats).pack(side=tk.RIGHT)
+        tk.Button(bar, text="Save CSV…", command=self._export_csv).pack(side=tk.RIGHT, padx=6)
+        scols = ["station"] + FKEYS + ["other", "total", "txtime"]
+        self.stree = ttk.Treeview(sframe, columns=scols, show="headings", selectmode="none")
+        for cid, text in zip(scols, ["Station"] + FKEYS + ["Other", "Total", "TX time"]):
+            self.stree.heading(cid, text=text)
+            self.stree.column(cid, width=110 if cid == "station" else (75 if cid in ("total", "txtime") else 48),
+                              anchor="w" if cid == "station" else "center", stretch=cid == "station")
+        self.stree.tag_configure("all", font=("Segoe UI", 10, "bold"))
+        self.stree.pack(fill=tk.BOTH, expand=True)
         for tag, (bg, fg) in ROW_STYLE.items():
             opts = {"foreground": fg}
             if bg:
@@ -421,6 +554,7 @@ class Overview:
             pass
 
     def _close(self):
+        self._save_stats()
         try:
             self.cfg.set("window", "geometry", self.root.geometry())
             self._save()
@@ -537,7 +671,12 @@ class Overview:
         notes.append("★ = master")
         for r in rows:
             r.pop("sort")
+        stat_cols, stat_rows = self._stats_table()
         return {
+            "stats": {
+                "columns": stat_cols, "rows": stat_rows,
+                "since": time.strftime("%d.%m. %H:%M", time.localtime(self.stats_since)),
+            },
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "rows": rows, "notes": notes,
             "columns": [[cid, dict((c[0], c[1]) for c in COLUMNS)[cid]] for cid in WEB_ORDER],
@@ -572,6 +711,13 @@ class Overview:
             else:
                 self.tree.insert("", index, iid=row["id"], values=vals, tags=tags)
         self.head.configure(text=snap["head"], fg="#c00000" if snap["warn"] else "black")
+        self.stats_label.configure(
+            text="Transmissions started by each function key, since {}".format(snap["stats"]["since"]))
+        self.stree.delete(*self.stree.get_children())
+        for row in snap["stats"]["rows"]:
+            self.stree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        if time.time() - self._stats_saved > STATS_SAVE:
+            self._save_stats()
         notes = list(snap["notes"])
         if self.web_port and not self.web_error:
             notes.append("web page: " + "  or  ".join(self.web_urls()[:3]))
@@ -611,6 +757,13 @@ PAGE = """<!doctype html>
   #notes { padding:10px 16px 16px; color:var(--muted); font-size:13px; }
   #notes div.w { color:var(--warn); }
   .empty { padding:16px; color:var(--muted); }
+  h2 { font-size:16px; margin:8px 16px 8px; }
+  #since { font-weight:400; color:var(--muted); font-size:13px; }
+  table.stats { min-width:760px; }
+  table.stats td, table.stats th { text-align:center; }
+  table.stats td:first-child, table.stats th:first-child { text-align:left; }
+  table.stats tr.all td { font-weight:700; }
+  .foot { color:var(--muted); font-size:12px; margin:8px 16px 24px; }
 </style>
 </head>
 <body>
@@ -622,6 +775,9 @@ PAGE = """<!doctype html>
 <div class="wrap"><table><thead><tr id="cols"></tr></thead><tbody id="rows"></tbody></table>
 <div class="empty" id="empty" hidden>No PingPong lamps heard yet.</div></div>
 <div id="notes"></div>
+<h2>Function keys <span id="since"></span></h2>
+<div class="wrap"><table class="stats"><thead><tr id="scols"></tr></thead><tbody id="srows"></tbody></table></div>
+<p class="foot">Transmissions started by each function key, per station. Reset and CSV export in the Overview window.</p>
 <script>
 const CENTER = new Set(["band","mode","run","role","ver"]), RIGHT = new Set(["freq","seen"]);
 let cols = [];
@@ -656,6 +812,17 @@ function render(d) {
     const div = document.createElement("div"); div.textContent = n;
     if (n.startsWith("\\u26a0")) div.className = "w";
     notes.appendChild(div);
+  }
+  if (d.stats) {
+    document.getElementById("since").textContent = "since " + d.stats.since;
+    const sc = document.getElementById("scols"); sc.innerHTML = "";
+    for (const name of d.stats.columns) { const th = document.createElement("th"); th.textContent = name; sc.appendChild(th); }
+    const sb = document.getElementById("srows"); sb.innerHTML = "";
+    for (const row of d.stats.rows) {
+      const tr = document.createElement("tr"); if (row[0] === "All") tr.className = "all";
+      for (const v of row) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+      sb.appendChild(tr);
+    }
   }
   const st = document.getElementById("status");
   st.textContent = "updated " + d.time; st.className = "";

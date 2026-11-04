@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.58 · Made by **S55OO** with AI assistance.
+> **Version:** 1.59 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -489,7 +489,19 @@ Above the table: number of lamps, the master and both F12 block times – or
 a red `⚠ TWO MASTERS`. Below it: different versions, who holds the
 ping-pong slot per band, and lamps whose N1MM data doesn't arrive.
 
-**Web page.** The same table is served at `http://<master PC>:8046` –
+**Function keys tab.** For every station: how many transmissions each
+function key **F1–F12** started, **Other** (a caption without an F-key
+number), **Total** and the total **TX time** – plus an **All** row.
+
+- Counted when N1MM reports a transmission start with that key's caption,
+  so keys that send nothing are not counted. Messages sent with Enter
+  (ESM) count under their F-key.
+- Kept per PC in `pingpong_stats.json` next to the exe (saved every 30 s
+  and on close), so a restart during the contest loses nothing.
+- **Save CSV…** exports the table (for Excel: `;`-separated);
+  **Reset…** sets everything to zero, e.g. before the contest starts.
+
+**Web page.** The same tables are served at `http://<master PC>:8046` –
 open it in any browser on the network, also on a **phone or tablet**
 (nothing to install; it updates every second). The addresses are shown at
 the bottom of the window. Other devices can open it once Windows allows
@@ -609,4 +621,5 @@ pingpong_test.log   – Diagnostics log (only while Diagnostics is on)
 pingpong_error.log  – unexpected errors (only if one happens)
 n1mm_lamps.vX.exe   – backup kept by the updater for "Revert"
 pingpong_overview.exe / .ini – Overview program and its window settings (master PC)
+pingpong_stats.json – Overview's function key statistics
 ```
