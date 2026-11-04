@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.37
+Version: 1.38
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.37"
+__version__ = "1.38"
 
 import argparse
 import base64
@@ -743,6 +743,15 @@ class DisplayApp:
 
     def _show_options(self, event):
         menu = tk.Menu(self.root, tearoff=0)
+        menu.add_checkbutton(
+            label="Compact mode",
+            accelerator="Shift+F",
+            variable=self.var_compact,
+            command=lambda: self.root.after(
+                50, lambda: self._set_compact(bool(self.var_compact.get()))
+            ),
+        )
+        menu.add_separator()
         menu.add_command(
             label="My name…  ({})".format(self.my_alias or "PC name"),
             command=self._choose_alias,
@@ -1450,6 +1459,7 @@ class DisplayApp:
         top.pack(fill=tk.X)
         self.frame, self.top = frame, top
         self._compact = False
+        self.var_compact = tk.BooleanVar(value=False)
         self._drag = None
         # Shift+F: compact mode (no title bar / margins, info on the lamp).
         self.root.bind("<Key-F>", self._toggle_compact)
@@ -1571,6 +1581,7 @@ class DisplayApp:
             pos = (self.root.winfo_rootx(), self.root.winfo_rooty())
         x, y = pos
         self._compact = on
+        self.var_compact.set(on)
         if self._compact:
             self.top.pack_forget()
             self.info.pack_forget()

@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.37 · Made by **S55OO** with AI assistance.
+> **Version:** 1.38 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -97,7 +97,8 @@ What N1MM reports – and therefore what PingPong can show:
 
 ### Compact mode (Shift+F)
 
-Click the lamp and press **Shift+F**: the title bar, the top row and the
+Click the lamp and press **Shift+F** – or tick **Options ▾ → Compact
+mode** – and the title bar, the top row and the
 gray margins disappear – only the lamp is left, same size and place. The
 status line moves onto the lamp's bottom edge (the sender's name and the
 frequency are on the lamp anyway), so no information is lost.
@@ -105,7 +106,8 @@ frequency are on the lamp anyway), so no information is lost.
 - **Drag the lamp** with the mouse to move it.
 - **Right-click** for the Options menu; a plain click still silences an
   F12 call.
-- **Shift+F** again brings back the normal window.
+- **Shift+F** again (or untick **Compact mode** in the right-click menu)
+  brings back the normal window.
 - The lamp **remembers its place and mode**: after a restart or update it
   comes back where it was, compact or not. If that place is no longer on
   a screen (e.g. a monitor was unplugged), it opens at the default place.
