@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.49</Version>
+  <Version>1.50</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -94,7 +94,9 @@ from.
   <N1MMMaster>1</N1MMMaster>       <!-- this PC's N1MM is network master: 1/0/empty -->
   <Started>1793824377.488</Started><!-- when this lamp started -->
   <Colors>pc:oo840g3=red;pc:oo840g4=light blue;…</Colors>  <!-- only from the master -->
-  <BlockTime>30</BlockTime>        <!-- F12 call/block time in s (1-30), only from the master -->
+  <BlockTime>30</BlockTime>        <!-- S&P-call block time in s (1-30), only from the master -->
+  <AlertRun>0</AlertRun>           <!-- 1 = the call was started in Run: reaches all stations -->
+  <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
 </PingPongHello>
 ```
 
@@ -150,8 +152,16 @@ the lamp turns off by itself, in case the "off" packet was lost.
 
 ## 4. F12 call and F-key block
 
-RUN1 runs, RUN2 searches & pounces on the same band. RUN1 wants RUN2 to
-hold off.
+A call's reach depends on the caller's mode **when F12 is pressed**
+(sent as `<AlertRun>`):
+
+| Caller in | Reaches on its band | Lasts |
+|---|---|---|
+| S&P | S&P stations only | S&P-call block time (`<BlockTime>`, default 30 s) |
+| Run | all other stations, Run and S&P | Run-call block time (`<BlockTimeRun>`, default 5 s) |
+
+Example: RUN1 runs, RUN2 searches & pounces on the same band. RUN1 wants
+RUN2 to hold off.
 
 ```mermaid
 sequenceDiagram
@@ -164,8 +174,8 @@ sequenceDiagram
 
     K1->>L1: F12 (N1MM active)
     Note over L1: call ON – border blinks in RUN1's color
-    L1->>L2: PingPongHello · Alert=1 · AlertBand=14 (sent at once)
-    Note over L2: same band + S&P → blink "F12 · RUN1 · 30 s" (counts down)<br/>double beep (once) · F-keys blocked, max F12 block time
+    L1->>L2: PingPongHello · Alert=1 · AlertBand=14 · AlertRun=1 (sent at once)
+    Note over L2: same band → blink "F12 · RUN1 · 5 s" (counts down)<br/>double beep (once) · F-keys blocked, max Run-call block time
     K2->>L2: F1
     L2--xN2: swallowed – lamp shows "BLOCKED · F1"
     K2->>L2: Esc / Enter / letters
@@ -180,10 +190,10 @@ band (silenced or not): F12 there is ignored and the lamp shows
 `BLOCKED · F12`. A Run station can always call.
 
 The call also ends on the receiving lamp when its operator **clicks the
-lamp**, changes band or switches to Run, when the calling lamp has not
-been heard for 12 s, and in any case after the **F12 block time**
-(1–30 s, set on the master): then blinking and block stop everywhere and
-the caller's call switches itself off.
+lamp**, changes band or (S&P call) switches to Run, when the calling lamp
+has not been heard for 12 s, and in any case after the call's **block
+time** (1–30 s each, set on the master): then blinking and block stop
+everywhere and the caller's call switches itself off.
 
 ---
 
@@ -242,11 +252,13 @@ flowchart TD
     C -- no --> X
     C -- yes --> D{"AlertBand == this PC's band?"}
     D -- no --> X
-    D -- yes --> E{"This PC in Run?<br/>(IsRunning)"}
+    D -- yes --> R{"Call started in Run?<br/>(AlertRun=1)"}
+    R -- yes --> F
+    R -- no --> E{"This PC in Run?<br/>(IsRunning)"}
     E -- yes --> X
     E -- "no (S&P)" --> F{"Silenced here by a click?"}
     F -- yes --> X
-    F -- no --> T{"Less than the F12 block time<br/>since this call was first seen?"}
+    F -- no --> T{"Less than the call's block time<br/>(S&P or Run call)<br/>since it was first seen?"}
     T -- no --> X
     T -- yes --> G["BLINK in the caller's color<br/>'F12 · caller'"]
     G --> H{"'Block my F-keys' ticked?"}
@@ -331,7 +343,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Blink rhythm | 0.4 s on / 0.4 s off |
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
-| F12 call time | F12 block time (1–30 s, default 30, set on the master, sent as `<BlockTime>`): then blinking and block end on the receivers and the caller's call switches off |
+| F12 call time | S&P call: 1–30 s, default 30 (`<BlockTime>`); Run call: 1–30 s, default 5 (`<BlockTimeRun>`); both set on the master. Then blinking and block end on the receivers and the caller's call switches off |
 | Ping-pong lock limit | 40 s without a RUN transmission |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |

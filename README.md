@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.49 · Made by **S55OO** with AI assistance.
+> **Version:** 1.50 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -15,8 +15,9 @@ On top of that the lamps talk to each other, so operators can:
   lamp is the **master** (it follows N1MM's network master) and hands out
   the automatic colors;
 - send an **F12 call** that makes the S&P stations on the same band blink,
-  and optionally **block their F-keys** for the F12 block time (1–30 s,
-  set on the master);
+  and optionally **block their F-keys** – a call from a **Run** station
+  reaches **all** stations on the band, with its own, shorter block time
+  (both set on the master);
 - use the **ping-pong lock**: RUN and inband stations (INB) on one band
   take turns, like with an interlock box;
 - see every station also when N1MM only sends to `127.0.0.1` or the PCs
@@ -181,32 +182,36 @@ stations, and every other lamp uses its list.
   (the others just `PingPong v1.46`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 
-### F12 call (Options ▾ → F12 call – blink S&P stations on my band)
+### F12 call (Options ▾ → F12 call – blink stations on my band)
 
 Warn the other operators on your band without transmitting.
 
 - Turn the option on on **every PC that may call** (saved per PC).
 - Press **F12 while N1MM is the active window** → your call is **on**:
   your lamp gets a wide **blinking border** in your color and counts
-  down: `F12 · 18 s` on the lamp, `F12 call ON (14 MHz) · 18 s left –
-  F12 = off` on the line under it.
-- Every other PingPong PC that is **on the same band** and in **S&P**
-  (N1MM `IsRunning = False`) **blinks** in your color with
-  `F12 · <your station> · 18 s` (counting down to the end of the call),
-  framed by a wide border in your color.
-  PCs in **Run** or on another band are not affected.
+  down: `F12 · 18 s` on the lamp, `F12 call ON (14 MHz, S&P stations) ·
+  18 s left – F12 = off` on the line under it.
+- **Who is called depends on your mode when you press F12:**
+
+  | You are in | Called on your band | Call lasts |
+  |---|---|---|
+  | **S&P** | only the **S&P** stations | **S&P call** block time (default 30 s) |
+  | **Run** | **all** other stations, Run and S&P | **Run call** block time (default 5 s) |
+
+- Each called PC **blinks** in your color with `F12 · <your station> · 18 s`
+  (counting down to the end of the call), framed by a wide border in your
+  color. PCs on another band are not affected.
 - Press **F12 again** → the call is off everywhere. It also ends when
-  your lamp closes; on a receiving PC it ends when that PC changes band
-  or goes to Run.
+  your lamp closes; on a receiving PC it ends when that PC changes band,
+  or (for an S&P call) goes to Run.
 - The receiving PC also gives a short **double beep** when the call starts
   (once per call; **Options ▾ → Sound on F12 call**, on by default).
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
-- The calling PC may itself be in Run or S&P.
 - **S&P stations can't answer a call with their own.** While another PC's
   call runs on your band and you are in **S&P**, F12 on your PC is
-  **ignored** (also if you silenced that call): the lamp shows `BLOCKED · F12` or `F12 busy · RUN1`, the line
-  under it `F12 ignored – RUN1 is calling on 14 MHz`. Once that call ends,
+  **ignored** (also if you silenced that call): the lamp shows
+  `BLOCKED · F12` or `F12 busy · RUN1`, the line under it `F12 ignored – RUN1 is calling on 14 MHz`. Once that call ends,
   F12 works again. A station in **Run** can always press F12, and ending
   your own call with F12 always works.
 - N1MM still gets F12 (PingPong only watches it). Tip: give F12 a message
@@ -224,15 +229,18 @@ per PC, off by default).
   stopped, the line under it `RUN1 calls (F12) · 14 MHz · 15 s left ·
   F-keys blocked`, and lamp and border **swap colors** back and forth.
 - **Esc**, Enter, letters, F12 and Alt combinations always work.
+- A **Run call** also blocks Run stations – tick this option on the Run
+  PCs too if they should be stopped.
 - The block ends when the caller presses F12 again, when you click the
-  lamp, change band or go to Run – and **by itself after the F12 block
-  time**: then the whole call ends (blinking stops on all PCs, and the
-  calling PC's call switches itself off).
-- **F12 block time** (default 30 s) is set **on the master only**:
-  **Options ▾ → F12 block time…** (**1–30 s**). The value goes to all
-  lamps at once; on other PCs the menu shows it greyed out, e.g.
-  `F12 block time: 20 s (set on master RUN1)`. A new master keeps the
-  current value.
+  lamp, change band or (S&P call) go to Run – and **by itself after the
+  F12 block time**: then the whole call ends (blinking stops on all PCs,
+  and the calling PC's call switches itself off).
+- **Two F12 block times**, set **on the master only** (**1–30 s** each):
+  **Options ▾ → F12 block time, S&P call…** (default **30 s**) and
+  **Options ▾ → F12 block time, Run call…** (default **5 s**). The values
+  go to all lamps at once; on other PCs the menu shows them greyed out,
+  e.g. `F12 block time: S&P call 30 s, Run call 5 s (set on master RUN1)`.
+  A new master keeps the current values.
 - Only while N1MM is the active window. It does **not** stop mouse clicks
   on N1MM's buttons, microphone PTT, paddle or footswitch – it guards
   against accidental key presses, it is not a hardware interlock.
@@ -397,7 +405,7 @@ PC, kept by updates.
 |---|---|
 | `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
 | `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), `role` (off / RUN / INB) |
-| `[network]` | `block_time` – F12 block time last received from the master |
+| `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call) last received from the master |
 | `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 

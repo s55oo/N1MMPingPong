@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.49
+Version: 1.50
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.49"
+__version__ = "1.50"
 
 import argparse
 import base64
@@ -94,14 +94,15 @@ STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
-BLOCK_LIMIT = 30.0  # s: default F12 call time (the master can change it)
+BLOCK_LIMIT = 30.0  # s: default time of an S&P station's F12 call (master can change)
+BLOCK_LIMIT_RUN = 5.0  # s: default time of a Run station's F12 call (master can change)
 BLOCK_RANGE = (1, 30)  # s: allowed F12 call / block times
 
 
-def clamp_block(value):
+def clamp_block(value, default=BLOCK_LIMIT):
     """F12 call/block time within BLOCK_RANGE (0 or missing = default)."""
     if not value:
-        return BLOCK_LIMIT
+        return default
     return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
 PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
 NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
@@ -494,6 +495,7 @@ def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
     n1mm_master="", started=0.0, colors="", block_time=0.0,
+    alert_run=False, block_time_run=0.0,
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -514,6 +516,8 @@ def make_hello(
         ("Started", "{:.3f}".format(started or 0.0)),
         ("Colors", colors or ""),
         ("BlockTime", "{:g}".format(block_time) if block_time else ""),
+        ("AlertRun", "1" if alert_run else "0"),
+        ("BlockTimeRun", "{:g}".format(block_time_run) if block_time_run else ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -551,6 +555,8 @@ def parse_hello(data):
         "started": _float(get("Started")),
         "colors": parse_colors(get("Colors")),
         "block_time": _float(get("BlockTime")),
+        "alert_run": get("AlertRun") == "1",
+        "block_time_run": _float(get("BlockTimeRun")),
     }
 
 
@@ -745,6 +751,8 @@ class Peer:
         self.started = 0.0
         self.colors = {}
         self.block_time = 0.0
+        self.block_time_run = 0.0
+        self.alert_run = False
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -809,6 +817,7 @@ class DisplayApp:
         self._f12_refused = 0.0  # when my F12 was ignored (band busy)
         self.key_watcher = None
         self.alert_on = False
+        self.alert_run = False  # my call was started in Run (blocks every station)
         self.alert_time = 0.0
         self.silenced = set()  # (peer id, call time) clicked away here
         self._shown_call = None
@@ -827,6 +836,9 @@ class DisplayApp:
         self.color_map = {}  # automatic colors decided by the master
         # F12 block time: set on the master, used by every lamp.
         self.block_limit = clamp_block(_float(self.settings.get_text("network", "block_time", "")))
+        self.block_limit_run = clamp_block(
+            _float(self.settings.get_text("network", "block_time_run", "")), BLOCK_LIMIT_RUN
+        )
         self._i_am_master = False
         self._master_peer = None
         self.my_role = self.settings.get_text("station", "role", "off")
@@ -915,14 +927,19 @@ class DisplayApp:
         )
         if self._i_am_master:
             menu.add_command(
-                label="F12 block time…  ({:g} s, for all PCs)".format(self.block_limit),
-                command=self._choose_block_time,
+                label="F12 block time, S&P call…  ({:g} s, blocks S&P)".format(self.block_limit),
+                command=lambda: self._choose_block_time(run=False),
+            )
+            menu.add_command(
+                label="F12 block time, Run call…  ({:g} s, blocks all)".format(
+                    self.block_limit_run),
+                command=lambda: self._choose_block_time(run=True),
             )
         else:
+            master = self.peer_name(self._master_peer) if self._master_peer else "?"
             menu.add_command(
-                label="F12 block time: {:g} s  (set on master {})".format(
-                    self.block_limit,
-                    self.peer_name(self._master_peer) if self._master_peer else "?",
+                label="F12 block time: S&P call {:g} s, Run call {:g} s  (set on master {})".format(
+                    self.block_limit, self.block_limit_run, master,
                 ),
                 state=tk.DISABLED,
             )
@@ -931,7 +948,7 @@ class DisplayApp:
             command=self._choose_color,
         )
         menu.add_checkbutton(
-            label="F12 call – blink S&P stations on my band",
+            label="F12 call – blink stations on my band",
             variable=self.var_keys,
             command=self._keys_toggled,
         )
@@ -1319,6 +1336,8 @@ class DisplayApp:
         peer.started = info.get("started", 0.0) or 0.0
         peer.colors = info.get("colors", {}) or {}
         peer.block_time = info.get("block_time", 0.0) or 0.0
+        peer.block_time_run = info.get("block_time_run", 0.0) or 0.0
+        peer.alert_run = info.get("alert_run", False)
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1396,6 +1415,8 @@ class DisplayApp:
             "started": self.started,
             "colors": format_colors(self.color_map) if self._i_am_master else "",
             "block_time": self.block_limit if self._i_am_master else 0.0,
+            "alert_run": self.alert_on and self.alert_run,
+            "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
         }
 
     # ---------------------------------------------------------- colors
@@ -1520,6 +1541,12 @@ class DisplayApp:
                 self.block_limit = clamp_block(master.block_time)
                 # Remember it, so this PC keeps it if it becomes master.
                 self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
+            run = master.block_time_run
+            if run and clamp_block(run, BLOCK_LIMIT_RUN) != self.block_limit_run:
+                self.block_limit_run = clamp_block(run, BLOCK_LIMIT_RUN)
+                self.settings.set_text(
+                    "network", "block_time_run", "{:g}".format(self.block_limit_run)
+                )
         if was != self._i_am_master:
             self._key_event("PingPong master: {}".format(
                 "this PC" if self._i_am_master else self.peer_name(master)
@@ -1787,25 +1814,46 @@ class DisplayApp:
                 return peer.alias
         return st.label
 
-    def _choose_block_time(self):
-        """Master only: how long an F12 call blocks F1-F11 on other PCs."""
+    def _choose_block_time(self, run=False):
+        """Master only: how long an F12 call blocks the other PCs.
+
+        run=False: call from an S&P station (blocks S&P stations);
+        run=True: call from a Run station (blocks every station).
+        """
         if not self._i_am_master:
             return
+        current = self.block_limit_run if run else self.block_limit
         value = simpledialog.askinteger(
-            "PingPong - F12 block time",
-            "How many seconds an F12 call lasts (blinking and F-key\n"
-            "block on the other PCs), {}-{} s. Used by all lamps.".format(*BLOCK_RANGE),
-            initialvalue=int(self.block_limit),
+            "PingPong - F12 block time ({})".format("Run call" if run else "S&P call"),
+            "How many seconds an F12 call from a station in {} lasts\n"
+            "(blinking and F-key block on {}), {}-{} s.\n"
+            "Used by all lamps.".format(
+                "Run" if run else "S&P",
+                "ALL other stations on the band" if run else "the S&P stations on the band",
+                *BLOCK_RANGE
+            ),
+            initialvalue=int(current),
             minvalue=BLOCK_RANGE[0],
             maxvalue=BLOCK_RANGE[1],
             parent=self.root,
         )
         if value is None:
             return
-        self.block_limit = float(value)
-        self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
-        self._key_event("F12 block time set to {:g} s".format(self.block_limit))
+        if run:
+            self.block_limit_run = float(value)
+            self.settings.set_text("network", "block_time_run", "{:g}".format(value))
+        else:
+            self.block_limit = float(value)
+            self.settings.set_text("network", "block_time", "{:g}".format(value))
+        self._key_event("F12 block time ({}) set to {:g} s".format(
+            "Run" if run else "S&P", value))
         self.hello_now.set()  # tell all lamps right away
+
+    def _my_limit(self):
+        return self.block_limit_run if self.alert_run else self.block_limit
+
+    def _call_limit(self, peer):
+        return self.block_limit_run if getattr(peer, "alert_run", False) else self.block_limit
 
     def _choose_alias(self):
         current = self.my_alias
@@ -2161,10 +2209,10 @@ class DisplayApp:
         now = time.time()
         owners = self._color_owners(now)
         self._update_master(owners, now)
-        if self.alert_on and now - self.alert_time > self.block_limit:
+        if self.alert_on and now - self.alert_time > self._my_limit():
             self.alert_on = False  # call time over: end my F12 call
             self.alert_time = now
-            self._key_event("F12 call ended after {:g} s".format(self.block_limit))
+            self._key_event("F12 call ended after {:g} s".format(self._my_limit()))
             self.hello_now.set()
         active = None
         latest = -1.0
@@ -2257,8 +2305,10 @@ class DisplayApp:
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(idle))
             header = ""
             if self.alert_on:
-                header = "F12 call ON ({} MHz) · {} s left – F12 = off  ·  ".format(
-                    self._my_band() or "?", self._my_call_left(now)
+                header = "F12 call ON ({} MHz, {}) · {} s left – F12 = off  ·  ".format(
+                    self._my_band() or "?",
+                    "Run call – all stations" if self.alert_run else "S&P stations",
+                    self._my_call_left(now),
                 ) + header
             note = self._my_color_note(owners)
             if note:
@@ -2521,12 +2571,18 @@ class DisplayApp:
                 )
             return
         self.alert_on = not self.alert_on
+        if self.alert_on:
+            mine = self._local_station()
+            # A Run station's call blocks every station on the band.
+            self.alert_run = mine is not None and mine.running is True
         self.alert_time = time.time()
         self.hello_now.set()
         if self.test_on:
             self._test_write(
                 "{}  F12 key  call {}".format(
-                    time.strftime("%H:%M:%S"), "ON" if self.alert_on else "OFF"
+                    time.strftime("%H:%M:%S"),
+                    ("ON (Run call - all stations)" if self.alert_run else "ON (S&P call)")
+                    if self.alert_on else "OFF",
                 )
             )
 
@@ -2535,15 +2591,21 @@ class DisplayApp:
         return mine.key[0] if mine is not None and mine.key else ""
 
     def _incoming_calls(self, now):
-        """Peers calling (F12) on this PC's band while this PC is in S&P."""
+        """Peers calling (F12) on this PC's band.
+
+        A call from an S&P station reaches only S&P stations; a call from a
+        Run station reaches every station on the band (Run and S&P).
+        """
         mine = self._local_station()
-        if mine is None or not mine.key or mine.running is True:
+        if mine is None or not mine.key:
             return []
         band = mine.key[0]
+        in_run = mine.running is True
         calls = [
             p for p in self._fresh_peers(now)
             if p.alert
             and p.alert_band == band
+            and (getattr(p, "alert_run", False) or not in_run)
             and not getattr(p, "same_pc", False)  # never "call" ourselves
             and (p.id, p.alert_time) not in self.silenced
             and self._block_left(p, now) > 0  # call time over: stop blinking
@@ -2557,7 +2619,7 @@ class DisplayApp:
         if len(self._call_seen) > 50:  # forget old calls
             for old in sorted(self._call_seen, key=self._call_seen.get)[:-20]:
                 self._call_seen.pop(old, None)
-        return self.block_limit - (now - start)
+        return self._call_limit(peer) - (now - start)
 
     def _peer_station(self, peer):
         for st in list(self.stations.values()):
@@ -2625,7 +2687,7 @@ class DisplayApp:
 
     def _my_call_left(self, now):
         """Whole seconds my own F12 call still runs."""
-        return max(0, int(self.block_limit - (now - self.alert_time) + 0.999))
+        return max(0, int(self._my_limit() - (now - self.alert_time) + 0.999))
 
     def _block_note(self, peer, now):
         if not self.block_on:
