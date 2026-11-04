@@ -88,6 +88,9 @@ from.
   <Status>N1MM 14 CW from 192.168.178.55, Run; …</Status>
   <Alias>RUN1</Alias>              <!-- My name -->
   <Role>RUN</Role>                 <!-- ping-pong role: RUN, INB or empty -->
+  <N1MMMaster>1</N1MMMaster>       <!-- this PC's N1MM is network master: 1/0/empty -->
+  <Started>1793824377.488</Started><!-- when this lamp started -->
+  <Colors>pc:oo840g3=red;pc:oo840g4=light blue;…</Colors>  <!-- only from the master -->
 </PingPongHello>
 ```
 
@@ -264,8 +267,14 @@ flowchart LR
 - If two PCs still claim the same color, every lamp applies the same rule:
   **the earliest `ColorTime` wins** (ties: PC name). The other PC falls back
   to an automatic color and shows `color … is taken`.
-- Stations whose PC runs no lamp keep their N1MM name and an automatic
-  color.
+- **Automatic colors come from the master.** The master is the PC whose
+  N1MM is network master (each lamp reads `IsNetworkMaster` from its own
+  `N1MM Logger.ini` and sends it as `<N1MMMaster>`); if none is, the lamp
+  with the earliest `<Started>`. The master sends its list in `<Colors>`
+  (keys `pc:<windows name>` for lamp PCs, `n1mm:<station name>` for the
+  rest); every lamp uses it. Colors stay with a station while it is
+  there, also across a master change, because the new master starts from
+  the list it last received.
 
 ---
 

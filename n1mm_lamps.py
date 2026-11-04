@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.41
+Version: 1.42
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.41"
+__version__ = "1.42"
 
 import argparse
 import base64
@@ -483,6 +483,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
 def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
+    n1mm_master="", started=0.0, colors="",
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -499,6 +500,9 @@ def make_hello(
         ("Status", status or ""),
         ("Alias", alias or ""),
         ("Role", role or ""),
+        ("N1MMMaster", n1mm_master or ""),
+        ("Started", "{:.3f}".format(started or 0.0)),
+        ("Colors", colors or ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -532,7 +536,60 @@ def parse_hello(data):
         "status": get("Status"),
         "alias": get("Alias"),
         "role": get("Role"),
+        "n1mm_master": get("N1MMMaster"),
+        "started": _float(get("Started")),
+        "colors": parse_colors(get("Colors")),
     }
+
+
+def format_colors(mapping):
+    """{'pc:oo840g4': 'red', ...} -> 'pc:oo840g4=red;...' for the hello."""
+    return ";".join("{}={}".format(k, v) for k, v in sorted(mapping.items()))
+
+
+def parse_colors(text):
+    result = {}
+    for part in (text or "").split(";"):
+        key, sep, value = part.partition("=")
+        if sep and key.strip() and value.strip():
+            result[key.strip()] = value.strip()
+    return result
+
+
+def n1mm_ini_path():
+    """N1MM Logger+ settings file: Documents\\N1MM Logger+\\N1MM Logger.ini."""
+    docs = ""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            buf = ctypes.create_unicode_buffer(1024)
+            # CSIDL_PERSONAL = 5: the real Documents folder (also if moved).
+            if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0:
+                docs = buf.value
+        except Exception:
+            docs = ""
+    if not docs:
+        docs = os.path.join(os.path.expanduser("~"), "Documents")
+    return os.path.join(docs, "N1MM Logger+", "N1MM Logger.ini")
+
+
+def read_n1mm_master(path):
+    """True/False from [NetworkStatus] IsNetworkMaster; None if no file."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            section = ""
+            for line in fh:
+                line = line.strip()
+                if line.startswith("[") and line.endswith("]"):
+                    section = line[1:-1].strip().lower()
+                elif section == "networkstatus" and "=" in line:
+                    key, _, value = line.partition("=")
+                    if key.strip().lower() == "isnetworkmaster":
+                        return value.strip().lower() == "true"
+    except OSError:
+        return None
+    return False
 
 
 def _float(text):
@@ -672,6 +729,9 @@ class Peer:
         self.local_n1mm = False
         self.alias = ""
         self.role = ""
+        self.n1mm_master = None
+        self.started = 0.0
+        self.colors = {}
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -744,6 +804,14 @@ class DisplayApp:
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
         self.my_alias = self.settings.get_text("station", "alias", "")[:MAX_ALIAS]
+        self.started = time.time()
+        self.n1mm_ini = self.settings.get_text("n1mm", "ini", "") or n1mm_ini_path()
+        self.n1mm_master = None
+        self._ini_mtime = None
+        self._ini_checked = 0.0
+        self.color_map = {}  # automatic colors decided by the master
+        self._i_am_master = False
+        self._master_peer = None
         self.my_role = self.settings.get_text("station", "role", "off")
         if self.my_role not in ROLES:
             self.my_role = "off"
@@ -1120,7 +1188,6 @@ class DisplayApp:
             free = [c for c in COLOR_PALETTE if c not in self.used_colors]
             color = free[0] if free else COLOR_PALETTE[-1]
             self.used_colors.add(color)
-            write_config(self.config_path, ip, station_name or ip, color)
         label = hint_label or station_name or ip
         station = Station(ip, label, color)
         self.stations[ip] = station
@@ -1211,6 +1278,10 @@ class DisplayApp:
         peer.host = info["host"] or src
         peer.alias = (info.get("alias") or "")[:MAX_ALIAS]
         peer.role = info.get("role", "") if info.get("role") in ROLES else ""
+        nm = info.get("n1mm_master", "")
+        peer.n1mm_master = True if nm == "1" else (False if nm == "0" else None)
+        peer.started = info.get("started", 0.0) or 0.0
+        peer.colors = info.get("colors", {}) or {}
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1263,6 +1334,12 @@ class DisplayApp:
                 if st.ip not in self.local and time.time() - st.last_seen < 30
             ) or "no other station"),
             "share N1MM " + ("on" if self.relay_on else "off"),
+            "N1MM master here: {}".format(
+                {True: "yes", False: "no", None: "unknown (no N1MM settings file)"}[self.n1mm_master]
+            ),
+            "PingPong master: " + ("this PC" if self._i_am_master else (
+                self.peer_name(self._master_peer) if self._master_peer else "?"
+            )),
             "ping-pong role " + self.my_role
             + (" (LOCKED)" if self._pp_locked else ""),
         ])
@@ -1278,6 +1355,9 @@ class DisplayApp:
             "status": self._status_text(),
             "alias": self.my_alias,
             "role": self.my_role if self.my_role != "off" else "",
+            "n1mm_master": {True: "1", False: "0"}.get(self.n1mm_master, ""),
+            "started": self.started,
+            "colors": format_colors(self.color_map) if self._i_am_master else "",
         }
 
     # ---------------------------------------------------------- colors
@@ -1305,6 +1385,93 @@ class DisplayApp:
             owners.setdefault(color.lower(), owner)
         return owners
 
+    # ---------------------------------------------------------- master
+
+    def _check_n1mm_master(self, now):
+        """Re-read IsNetworkMaster from this PC's N1MM settings (cheap: only
+        when the file changed, at most every 2 s)."""
+        if now - self._ini_checked < 2.0:
+            return
+        self._ini_checked = now
+        try:
+            mtime = os.path.getmtime(self.n1mm_ini)
+        except OSError:
+            if self.n1mm_master is not None:
+                self.n1mm_master = None
+                self.hello_now.set()
+            return
+        if mtime != self._ini_mtime:
+            self._ini_mtime = mtime
+            value = read_n1mm_master(self.n1mm_ini)
+            if value != self.n1mm_master:
+                self.n1mm_master = value
+                self._key_event("N1MM network master on this PC: {}".format(value))
+                self.hello_now.set()
+
+    def _pick_master(self, now):
+        """'me' or a Peer: the PC whose N1MM is network master; if none
+        says so, the lamp that started first (ties: PC name)."""
+        me = ("me", self.n1mm_master, self.started, socket.gethostname().lower())
+        cands = [me] + [
+            (p, p.n1mm_master, p.started or now, (p.host or "").lower())
+            for p in self._fresh_peers(now)
+            if not getattr(p, "same_pc", False)
+        ]
+        masters = [c for c in cands if c[1] is True]
+        pool = masters or cands
+        return min(pool, key=lambda c: (c[2], c[3]))[0]
+
+    def color_key(self, station, now):
+        """'pc:<windows name>' for a PC running a lamp, else 'n1mm:<name>'."""
+        if station.ip in self.local:
+            return "pc:" + socket.gethostname().lower()
+        for peer in self._fresh_peers(now):
+            if station.ip in peer.ips and not getattr(peer, "same_pc", False):
+                return "pc:" + (peer.host or "").lower()
+        return "n1mm:" + (station.label or station.ip).lower()
+
+    def _assign_colors(self, owners, now):
+        """Master: keep every color already given, give new stations the
+        next free palette color (never one a PC has chosen itself)."""
+        keys = {"pc:" + socket.gethostname().lower()}
+        for peer in self._fresh_peers(now):
+            if not getattr(peer, "same_pc", False):
+                keys.add("pc:" + (peer.host or "").lower())
+        for st in list(self.stations.values()):
+            if now - st.last_seen <= STATION_FORGET:
+                keys.add(self.color_key(st, now))
+        # Keep colors of stations still here (sticky); drop names that no
+        # longer exist, e.g. a station first seen before its lamp was heard.
+        result = {
+            k: v for k, v in self.color_map.items()
+            if k in keys and v.lower() not in owners
+        }
+        used = set(owners) | {v.lower() for v in result.values()}
+        for key in sorted(keys - set(result)):
+            free = [c for c in COLOR_PALETTE if c.lower() not in used]
+            color = free[0] if free else COLOR_PALETTE[len(result) % len(COLOR_PALETTE)]
+            result[key] = color
+            used.add(color.lower())
+        return result
+
+    def _update_master(self, owners, now):
+        self._check_n1mm_master(now)
+        master = self._pick_master(now)
+        was = self._i_am_master
+        self._i_am_master = master == "me"
+        self._master_peer = None if self._i_am_master else master
+        if self._i_am_master:
+            new = self._assign_colors(owners, now)
+            if new != self.color_map:
+                self.color_map = new
+                self.hello_now.set()
+        elif master.colors:
+            self.color_map = dict(master.colors)
+        if was != self._i_am_master:
+            self._key_event("PingPong master: {}".format(
+                "this PC" if self._i_am_master else self.peer_name(master)
+            ))
+
     def _color_for(self, station, owners, now):
         if station.ip in self.local:
             if self.my_color and owners.get(self.my_color.lower()) == "me":
@@ -1315,7 +1482,10 @@ class DisplayApp:
                     if owners.get(peer.color.lower()) is peer:
                         return peer.color
                     break
-        # Automatic / lamps.cfg color - but never one another PC has chosen.
+        auto = self.color_map.get(self.color_key(station, now))
+        if auto and auto.lower() not in owners:
+            return auto
+        # Fallback (no master list yet) - never a color another PC has chosen.
         if (station.color or "").lower() in owners:
             taken = set(owners) | set(
                 (st.color or "").lower()
@@ -1550,13 +1720,19 @@ class DisplayApp:
             key=lambda st: self.station_name(st).lower(),
         )
         rows = [
-            "{}{} (me)".format(
-                (self.my_alias + " ") if self.my_alias else "", self._station_state(st)
+            "{}{} (me{})".format(
+                (self.my_alias + " ") if self.my_alias else "", self._station_state(st),
+                ", master" if self._i_am_master else "",
             )
             for st in mine[:1]
         ]
+        mp = self._master_peer
         rows += [
-            "{} {}".format(self.station_name(st), self._station_state(st)) for st in others
+            "{} {}{}".format(
+                self.station_name(st), self._station_state(st),
+                " (master)" if mp is not None and st.ip in mp.ips else "",
+            )
+            for st in others
         ]
         return rows
 
@@ -1826,6 +2002,7 @@ class DisplayApp:
             self.root.after(0, self._ui_calls.pop(0))
         now = time.time()
         owners = self._color_owners(now)
+        self._update_master(owners, now)
         active = None
         latest = -1.0
         for station in list(self.stations.values()):

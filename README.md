@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.41 · Made by **S55OO** with AI assistance.
+> **Version:** 1.42 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -150,9 +150,25 @@ Each PC chooses the color of **its own station on every lamp**.
   other chose), the PC that chose it **first** keeps it; the other uses
   an automatic color and shows `color <color> is taken (<PC>)`.
 - **Automatic** removes the choice. Stations without a chosen color get
-  palette colors in order of appearance (red, orange, light blue, light
-  green, purple, cyan, gold, pink, brown, lime green), never a color
-  another PC has chosen.
+  their color from the **master** (see below), so it is the same on every
+  lamp: red, orange, light blue, light green, purple, cyan, gold, pink,
+  brown, lime green – never a color another PC has chosen.
+
+### Master (follows N1MM)
+
+One lamp is the **master**: it hands out the automatic colors for all
+stations, and every other lamp uses its list.
+
+- The master is the PC whose **N1MM is the network master**. Each lamp
+  reads `IsNetworkMaster` from its own PC's N1MM settings
+  (`Documents\N1MM Logger+\N1MM Logger.ini`) every few seconds. Switch the
+  master in N1MM's Network Status window and PingPong follows.
+- If no N1MM reports a master (not networked, or lamps older than v1.42),
+  the **lamp started first** is master.
+- Colors are **sticky**: a station keeps its color while it is there,
+  also when the master changes.
+- The line under the lamp marks it: `RUN1 7 CW RUN (me, master)` or
+  `OO840G3 7 CW RUN (master)`.
 
 ### F12 call (Options ▾ → F12 call – blink S&P stations on my band)
 
@@ -326,9 +342,10 @@ IP,label,color
 192.168.178.56,Run2,orange
 ```
 
-Lines starting with `#` are skipped. A newly detected station is written
-to the file automatically with its palette color. A color chosen with
-**My color…** on that PC overrides the file.
+Lines starting with `#` are skipped. Since v1.42 new stations are no
+longer written to the file automatically (automatic colors come from the
+master). A color in the file is used only for a station whose PC runs no
+lamp and isn't in the master's list yet; **My color…** always wins.
 
 ### Settings file: pingpong.ini
 
@@ -336,7 +353,8 @@ Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
 `block_keys`, `call_sound`, `share_n1mm`. `[station]` also has `role` (off / RUN /
 INB). `[window]`: `x`, `y`, `compact` (where the
-lamp was and whether it was in compact mode). `[station]`: `alias` (My name), `color`, `color_time` (when the
+lamp was and whether it was in compact mode). Optional `[n1mm]` `ini` =
+path of N1MM's settings file, if it isn't in the usual Documents folder. `[station]`: `alias` (My name), `color`, `color_time` (when the
 color was chosen – the earliest choice wins a conflict).
 
 ---
