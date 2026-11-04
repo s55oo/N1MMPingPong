@@ -17,3 +17,4 @@ pingpong_test.log
 
 # Per-PC station file (see lamps.example.cfg)
 lamps.cfg
+pingpong_error.log

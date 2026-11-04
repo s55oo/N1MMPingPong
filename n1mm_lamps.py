@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.39
+Version: 1.40
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.39"
+__version__ = "1.40"
 
 import argparse
 import base64
@@ -59,6 +59,33 @@ PEER_TIMEOUT = 12.0  # s: a lamp not heard this long is gone
 NETWORK_REFRESH = 30.0  # s: re-read this PC's network adapters
 LOCAL_N1MM_RECENT = 10.0  # s: own N1MM counts as running if heard this recently
 TEST_LOG = "pingpong_test.log"
+ERROR_LOG = "pingpong_error.log"
+
+
+def log_error(where):
+    """Write the current exception to pingpong_error.log (next to the exe)
+    instead of letting a network thread die silently."""
+    import traceback
+
+    try:
+        path = os.path.join(app_dir(), ERROR_LOG)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write("{}  v{}  {}\n{}\n".format(
+                time.strftime("%Y-%m-%d %H:%M:%S"), __version__, where,
+                traceback.format_exc(),
+            ))
+    except Exception:
+        pass
+
+
+def guarded(where, func):
+    """Call func(*args); on any error log it and keep the thread alive."""
+    def call(*args):
+        try:
+            return func(*args)
+        except Exception:
+            log_error(where)
+    return call
 BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
 MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
@@ -446,7 +473,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
             continue
         except OSError:
             break
-        on_packet(addr[0], data)
+        guarded("N1MM packet", on_packet)(addr[0], data)
     try:
         sock.close()
     except OSError:
@@ -624,11 +651,11 @@ def discovery_loop(
         relay = parse_relay(data)
         if relay is not None:
             if on_relay is not None:
-                on_relay(addr[0], relay[0], relay[1])
+                guarded("relay", on_relay)(addr[0], relay[0], relay[1])
             continue
         info = parse_hello(data)
         if info:
-            on_hello(addr[0], info)
+            guarded("hello", on_hello)(addr[0], info)
     for sock in list(senders.values()) + ([recv] if recv else []):
         try:
             sock.close()
@@ -1128,8 +1155,11 @@ class DisplayApp:
 
     def on_packet(self, src, data, relayed=False):
         is_radio, caption, station_name, is_tx, freq, mode = packet_info(data)
-        if self.test_on and src in self.local:
-            self._test_log(src, data)
+        if self.test_on:
+            if src in self.local:
+                self._test_log(src, data)
+            elif is_radio:
+                self._test_log(src, data, "relayed" if relayed else "direct")
         if not relayed:
             if src in self.local:
                 if is_radio and self.relay_on:
@@ -1227,6 +1257,12 @@ class DisplayApp:
             "keyboard watcher " + ("running" if self.key_watcher is not None else "off"),
             "calls seen: " + (", ".join(calls) or "none"),
             "F-keys " + ("BLOCKED" if self._block_active else "free"),
+            "sees: " + (", ".join(
+                "{} {}".format(st.label, group_label(st.key) or "?")
+                for st in list(self.stations.values())
+                if st.ip not in self.local and time.time() - st.last_seen < 30
+            ) or "no other station"),
+            "share N1MM " + ("on" if self.relay_on else "off"),
             "ping-pong role " + self.my_role
             + (" (LOCKED)" if self._pp_locked else ""),
         ])
@@ -1915,7 +1951,7 @@ class DisplayApp:
         except OSError:
             pass
 
-    def _test_log(self, src, data):
+    def _test_log(self, src, data, via=""):
         """Diagnostics: one line per packet from this PC's N1MM."""
         raw = data.decode("utf-8", errors="replace")
         tag = re.search(r"<(?![?!])([A-Za-z]\w*)", raw)
@@ -1928,9 +1964,11 @@ class DisplayApp:
         kind = tag.group(1) if tag else "?"
         if kind == "RadioInfo":
             self._test_write(
-                "{}  {}  RadioInfo  key='{}'  tx={}  freq={}  mode={}".format(
-                    stamp, src, field("FunctionKeyCaption"),
+                "{}  {}  RadioInfo{}  {}  key='{}'  tx={}  freq={}  mode={}  run={}".format(
+                    stamp, src, " ({})".format(via) if via else "",
+                    field("StationName"), field("FunctionKeyCaption"),
                     field("IsTransmitting"), field("Freq"), field("Mode"),
+                    field("IsRunning"),
                 )
             )
         else:

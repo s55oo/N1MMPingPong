@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.39 · Made by **S55OO** with AI assistance.
+> **Version:** 1.40 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -257,11 +257,16 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
 Writes what the lamp sees to `pingpong_test.log` next to the exe – use it
 when something doesn't work as expected. It changes nothing on the lamp.
 
-- every packet from this PC's N1MM (time, key caption, transmit state,
-  frequency, mode);
+- every `RadioInfo` packet – from this PC's N1MM and from other PCs,
+  marked `(direct)` or `(relayed)` (time, station, key caption, transmit
+  state, frequency, mode, Run);
 - the state every other PingPong PC reports (band, Run/S&P, F12 call and
-  block options, calls it sees, whether its F-keys are blocked);
+  block options, calls it sees, whether its F-keys are blocked, **which
+  stations it sees**, whether it shares its N1MM);
 - F12 presses, blocked keys and keyboard-watcher events.
+
+Unexpected errors are always written to `pingpong_error.log` next to the
+exe (the lamp keeps running) – send that file if something stops working.
 
 Always off after a restart, so the log only grows while you diagnose.
 Delete the file any time.
@@ -424,5 +429,6 @@ n1mm_lamps.exe      – the lamp (download from Releases)
 lamps.cfg           – optional station labels/colors, auto-written
 pingpong.ini        – per-PC settings from the Options menu
 pingpong_test.log   – Diagnostics log (only while Diagnostics is on)
+pingpong_error.log  – unexpected errors (only if one happens)
 n1mm_lamps.vX.exe   – backup kept by the updater for "Revert"
 ```
