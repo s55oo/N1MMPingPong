@@ -25,15 +25,18 @@ are three kinds of traffic:
 1. **N1MM → all lamps** (UDP 12060): N1MM's own External Broadcast.
    PingPong only listens to it and never sends anything on this port.
 2. **Lamp ↔ lamp** (UDP 46070): small `PingPongHello` messages with each
-   PC's name, color, F12 call and state – and (v1.39+) a **copy of each
-   PC's own N1MM `RadioInfo`**, so every lamp sees every station on any
+   PC's name, color, role, F12 call and state – the **master** adds the
+   automatic colors and the F12 block time – and a **copy of each PC's own
+   N1MM `RadioInfo`** (relay), so every lamp sees every station on any
    network the lamps share (LAN, ZeroTier, VPN), even if N1MM only sends to
    `127.0.0.1`.
 3. **Lamp → GitHub** (HTTPS): only to check for and download updates.
 
 On its own PC the lamp also **watches the keyboard** while N1MM is the
-active window: F12 starts or ends a call, and during a call it can swallow
-F1–F11 before N1MM gets them.
+active window: F12 starts or ends a call, during a call it can swallow
+F1–F11 before N1MM gets them, and the ping-pong lock also swallows Enter
+and Insert. It also reads one value from N1MM's settings file:
+`IsNetworkMaster` (read only).
 
 ![PingPong communication overview](communication.svg)
 
@@ -77,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.39</Version>
+  <Version>1.46</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -340,4 +343,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | RUN2's Broadcast Address |
 | Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC, same version on all PCs; **Diagnostics** shows what each lamp reports |
 | F12 does nothing locally | keyboard → lamp | N1MM must be the active window; if N1MM runs as administrator, run PingPong as administrator too |
+| A station seen only over a VPN is missing | relay (46070) | **Share my N1MM with other lamps** on on that PC; firewall allows UDP 46070 on that network |
+| Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |
+| Ping-pong lock never locks | 12060 + roles | a station with role **RUN** on the same band; roles set on every PC |
 | No update offered | lamp → GitHub | internet access to github.com |

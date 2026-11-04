@@ -1,9 +1,10 @@
-"""Watch one key (F12) while N1MM Logger+ is the active window.
+"""Watch the keyboard while N1MM Logger+ is the active window.
 
 Uses a Windows low-level keyboard hook: Windows reports each key press
-to PingPong and then passes it on unchanged, so N1MM still receives the
-key. Only the chosen key is looked at, only while N1MMLogger.net.exe is
-the foreground program, and nothing is recorded.
+to PingPong, which notices F12 (the call key) and passes it on unchanged,
+so N1MM still receives it. During an F12 call (F1-F11) or the ping-pong
+lock (F1-F11, Enter, Insert) those keys are swallowed. Only while
+N1MMLogger.net.exe is the foreground program; nothing is recorded.
 
 Note: if N1MM runs "as administrator" and PingPong does not, Windows
 hides N1MM's key presses from PingPong - run both at the same level.

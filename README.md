@@ -11,10 +11,20 @@ transmission.
 
 On top of that the lamps talk to each other, so operators can:
 
-- give every PC its **own name and color**, the same on all lamps;
+- give every PC its **own name and color**, the same on all lamps – one
+  lamp is the **master** (it follows N1MM's network master) and hands out
+  the automatic colors;
 - send an **F12 call** that makes the S&P stations on the same band blink,
-  and optionally **block their F-keys** while the call is on;
+  and optionally **block their F-keys** for the F12 block time (1–30 s,
+  set on the master);
+- use the **ping-pong lock**: RUN and inband stations (INB) on one band
+  take turns, like with an interlock box;
+- see every station also when N1MM only sends to `127.0.0.1` or the PCs
+  are only connected over a VPN such as ZeroTier – each lamp **passes its
+  own N1MM's data on** to the other lamps;
 - **update** all PCs from GitHub, and switch back to an older version.
+
+All PCs should run the **same PingPong version**.
 
 How the PCs, lamps and N1MM talk to each other – ports, messages, the
 F12 call step by step, updates – is described with diagrams in
@@ -46,7 +56,7 @@ Two tools are provided:
    reports you want (ContactInfo, Spot, AppInfo, dynamicresults …).
 2. **Broadcast Address**: `127.0.0.1:12060` is enough – the lamp on the
    same PC passes this PC's N1MM data on to all other lamps, on **every**
-   network both PCs are on (LAN, Wi-Fi, ZeroTier, other VPNs; v1.39+).
+   network both PCs are on (LAN, Wi-Fi, ZeroTier, other VPNs).
    You can also send to your subnet broadcast (e.g. `192.168.178.255`)
    as before; then lamps on that LAN get it directly, which they prefer.
 3. **Broadcast Port**: `12060` (default, do not change).
@@ -83,13 +93,13 @@ What N1MM reports – and therefore what PingPong can show:
   idle.
 - The line under the lamp lists every station with band, mode and role,
   this PC first, e.g. `RUN1 14 CW RUN (me) · INB1 14 CW INB · PC5 7 SSB RUN`.
+  Stations not heard for a minute drop off the list.
 - While someone transmits it shows **name (hostname) · RUN/INB ·
   transmitting · band mode**, e.g.
   `INB1 (OO840G3) · INB · transmitting · 14 CW`.
 - **RUN / INB** is the station's ping-pong role if one is set, otherwise
   it follows N1MM's mode: **Run = RUN, S&P = INB**. The hostname is the
   PC's Windows name (shown when it differs from the name).
-  Stations not heard for a minute drop off.
 - The window is always on top. **Only one lamp per PC** can run; starting
   a second one just says PingPong is already running.
 - **Options ▾** (top-right) holds all settings; the **help icon** next to
@@ -145,7 +155,7 @@ Each PC chooses the color of **its own station on every lamp**.
   color picker.
 - Colors already chosen by other PCs are greyed out and show that PC's
   name; a custom color **too similar** to another PC's color is refused.
-- The choice is sent to all lamps and overrides `lamps.cfg`.
+- The choice is sent to all lamps and overrides everything else.
 - If two PCs still end up with the same color (one was offline when the
   other chose), the PC that chose it **first** keeps it; the other uses
   an automatic color and shows `color <color> is taken (<PC>)`.
@@ -163,8 +173,8 @@ stations, and every other lamp uses its list.
   reads `IsNetworkMaster` from its own PC's N1MM settings
   (`Documents\N1MM Logger+\N1MM Logger.ini`) every few seconds. Switch the
   master in N1MM's Network Status window and PingPong follows.
-- If no N1MM reports a master (not networked, or lamps older than v1.42),
-  the **lamp started first** is master.
+- If no N1MM reports a master (N1MM not networked), the **lamp started
+  first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** of the master's lamp says `PingPong - MASTER v1.46`
@@ -249,7 +259,7 @@ changes):
   with role **RUN** is on that band. It releases itself if RUN stays
   silent for **40 s**.
 - Like the F-key block, it only stops key presses in N1MM (not mouse
-  clicks, PTT or paddle), and it needs every PC on v1.36 or newer.
+  clicks, PTT or paddle).
 - How it works step by step: [docs/COMMUNICATION.md](docs/COMMUNICATION.md#5-ping-pong-lock).
 
 ### Updates and switching back (Options ▾)
@@ -271,9 +281,10 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
 - Updates work in the **exe** only, not when running `n1mm_lamps.py`.
 - Updates are checked only at startup – the lamp never restarts while you
   operate.
-- Versions **before 1.6 have no Options menu.** To come back from one,
-  double-click the kept backup (e.g. `n1mm_lamps.v1.30.exe`) or download
-  the latest release.
+- Only the **last three versions** are kept on GitHub, so **Switch
+  version…** lists just those. The backup of the version you had before is
+  kept next to the exe (e.g. `n1mm_lamps.v1.45.exe`); double-click it to
+  run it without installing.
 - Without internet access the check is silently skipped.
 
 ### Diagnostics (Options ▾ → Diagnostics (log to file))
@@ -323,7 +334,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - The lamp reads all of the PC's IPv4 addresses directly from Windows and
   re-checks them every 30 s, so it always recognises its **own** N1MM
   station (also when N1MM sends to `127.0.0.1`).
-- **Sharing N1MM data (v1.39+):** each lamp forwards its **own** N1MM's
+- **Sharing N1MM data:** each lamp forwards its **own** N1MM's
   `RadioInfo` to the other lamps on port 46070, on every network. So a
   station is seen even if its N1MM only sends to `127.0.0.1`, or to a LAN
   the other PC isn't on (e.g. over ZeroTier). If N1MM's own broadcast also
@@ -335,7 +346,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
 
   | Note | Meaning |
   |---|---|
-  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – update RUN2's lamp to v1.39+ (sharing on), or check RUN2's **Broadcast Address** |
+  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
 
 ### lamps.cfg (optional)
@@ -350,20 +361,23 @@ IP,label,color
 192.168.178.56,Run2,orange
 ```
 
-Lines starting with `#` are skipped. Since v1.42 new stations are no
-longer written to the file automatically (automatic colors come from the
-master). A color in the file is used only for a station whose PC runs no
-lamp and isn't in the master's list yet; **My color…** always wins.
+Lines starting with `#` are skipped. The lamp never writes this file
+(automatic colors come from the master). A color in the file is used only
+for a station whose PC runs no lamp and isn't in the master's list yet;
+**My color…** always wins.
 
 ### Settings file: pingpong.ini
 
 Written next to the exe when you change something in **Options**; one per
-PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
-`block_keys`, `call_sound`, `share_n1mm`. `[station]` also has `role` (off / RUN /
-INB). `[network]` `block_time` = F12 block time (from the master). `[window]`: `x`, `y`, `compact` (where the
-lamp was and whether it was in compact mode). Optional `[n1mm]` `ini` =
-path of N1MM's settings file, if it isn't in the usual Documents folder. `[station]`: `alias` (My name), `color`, `color_time` (when the
-color was chosen – the earliest choice wins a conflict).
+PC, kept by updates.
+
+| Section | Keys |
+|---|---|
+| `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
+| `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), `role` (off / RUN / INB) |
+| `[network]` | `block_time` – F12 block time last received from the master |
+| `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
+| `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 
 ---
 
@@ -377,7 +391,8 @@ color was chosen – the earliest choice wins a conflict).
 | Other PCs don't blink on F12 | All PCs on the same version; receiving PC in **S&P** on the **same band**; F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |
 | One PC never receives the other lamps | Windows Firewall on that PC must allow `n1mm_lamps.exe` (or UDP port 46070) on private networks, e.g. as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP 46070" dir=in action=allow protocol=UDP localport=46070 profile=private,domain` |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |
-| N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A lamp older than v1.9 is still running somewhere (it used port 12070, N1MM's multi-computer port) – update it. |
+| N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A very old lamp (it used port 12070, N1MM's multi-computer port) is still running somewhere – update it. |
+| Colors or F12 block time differ between PCs | All PCs on the same version; the master's title bar says `MASTER` – only one PC should. |
 
 ---
 
@@ -455,7 +470,7 @@ Created next to the exe on each PC (not in the repository):
 
 ```
 n1mm_lamps.exe      – the lamp (download from Releases)
-lamps.cfg           – optional station labels/colors, auto-written
+lamps.cfg           – optional station labels/colors (written by you only)
 pingpong.ini        – per-PC settings from the Options menu
 pingpong_test.log   – Diagnostics log (only while Diagnostics is on)
 pingpong_error.log  – unexpected errors (only if one happens)
