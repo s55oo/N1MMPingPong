@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.55 · Made by **S55OO** with AI assistance.
+> **Version:** 1.56 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -256,13 +256,14 @@ For when everybody on the band must look **now**.
   N1MM still gets the key and fires **F4 at the same time**, as usual.
 - **Every** other PingPong PC on the **same band and mode**, Run or S&P,
   **flashes fast**: the lamp and its border swap between your color and
-  white, and it shows `!! <your station> !!` (no sound). It takes over the lamp, even over a
-  transmission or an F12 call. The line under it says
-  `URGENT call from RUN1 · 14 CW · 25 s left · click = silence`.
+  white, and it shows **your name and the F4 message**, e.g. `RUN1 · QRL?`
+  (`RUN1 · MSG` until the caption arrives; no sound). It takes over the
+  lamp, even over a transmission or an F12 call. The line under it says
+  `URGENT call from RUN1 · 14 CW · while it transmits · click = silence`.
 - It lasts **exactly while your F4 message is being sent**: it ends as
   soon as N1MM stops transmitting (message done, or Esc). If N1MM starts
   no transmission within **3 s** (e.g. F4 has no message), it ends by
-  itself; it never lasts longer than 30 s.
+  itself. There is no other time limit.
 - Your own lamp's border flashes fast meanwhile.
 - Pressing **Shift+F4** again starts a new urgent call with the next F4.
 - A **click on a flashing lamp** silences it on that PC.

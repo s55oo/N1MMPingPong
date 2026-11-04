@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.55
+Version: 1.56
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.55"
+__version__ = "1.56"
 
 import argparse
 import base64
@@ -90,7 +90,6 @@ BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
 MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
-URGENT_LIMIT = 30.0  # s: safety: an urgent call (Shift+F4) never lasts longer
 URGENT_WAIT = 3.0  # s: urgent call ends if N1MM starts no transmission by then
 URGENT_HALF = 0.15  # s: fast flash of an urgent call
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
@@ -2027,10 +2026,8 @@ class DisplayApp:
         tx = mine is not None and mine.tx
         if tx:
             self._urgent_tx_seen = True
-            if now - self.urgent_time <= URGENT_LIMIT:
-                return
-            why = "after {:g} s".format(URGENT_LIMIT)
-        elif self._urgent_tx_seen:
+            return
+        if self._urgent_tx_seen:
             why = "transmission ended"
         elif now - self.urgent_time > URGENT_WAIT:
             why = "no transmission started (F4 has no message?)"
@@ -2041,14 +2038,10 @@ class DisplayApp:
         self._key_event("urgent call ended: " + why)
         self.hello_now.set()  # receivers stop flashing right away
 
-    def _my_urgent_left(self, now):
-        return max(0, int(URGENT_LIMIT - (now - self.urgent_time) + 0.999))
-
-    def _urgent_left(self, peer, now):
-        """Seconds an urgent call still runs here (local clock)."""
-        key = ("urgent", peer.id, peer.urgent_time)
-        start = self._call_seen.setdefault(key, now)
-        return URGENT_LIMIT - (now - start)
+    def _urgent_seen(self, peer, now):
+        """Remember when this urgent call was first seen here (local clock)."""
+        self._call_seen.setdefault(("urgent", peer.id, peer.urgent_time), now)
+        return True
 
     def _incoming_urgent(self, now):
         """Urgent calls (Shift+F4) from other PCs on this PC's band and
@@ -2064,7 +2057,7 @@ class DisplayApp:
             and p.urgent_mode == mode
             and not getattr(p, "same_pc", False)
             and ("urgent", p.id, p.urgent_time) not in self.silenced
-            and self._urgent_left(p, now) > 0
+            and self._urgent_seen(p, now)
         ]
         return sorted(calls, key=lambda p: p.urgent_time)
 
@@ -2079,7 +2072,15 @@ class DisplayApp:
         want = "white" if lit else color
         if self.canvas.cget("highlightbackground") != want:
             self.canvas.configure(highlightbackground=want, highlightcolor=want)
-        shown = "!! {} !!".format(name)
+        # Caller's alias + the F4 message caption it is sending right now
+        # (N1MM's FunctionKeyCaption); "MSG" until the caption arrives.
+        msg = ""
+        seen = self._call_seen.get(("urgent", peer.id, peer.urgent_time), now)
+        if station is not None and station.msg and (
+            station.tx or station.msg_time >= seen - 1.0
+        ):
+            msg = station.msg
+        shown = "{} · {}".format(self.peer_name(peer), msg or "MSG")
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
