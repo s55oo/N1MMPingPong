@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.45
+Version: 1.46
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.45"
+__version__ = "1.46"
 
 import argparse
 import base64
@@ -1482,12 +1482,22 @@ class DisplayApp:
             used.add(color.lower())
         return result
 
+    def _set_title(self, master):
+        """Title bar: 'MASTER' on the master PC only."""
+        title = (
+            "PingPong  -  MASTER  v{}" if master else "PingPong  v{}"
+        ).format(__version__)
+        if getattr(self, "_title", None) != title:
+            self._title = title
+            self.root.title(title)
+
     def _update_master(self, owners, now):
         self._check_n1mm_master(now)
         master = self._pick_master(now)
         was = self._i_am_master
         self._i_am_master = master == "me"
         self._master_peer = None if self._i_am_master else master
+        self._set_title(self._i_am_master)
         if self._i_am_master:
             new = self._assign_colors(owners, now)
             if new != self.color_map:
@@ -1793,7 +1803,7 @@ class DisplayApp:
         return bool(self.tracked) and station.key == self.tracked
 
     def _build(self):
-        self.root.title("PingPong  -  UDP {}  v{}".format(self.port, __version__))
+        self._set_title(False)
         self.root.attributes("-topmost", True)
         try:
             self.app_icon = tk.PhotoImage(

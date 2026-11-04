@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.45 · Made by **S55OO** with AI assistance.
+> **Version:** 1.46 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -167,8 +167,9 @@ stations, and every other lamp uses its list.
   the **lamp started first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The line under the lamp marks it: `RUN1 7 CW RUN (me, master)` or
-  `OO840G3 7 CW RUN (master)`.
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.46`
+  (the others just `PingPong v1.46`), and the line under the lamp marks
+  it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 
 ### F12 call (Options ▾ → F12 call – blink S&P stations on my band)
 
