@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.43 · Made by **S55OO** with AI assistance.
+> **Version:** 1.44 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -202,16 +202,17 @@ per PC, off by default).
 
 - While this PC's lamp blinks for an F12 call, N1MM's function keys
   **F1–F11** are swallowed. The lamp shows `BLOCKED · F1`, the line under
-  it `F-keys blocked 35 s more`, and lamp and border **swap colors** back
+  it `F-keys blocked 15 s more`, and lamp and border **swap colors** back
   and forth.
 - **Esc**, Enter, letters, F12 and Alt combinations always work.
 - The block ends when the caller presses F12 again, when you click the
   lamp, change band or go to Run – and **by itself after the F12 block
-  time** if the caller forgets (the lamp keeps blinking: `block expired`).
-- **F12 block time** (default 40 s) is set **on the master only**:
-  **Options ▾ → F12 block time…** (5–600 s). The value goes to all lamps
-  at once; on other PCs the menu shows it greyed out, e.g.
-  `F12 block time: 25 s (set on master RUN1)`. A new master keeps the
+  time**: then the whole call ends (blinking stops on all PCs, and the
+  calling PC's call switches itself off).
+- **F12 block time** (default 30 s) is set **on the master only**:
+  **Options ▾ → F12 block time…** (**1–30 s**). The value goes to all
+  lamps at once; on other PCs the menu shows it greyed out, e.g.
+  `F12 block time: 20 s (set on master RUN1)`. A new master keeps the
   current value.
 - Only while N1MM is the active window. It does **not** stop mouse clicks
   on N1MM's buttons, microphone PTT, paddle or footswitch – it guards

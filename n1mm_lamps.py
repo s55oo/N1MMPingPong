@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.43
+Version: 1.44
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.43"
+__version__ = "1.44"
 
 import argparse
 import base64
@@ -94,8 +94,15 @@ STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
-BLOCK_LIMIT = 40.0  # s: default F-key block time (the master can change it)
-BLOCK_RANGE = (5, 600)  # s: allowed F12 block times
+BLOCK_LIMIT = 30.0  # s: default F12 call time (the master can change it)
+BLOCK_RANGE = (1, 30)  # s: allowed F12 call / block times
+
+
+def clamp_block(value):
+    """F12 call/block time within BLOCK_RANGE (0 or missing = default)."""
+    if not value:
+        return BLOCK_LIMIT
+    return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
 PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
 ROLES = ("off", "RUN", "INB")
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
@@ -815,7 +822,7 @@ class DisplayApp:
         self._ini_checked = 0.0
         self.color_map = {}  # automatic colors decided by the master
         # F12 block time: set on the master, used by every lamp.
-        self.block_limit = _float(self.settings.get_text("network", "block_time", "")) or BLOCK_LIMIT
+        self.block_limit = clamp_block(_float(self.settings.get_text("network", "block_time", "")))
         self._i_am_master = False
         self._master_peer = None
         self.my_role = self.settings.get_text("station", "role", "off")
@@ -1489,8 +1496,8 @@ class DisplayApp:
         else:
             if master.colors:
                 self.color_map = dict(master.colors)
-            if master.block_time and master.block_time != self.block_limit:
-                self.block_limit = master.block_time
+            if master.block_time and clamp_block(master.block_time) != self.block_limit:
+                self.block_limit = clamp_block(master.block_time)
                 # Remember it, so this PC keeps it if it becomes master.
                 self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
         if was != self._i_am_master:
@@ -1681,8 +1688,8 @@ class DisplayApp:
             return
         value = simpledialog.askinteger(
             "PingPong - F12 block time",
-            "How many seconds an F12 call blocks the F-keys\n"
-            "on the other PCs ({}-{}). Used by all lamps.".format(*BLOCK_RANGE),
+            "How many seconds an F12 call lasts (blinking and F-key\n"
+            "block on the other PCs), {}-{} s. Used by all lamps.".format(*BLOCK_RANGE),
             initialvalue=int(self.block_limit),
             minvalue=BLOCK_RANGE[0],
             maxvalue=BLOCK_RANGE[1],
@@ -2049,6 +2056,11 @@ class DisplayApp:
         now = time.time()
         owners = self._color_owners(now)
         self._update_master(owners, now)
+        if self.alert_on and now - self.alert_time > self.block_limit:
+            self.alert_on = False  # call time over: end my F12 call
+            self.alert_time = now
+            self._key_event("F12 call ended after {:g} s".format(self.block_limit))
+            self.hello_now.set()
         active = None
         latest = -1.0
         for station in list(self.stations.values()):
@@ -2382,6 +2394,7 @@ class DisplayApp:
             and p.alert_band == band
             and not getattr(p, "same_pc", False)  # never "call" ourselves
             and (p.id, p.alert_time) not in self.silenced
+            and self._block_left(p, now) > 0  # call time over: stop blinking
         ]
         return sorted(calls, key=lambda p: p.alert_time)
 
@@ -2460,7 +2473,7 @@ class DisplayApp:
         left = self._block_left(peer, now)
         if left > 0 and self._block_active:
             return "F-keys blocked {} s more  ·  ".format(int(left + 0.999))
-        return "block expired  ·  "
+        return ""
 
     def _call_color(self, peer, owners, now):
         station = self._peer_station(peer)

@@ -91,7 +91,7 @@ from.
   <N1MMMaster>1</N1MMMaster>       <!-- this PC's N1MM is network master: 1/0/empty -->
   <Started>1793824377.488</Started><!-- when this lamp started -->
   <Colors>pc:oo840g3=red;pc:oo840g4=light blue;…</Colors>  <!-- only from the master -->
-  <BlockTime>40</BlockTime>        <!-- F12 block time in s, only from the master -->
+  <BlockTime>30</BlockTime>        <!-- F12 call/block time in s (1-30), only from the master -->
 </PingPongHello>
 ```
 
@@ -174,7 +174,9 @@ sequenceDiagram
 
 The call also ends on the receiving lamp when its operator **clicks the
 lamp**, changes band or switches to Run, when the calling lamp has not
-been heard for 12 s, and the F-key block alone ends after **40 s**.
+been heard for 12 s, and in any case after the **F12 block time**
+(1–30 s, set on the master): then blinking and block stop everywhere and
+the caller's call switches itself off.
 
 ---
 
@@ -237,8 +239,10 @@ flowchart TD
     E -- yes --> X
     E -- "no (S&P)" --> F{"Silenced here by a click?"}
     F -- yes --> X
-    F -- no --> G["BLINK in the caller's color<br/>'F12 · caller'"]
-    G --> H{"'Block my F-keys' ticked<br/>and less than 40 s since<br/>this call was first seen?"}
+    F -- no --> T{"Less than the F12 block time<br/>since this call was first seen?"}
+    T -- no --> X
+    T -- yes --> G["BLINK in the caller's color<br/>'F12 · caller'"]
+    G --> H{"'Block my F-keys' ticked?"}
     H -- no --> I["blink only<br/>(border steady)"]
     H -- yes --> J["swallow F1–F11 while N1MM is active<br/>lamp and border swap colors"]
 ```
@@ -320,7 +324,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Blink rhythm | 0.4 s on / 0.4 s off |
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
-| F-key block limit | F12 block time after the call is first seen (default 40 s, set on the master, sent as `<BlockTime>`) |
+| F12 call time | F12 block time (1–30 s, default 30, set on the master, sent as `<BlockTime>`): then blinking and block end on the receivers and the caller's call switches off |
 | Ping-pong lock limit | 40 s without a RUN transmission |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
