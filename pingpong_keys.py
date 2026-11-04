@@ -20,6 +20,10 @@ N1MM_EXE = "n1mmlogger.net.exe"
 # (F12 stays free - it is the call key). Esc, Enter and all other keys
 # are never blocked, so an operator can always stop a transmission.
 SEND_KEYS = {vk: "F{}".format(vk - 0x6F) for vk in range(0x70, 0x7B)}
+F_KEYS = frozenset(SEND_KEYS)
+# Ping-pong lock also stops Enter (Enter Sends Messages) and Insert.
+KEY_NAMES = {**SEND_KEYS, 0x0D: "Enter", 0x2D: "Insert"}
+PINGPONG_KEYS = frozenset(KEY_NAMES)
 LLKHF_ALTDOWN = 0x20
 
 WH_KEYBOARD_LL = 13
@@ -146,16 +150,22 @@ class KeyWatcher:
         """
         fg = foreground or foreground_exe
         down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
+        blocked = None
+        if vk in KEY_NAMES and self.should_block is not None:
+            # should_block() returns the keys to block now: a set of
+            # virtual-key codes, True (= F1-F11) or nothing.
+            blocked = self.should_block()
+            if blocked is True:
+                blocked = F_KEYS
         if (
-            vk in SEND_KEYS
+            blocked
+            and vk in blocked
             and not (flags & LLKHF_ALTDOWN)
-            and self.should_block is not None
-            and self.should_block()
             and (not self.only_exe or fg() == self.only_exe)
         ):
             # F10 alone arrives as WM_SYSKEYDOWN, Alt is not down then.
             if down and self.on_blocked:
-                self.on_blocked(SEND_KEYS[vk])
+                self.on_blocked(KEY_NAMES[vk])
             return "block"
         if vk == self.vk:
             if down:

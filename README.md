@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.35 · Made by **S55OO** with AI assistance.
+> **Version:** 1.36 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -189,6 +189,35 @@ per PC, off by default).
   on N1MM's buttons, microphone PTT, paddle or footswitch – it guards
   against accidental key presses, it is not a hardware interlock.
 
+### Ping-pong lock (Options ▾ → Ping-pong role)
+
+For the "ping-pong mode" of a multi-op station: one **RUN** station and
+inband stations (**INB1**, **INB2** …) on the same band take turns – RUN
+transmits, and in RUN's listening gap one inband station transmits. The
+lock does in software what an interlock box does for this rule. N1MM
+still prevents two real transmissions at the same time; PingPong adds the
+alternation.
+
+Set the role on each PC (saved per PC, **off by default** – then nothing
+changes):
+
+| Role | Behavior |
+|---|---|
+| **off** | No ping-pong lock. |
+| **RUN** | Never locked. Every RUN transmission opens a new period for the inband stations. |
+| **INB** | After RUN has transmitted, **the first INB that transmits takes the slot**; every other INB on that band is **locked until RUN transmits again**. The INB holding the slot may keep transmitting in it. |
+
+- While locked, the INB's **F1–F11, Enter and Insert** are swallowed (Esc,
+  letters, F12 and Alt combinations always work). The lamp shows `WAIT`
+  (`BLOCKED · F1` when a key is stopped) and the line under it
+  `slot taken by INB1 – wait for RUN`.
+- The lock applies only on the **same band**, and only when a station
+  with role **RUN** is on that band. It releases itself if RUN stays
+  silent for **40 s**.
+- Like the F-key block, it only stops key presses in N1MM (not mouse
+  clicks, PTT or paddle), and it needs every PC on v1.36 or newer.
+- How it works step by step: [docs/COMMUNICATION.md](docs/COMMUNICATION.md#5-ping-pong-lock).
+
 ### Updates and switching back (Options ▾)
 
 | Item | What it does |
@@ -280,7 +309,8 @@ to the file automatically with its palette color. A color chosen with
 
 Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
-`block_keys`, `call_sound`. `[window]`: `x`, `y`, `compact` (where the
+`block_keys`, `call_sound`. `[station]` also has `role` (off / RUN /
+INB). `[window]`: `x`, `y`, `compact` (where the
 lamp was and whether it was in compact mode). `[station]`: `alias` (My name), `color`, `color_time` (when the
 color was chosen – the earliest choice wins a conflict).
 

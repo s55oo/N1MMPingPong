@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.35
+Version: 1.36
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.35"
+__version__ = "1.36"
 
 import argparse
 import base64
@@ -68,6 +68,8 @@ STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
 BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets
+PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
+ROLES = ("off", "RUN", "INB")
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
@@ -453,7 +455,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
 
 def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
-    alert=False, alert_band="", alert_time=0.0, status="", alias="",
+    alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -469,6 +471,7 @@ def make_hello(
         ("AlertTime", "{:.3f}".format(alert_time or 0.0)),
         ("Status", status or ""),
         ("Alias", alias or ""),
+        ("Role", role or ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -501,6 +504,7 @@ def parse_hello(data):
         "alert_time": _float(get("AlertTime")),
         "status": get("Status"),
         "alias": get("Alias"),
+        "role": get("Role"),
     }
 
 
@@ -602,6 +606,7 @@ class Peer:
         self.ips = set()
         self.local_n1mm = False
         self.alias = ""
+        self.role = ""
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -670,6 +675,13 @@ class DisplayApp:
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
         self.my_alias = self.settings.get_text("station", "alias", "")[:MAX_ALIAS]
+        self.my_role = self.settings.get_text("station", "role", "off")
+        if self.my_role not in ROLES:
+            self.my_role = "off"
+        self.var_role = tk.StringVar(value=self.my_role)
+        self._slots = {}  # band -> [holder station ip, time of its last TX start]
+        self._pp_locked = False
+        self._pp_holder = None
         self.my_color = self.settings.get_text("station", "color", "")
         self.my_color_time = _float(
             self.settings.get_text("station", "color_time", "0")
@@ -706,7 +718,9 @@ class DisplayApp:
             self.discovery.start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
-        if (self.var_keys.get() or self.var_block.get()) and keys.supported():
+        if (
+            self.var_keys.get() or self.var_block.get() or self.my_role == "INB"
+        ) and keys.supported():
             self.root.after(500, self._keys_toggled)
         if upd.is_frozen():
             upd.cleanup_leftovers(upd.exe_path())
@@ -752,6 +766,16 @@ class DisplayApp:
             variable=self.var_sound,
             command=lambda: self.settings.set("call_sound", self.var_sound.get()),
         )
+        menu.add_separator()
+        for value, text in (
+            ("off", "Ping-pong role: off"),
+            ("RUN", "Ping-pong role: RUN"),
+            ("INB", "Ping-pong role: INB (inband, locked by the slot rule)"),
+        ):
+            menu.add_radiobutton(
+                label=text, variable=self.var_role, value=value,
+                command=self._role_changed,
+            )
         menu.add_separator()
         frozen = upd.is_frozen()
         state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
@@ -1029,6 +1053,7 @@ class DisplayApp:
             running = radio_running(data)
             if running is not None:
                 station.running = running
+            started = is_tx and not station.tx
             station.tx = is_tx
             station.last_seen = time.time()
             if caption:
@@ -1042,6 +1067,8 @@ class DisplayApp:
             station.key = group_of(station.freq, station.mode)
             if station.ip in self.local:
                 self.tracked = station.key
+            if started:
+                self._pingpong_tx(station)
 
     def on_networks(self, nets):
         self.local_nets = set(ip for ip, _ in nets)
@@ -1060,6 +1087,7 @@ class DisplayApp:
             self.peers[info["id"]] = peer
         peer.host = info["host"] or src
         peer.alias = (info.get("alias") or "")[:MAX_ALIAS]
+        peer.role = info.get("role", "") if info.get("role") in ROLES else ""
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1106,6 +1134,8 @@ class DisplayApp:
             "keyboard watcher " + ("running" if self.key_watcher is not None else "off"),
             "calls seen: " + (", ".join(calls) or "none"),
             "F-keys " + ("BLOCKED" if self._block_active else "free"),
+            "ping-pong role " + self.my_role
+            + (" (LOCKED)" if self._pp_locked else ""),
         ])
 
     def _hello_state(self):
@@ -1118,6 +1148,7 @@ class DisplayApp:
             "alert_time": self.alert_time,
             "status": self._status_text(),
             "alias": self.my_alias,
+            "role": self.my_role if self.my_role != "off" else "",
         }
 
     # ---------------------------------------------------------- colors
@@ -1668,6 +1699,13 @@ class DisplayApp:
             )
         self._block_active = block
         self._had_calls = bool(all_calls)
+        locked, holder = self._pingpong_state(now)
+        if locked != self._pp_locked:
+            self._key_event("ping-pong lock {}{}".format(
+                "ON - slot held by " if locked else "off",
+                self.station_name(holder) if locked and holder else "",
+            ))
+        self._pp_locked, self._pp_holder = locked, holder
         calls = all_calls if active is None else []
         self._show_border(owners, now, all_calls)
 
@@ -1701,9 +1739,13 @@ class DisplayApp:
             )
         else:
             self._set_bg(COLOR_IDLE)
-            if self.canvas.itemcget(self.text_id, "text") != "—":
-                self.canvas.itemconfigure(self.text_id, text="—")
-                self.canvas.itemconfigure(self.text_id, font=self._font_for("—"))
+            idle = "—"
+            key, when = self._blocked_key
+            if self._pp_locked:
+                idle = "BLOCKED · {}".format(key) if key and now - when <= 1.5 else "WAIT"
+            if self.canvas.itemcget(self.text_id, "text") != idle:
+                self.canvas.itemconfigure(self.text_id, text=idle)
+                self.canvas.itemconfigure(self.text_id, font=self._font_for(idle))
             header = ""
             if self.alert_on:
                 header = "F12 call ON ({} MHz) – F12 = off  ·  ".format(
@@ -1712,6 +1754,10 @@ class DisplayApp:
             note = self._my_color_note(owners)
             if note:
                 header = note + "  ·  " + header
+            if self._pp_locked:
+                header = "slot taken by {} – wait for RUN  ·  ".format(
+                    self.station_name(self._pp_holder) if self._pp_holder else "INB"
+                ) + header
             if self._status:
                 header = self._status + "  ·  " + header
             parts = self._station_rows(now)
@@ -1774,7 +1820,7 @@ class DisplayApp:
             return True
         watcher = keys.KeyWatcher(
             self._f12_pressed,
-            should_block=lambda: self._block_active,
+            should_block=self._keys_to_block,
             on_blocked=self._key_blocked,
             on_event=self._key_event,
         )
@@ -1790,11 +1836,17 @@ class DisplayApp:
 
     def _keys_toggled(self):
         call, block = bool(self.var_keys.get()), bool(self.var_block.get())
-        if (call or block) and not self._start_keys():
+        inb = self.my_role == "INB"
+        if (call or block or inb) and not self._start_keys():
             self.var_keys.set(False)
             self.var_block.set(False)
             call = block = False
-        if not (call or block) and self.key_watcher is not None:
+            if inb:
+                self.my_role = "off"
+                self.var_role.set("off")
+                self.settings.set_text("station", "role", "off")
+                inb = False
+        if not (call or block or inb) and self.key_watcher is not None:
             self.key_watcher.stop()
             self.key_watcher = None
         if not call and self.alert_on:
@@ -1806,6 +1858,85 @@ class DisplayApp:
             self._block_active = False
         self.settings.set("f12_call", call)
         self.settings.set("block_keys", block)
+
+    # ---------------------------------------------------------- ping-pong
+
+    def _role_changed(self):
+        role = self.var_role.get()
+        self.my_role = role if role in ROLES else "off"
+        self.settings.set_text("station", "role", self.my_role)
+        self._key_event("ping-pong role: {}".format(self.my_role))
+        self.hello_now.set()
+        self._keys_toggled()
+
+    def role_of(self, st):
+        """Ping-pong role of an N1MM station: "RUN", "INB" or ""."""
+        if st.ip in self.local:
+            return self.my_role if self.my_role != "off" else ""
+        for peer in self._fresh_peers(time.time()):
+            if st.ip in peer.ips and not getattr(peer, "same_pc", False):
+                return peer.role
+        return ""
+
+    def _pingpong_tx(self, st):
+        """UDP thread: a station started transmitting.
+
+        RUN transmitting opens a new period (slot free). The first INB that
+        transmits after that holds the slot until RUN transmits again.
+        """
+        if not st.key:
+            return
+        band = st.key[0]
+        role = self.role_of(st)
+        now = time.time()
+        if role == "RUN":
+            if self._slots.pop(band, None) is not None:
+                self._key_event("ping-pong {} MHz: RUN transmits - slot free".format(band))
+        elif role == "INB":
+            slot = self._slots.get(band)
+            if slot is None or now - slot[1] > PP_LIMIT:
+                self._slots[band] = [st.ip, now]
+                self._key_event(
+                    "ping-pong {} MHz: slot taken by {}".format(band, self.station_name(st))
+                )
+            elif slot[0] == st.ip:
+                slot[1] = now  # holder keeps transmitting in its slot
+
+    def _run_on_band(self, band, now):
+        for st in list(self.stations.values()):
+            if (
+                st.key and st.key[0] == band
+                and now - st.last_seen <= STATION_FORGET
+                and self.role_of(st) == "RUN"
+            ):
+                return st
+        return None
+
+    def _pingpong_state(self, now):
+        """(locked, holder station) for this PC as an INB."""
+        if self.my_role != "INB":
+            return False, None
+        mine = self._local_station()
+        if mine is None or not mine.key:
+            return False, None
+        band = mine.key[0]
+        slot = self._slots.get(band)
+        if slot is None or now - slot[1] > PP_LIMIT:
+            return False, None
+        if slot[0] in self.local:
+            return False, None  # this PC holds the slot
+        if self._run_on_band(band, now) is None:
+            return False, None  # no RUN known on this band: no lock
+        holder = self.stations.get(slot[0])
+        return True, holder
+
+    def _keys_to_block(self):
+        """Keyboard thread: which keys to swallow right now."""
+        if self._pp_locked:
+            return keys.PINGPONG_KEYS
+        if self._block_active:
+            return True
+        return None
 
     def _key_event(self, text):
         if self.test_on:

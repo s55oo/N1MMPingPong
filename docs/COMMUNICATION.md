@@ -8,11 +8,12 @@ and GitHub, and how a lamp decides what to show. For using the lamp see the
 - [2. Ports and messages](#2-ports-and-messages)
 - [3. A transmission on the lamp](#3-a-transmission-on-the-lamp)
 - [4. F12 call and F-key block](#4-f12-call-and-f-key-block)
-- [5. Does this lamp blink and block?](#5-does-this-lamp-blink-and-block)
-- [6. Names and colors](#6-names-and-colors)
-- [7. Updates](#7-updates)
-- [8. Timings](#8-timings)
-- [9. Where things can break](#9-where-things-can-break)
+- [5. Ping-pong lock](#5-ping-pong-lock)
+- [6. Does this lamp blink and block?](#6-does-this-lamp-blink-and-block)
+- [7. Names and colors](#7-names-and-colors)
+- [8. Updates](#8-updates)
+- [9. Timings](#9-timings)
+- [10. Where things can break](#10-where-things-can-break)
 
 ---
 
@@ -73,7 +74,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.35</Version>
+  <Version>1.36</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -83,6 +84,7 @@ from.
   <AlertTime>1793127941.120</AlertTime>
   <Status>N1MM 14 CW from 192.168.178.55, Run; …</Status>
   <Alias>RUN1</Alias>              <!-- My name -->
+  <Role>RUN</Role>                 <!-- ping-pong role: RUN, INB or empty -->
 </PingPongHello>
 ```
 
@@ -148,7 +150,48 @@ been heard for 12 s, and the F-key block alone ends after **40 s**.
 
 ---
 
-## 5. Does this lamp blink and block?
+## 5. Ping-pong lock
+
+One RUN and inband stations (INB1, INB2) on the same band take turns, like
+a doubles match: RUN transmits, and in RUN's listening gap **one** inband
+station transmits. Each PC's role (off / RUN / INB) is set under Options
+and sent in the hello (`<Role>`).
+
+Every lamp sees every transmission start (N1MM's `IsTransmitting`
+changing to True on port 12060), so each INB lamp keeps the same "slot"
+for its band without any extra messages:
+
+- **RUN starts transmitting** → the slot is free (new period).
+- **An INB starts transmitting** while the slot is free → it holds the
+  slot. Any other INB on that band is locked until RUN transmits again.
+- The slot holder may transmit again in the same period.
+- No RUN on the band, or RUN silent for 40 s → no lock.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant R as RUN
+    participant I1 as INB1
+    participant I2 as INB2 (lamp locks keys)
+
+    R->>R: TX (CQ / exchange)
+    Note over I1,I2: slot free
+    I1->>I1: TX – takes the slot
+    Note over I2: locked: F1–F11, Enter, Insert<br/>lamp "WAIT"
+    I2--xI2: F1 pressed → BLOCKED
+    I1->>I1: TX again (still its slot)
+    R->>R: TX
+    Note over I1,I2: slot free again
+    I2->>I2: TX – takes the slot
+    Note over I1: locked until RUN transmits
+```
+
+This is the rule; N1MM's own interlock still prevents two transmissions
+overlapping in time.
+
+---
+
+## 6. Does this lamp blink and block?
 
 Every 0.12 s each lamp checks every call it has heard:
 
@@ -176,7 +219,7 @@ not by comparing all addresses – virtual adapters such as VirtualBox's
 
 ---
 
-## 6. Names and colors
+## 7. Names and colors
 
 Each PC owns its **name** (`Alias`) and **color**; the other lamps only
 display them.
@@ -200,7 +243,7 @@ flowchart LR
 
 ---
 
-## 7. Updates
+## 8. Updates
 
 ```mermaid
 sequenceDiagram
@@ -229,7 +272,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 
 ---
 
-## 8. Timings
+## 9. Timings
 
 | What | Value |
 |---|---|
@@ -241,13 +284,14 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
 | F-key block limit | 40 s after the call is first seen |
+| Ping-pong lock limit | 40 s without a RUN transmission |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
 | Update check | once, 3 s after start |
 
 ---
 
-## 9. Where things can break
+## 10. Where things can break
 
 | Symptom | Likely link | Check |
 |---|---|---|
