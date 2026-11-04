@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.34
+Version: 1.35
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.34"
+__version__ = "1.35"
 
 import argparse
 import base64
@@ -652,6 +652,8 @@ class DisplayApp:
         self.var_test = tk.BooleanVar(value=False)
         self.var_keys = tk.BooleanVar(value=self.settings.get("f12_call", False))
         self.var_block = tk.BooleanVar(value=self.settings.get("block_keys", False))
+        self.var_sound = tk.BooleanVar(value=self.settings.get("call_sound", True))
+        self._beeped = set()  # calls already announced with a sound
         # Plain copies, read from the keyboard thread.
         self.f12_on = bool(self.var_keys.get())
         self.block_on = bool(self.var_block.get())
@@ -676,7 +678,10 @@ class DisplayApp:
         self._ui_calls = []
         self._busy = False
         self._status = ""
+        self._save_job = None
         self._build()
+        self._restore_window()
+        self.root.bind("<Configure>", self._on_root_configure, add="+")
         self.stop = threading.Event()
         self.thread = threading.Thread(
             target=listener_loop,
@@ -741,6 +746,11 @@ class DisplayApp:
             label="Block my F-keys while another station calls (F12)",
             variable=self.var_block,
             command=self._keys_toggled,
+        )
+        menu.add_checkbutton(
+            label="Sound on F12 call",
+            variable=self.var_sound,
+            command=lambda: self.settings.set("call_sound", self.var_sound.get()),
         )
         menu.add_separator()
         frozen = upd.is_frozen()
@@ -1500,8 +1510,14 @@ class DisplayApp:
     def _toggle_compact(self, event=None):
         """Shift+F: lamp only, no title bar or margins, info drawn on the
         lamp; Shift+F again: normal window. Same size and place."""
-        x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
-        self._compact = not self._compact
+        self._set_compact(not self._compact)
+        return "break"
+
+    def _set_compact(self, on, pos=None):
+        if pos is None:
+            pos = (self.root.winfo_rootx(), self.root.winfo_rooty())
+        x, y = pos
+        self._compact = on
         if self._compact:
             self.top.pack_forget()
             self.info.pack_forget()
@@ -1520,7 +1536,55 @@ class DisplayApp:
         self.root.focus_force()
         self._recenter_text()
         self._sync_compact()
-        return "break"
+        self.root.after(300, self._save_window)
+
+    # ---------------------------------------------------------- window place
+
+    def _window_pos(self):
+        """(x, y) of the window as used by geometry('+x+y')."""
+        m = re.match(r"\d+x\d+([+-]-?\d+)([+-]-?\d+)", self.root.geometry())
+        if not m:
+            return None
+        return int(m.group(1).replace("+-", "-")), int(m.group(2).replace("+-", "-"))
+
+    def _save_window(self):
+        """Remember place and compact mode in pingpong.ini."""
+        pos = self._window_pos()
+        if pos is None:
+            return
+        want = ("{}".format(pos[0]), "{}".format(pos[1]), "yes" if self._compact else "no")
+        have = tuple(
+            self.settings.get_text("window", k, "") for k in ("x", "y", "compact")
+        )
+        if want != have:
+            for key, value in zip(("x", "y", "compact"), want):
+                self.settings.set_text("window", key, value)
+
+    def _on_root_configure(self, event):
+        """Window moved: save the new place a moment later (debounced)."""
+        if event.widget is not self.root:
+            return
+        if self._save_job is not None:
+            self.root.after_cancel(self._save_job)
+        self._save_job = self.root.after(1500, self._save_window_job)
+
+    def _save_window_job(self):
+        self._save_job = None
+        self._save_window()
+
+    def _restore_window(self):
+        """Put the lamp back where it was, in the mode it was in."""
+        try:
+            x = int(self.settings.get_text("window", "x", ""))
+            y = int(self.settings.get_text("window", "y", ""))
+        except ValueError:
+            return
+        if not on_screen(x + 40, y + 20):
+            return  # e.g. that monitor is gone: keep the default place
+        if self.settings.get_text("window", "compact", "no") == "yes":
+            self._set_compact(True, pos=(x, y))
+        else:
+            self.root.geometry("+{}+{}".format(x, y))
 
     def _sync_compact(self):
         """Texts drawn on the lamp: sender name (top-left) and frequency
@@ -1555,6 +1619,8 @@ class DisplayApp:
         self._drag = None
         if not moved:
             self._silence_call()
+        else:
+            self._save_window()
 
     def _open_help(self):
         try:
@@ -1619,6 +1685,7 @@ class DisplayApp:
             self._set_who("")
             self._freq_text = ""
         if calls:
+            self._call_sound(calls[-1])
             self._show_call(calls[-1], owners, now)
         elif active is not None:
             color = self._color_for(active, owners, now) or "red"
@@ -1807,6 +1874,30 @@ class DisplayApp:
             self.silenced.add((peer.id, peer.alert_time))
             self._shown_call = None
 
+    def _call_sound(self, peer):
+        """Double beep once when a call starts blinking on this lamp."""
+        key = (peer.id, peer.alert_time)
+        if key in self._beeped:
+            return
+        self._beeped.add(key)
+        if len(self._beeped) > 50:
+            self._beeped = {key}
+        if not self.var_sound.get():
+            return
+        self._key_event("call sound for {}".format(self.peer_name(peer)))
+
+        def beep():
+            try:
+                import winsound
+
+                for _ in range(2):
+                    winsound.Beep(1000, 150)
+                    time.sleep(0.08)
+            except Exception:
+                pass  # no sound device / not Windows
+
+        threading.Thread(target=beep, daemon=True).start()
+
     def _show_call(self, peer, owners, now):
         self._shown_call = peer
         station = self._peer_station(peer)
@@ -1872,10 +1963,30 @@ class DisplayApp:
             self.canvas.configure(highlightbackground=want, highlightcolor=want)
 
     def on_close(self):
+        try:
+            self._save_window()
+        except Exception:
+            pass
         if self.key_watcher is not None:
             self.key_watcher.stop()
         self.stop.set()
         self.root.destroy()
+
+
+def on_screen(x, y):
+    """Is the point on one of the monitors connected right now?"""
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL("user32")
+        user32.MonitorFromPoint.restype = ctypes.c_void_p
+        user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
+        return bool(user32.MonitorFromPoint(wintypes.POINT(x, y), 0))  # NULL if none
+    except Exception:
+        return True
 
 
 def app_dir():

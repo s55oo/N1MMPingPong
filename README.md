@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.34 · Made by **S55OO** with AI assistance.
+> **Version:** 1.35 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -102,6 +102,9 @@ frequency are on the lamp anyway), so no information is lost.
 - **Right-click** for the Options menu; a plain click still silences an
   F12 call.
 - **Shift+F** again brings back the normal window.
+- The lamp **remembers its place and mode**: after a restart or update it
+  comes back where it was, compact or not. If that place is no longer on
+  a screen (e.g. a monitor was unplugged), it opens at the default place.
 
 ### Band + mode group
 
@@ -159,6 +162,8 @@ Warn the other operators on your band without transmitting.
 - Press **F12 again** → the call is off everywhere. It also ends when
   your lamp closes; on a receiving PC it ends when that PC changes band
   or goes to Run.
+- The receiving PC also gives a short **double beep** when the call starts
+  (once per call; **Options ▾ → Sound on F12 call**, on by default).
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
 - The calling PC may itself be in Run or S&P.
@@ -275,7 +280,8 @@ to the file automatically with its palette color. A color chosen with
 
 Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
-`block_keys`. `[station]`: `alias` (My name), `color`, `color_time` (when the
+`block_keys`, `call_sound`. `[window]`: `x`, `y`, `compact` (where the
+lamp was and whether it was in compact mode). `[station]`: `alias` (My name), `color`, `color_time` (when the
 color was chosen – the earliest choice wins a conflict).
 
 ---
