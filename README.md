@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.36 · Made by **S55OO** with AI assistance.
+> **Version:** 1.37 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -80,10 +80,14 @@ What N1MM reports – and therefore what PingPong can show:
 - The lamp's top-left corner shows **who is sending on this band right
   now** (e.g. `OO840G3`), or `F12: <PC>` during an F12 call; empty when
   idle.
-- The line under the lamp lists every station with band, mode and
-  Run/S&P, this PC first, e.g.
-  `14 CW Run (me) · OO840G3 14 CW S&P · OO840G5 7 SSB Run`.
-  While someone transmits: `OO840G3 transmitting · 14 CW S&P`.
+- The line under the lamp lists every station with band, mode and role,
+  this PC first, e.g. `RUN1 14 CW RUN (me) · INB1 14 CW INB · PC5 7 SSB RUN`.
+- While someone transmits it shows **name (hostname) · RUN/INB ·
+  transmitting · band mode**, e.g.
+  `INB1 (OO840G3) · INB · transmitting · 14 CW`.
+- **RUN / INB** is the station's ping-pong role if one is set, otherwise
+  it follows N1MM's mode: **Run = RUN, S&P = INB**. The hostname is the
+  PC's Windows name (shown when it differs from the name).
   Stations not heard for a minute drop off.
 - The window is always on top. **Only one lamp per PC** can run; starting
   a second one just says PingPong is already running.

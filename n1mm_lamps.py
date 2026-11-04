@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.36
+Version: 1.37
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.36"
+__version__ = "1.37"
 
 import argparse
 import base64
@@ -1376,13 +1376,35 @@ class DisplayApp:
         self.settings.set_text("station", "alias", text)
         self.hello_now.set()  # tell the other lamps right away
 
-    def _station_state(self, st):
-        """'14 CW Run' - band, mode and Run/S&P of a station."""
-        where = group_label(st.key) or (
+    def _band_mode(self, st):
+        return group_label(st.key) or (
             "{} {}".format(band_of(st.freq) or "?", st.mode).strip() if st.mode else "?"
         )
-        role = {True: "Run", False: "S&P"}.get(st.running, "")
-        return "{} {}".format(where, role).strip()
+
+    def role_label(self, st):
+        """RUN or INB: the ping-pong role if set, else from N1MM's mode
+        (Run = RUN, S&P = INB); "" if unknown."""
+        return self.role_of(st) or {True: "RUN", False: "INB"}.get(st.running, "")
+
+    def station_host(self, st):
+        """Windows computer name of the PC behind a station, if known."""
+        if st.ip in self.local:
+            return socket.gethostname()
+        for peer in self._fresh_peers(time.time()):
+            if st.ip in peer.ips and not getattr(peer, "same_pc", False):
+                return peer.host
+        return st.label
+
+    def station_title(self, st):
+        """'RUN1 (OO840G4)' - name plus hostname when they differ."""
+        name, host = self.station_name(st), self.station_host(st)
+        if host and host.lower() != name.lower():
+            return "{} ({})".format(name, host)
+        return name
+
+    def _station_state(self, st):
+        """'14 CW RUN' - band, mode and RUN/INB of a station."""
+        return "{} {}".format(self._band_mode(st), self.role_label(st)).strip()
 
     def _station_rows(self, now):
         """One entry per station (newest per name), this PC's first."""
@@ -1732,9 +1754,15 @@ class DisplayApp:
             if self.canvas.itemcget(self.text_id, "text") != shown:
                 self.canvas.itemconfigure(self.text_id, text=shown)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
+            role = self.role_label(active)
             self.info.configure(
-                text="{} transmitting  ·  {}".format(
-                    self.station_name(active), self._station_state(active)
+                text="  ·  ".join(
+                    part for part in (
+                        self.station_title(active),
+                        role,
+                        "transmitting",
+                        self._band_mode(active),
+                    ) if part
                 )
             )
         else:
