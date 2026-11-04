@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.54
+Version: 1.55
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.54"
+__version__ = "1.55"
 
 import argparse
 import base64
@@ -90,7 +90,8 @@ BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
 MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
-URGENT_LIMIT = 30.0  # s: an urgent call (Shift+F4) ends by itself
+URGENT_LIMIT = 30.0  # s: safety: an urgent call (Shift+F4) never lasts longer
+URGENT_WAIT = 3.0  # s: urgent call ends if N1MM starts no transmission by then
 URGENT_HALF = 0.15  # s: fast flash of an urgent call
 STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
@@ -916,6 +917,7 @@ class DisplayApp:
         self.urgent_on = False  # my urgent call (Shift+F4)
         self.urgent_time = 0.0
         self.urgent_key = ("", "")  # (band, mode) of my urgent call
+        self._urgent_tx_seen = False  # my F4 transmission has started
         self._shown_urgent = None
         self.alert_time = 0.0
         self.silenced = set()  # (peer id, call time) clicked away here
@@ -1995,16 +1997,20 @@ class DisplayApp:
         self.hello_now.set()  # tell all lamps right away
 
     def _urgent_pressed(self):
-        """Keyboard thread: Shift+F4 in N1MM toggles this PC's urgent call."""
+        """Keyboard thread: Shift+F4 in N1MM starts an urgent call.
+
+        It lasts while N1MM transmits the F4 message N1MM fires at the same
+        time; it ends when that transmission ends (see _urgent_check).
+        """
         if not self.f12_on:
             return
         mine = self._local_station()
-        if not self.urgent_on and (mine is None or not mine.key):
+        if mine is None or not mine.key:
             self._key_event("Shift+F4 ignored - this PC's band/mode unknown")
             return
-        self.urgent_on = not self.urgent_on
-        if self.urgent_on:
-            self.urgent_key = (mine.key[0], mine.key[1])
+        self.urgent_on = True
+        self.urgent_key = (mine.key[0], mine.key[1])
+        self._urgent_tx_seen = False
         self.urgent_time = time.time()
         self.hello_now.set()
         if self.test_on:
@@ -2012,6 +2018,28 @@ class DisplayApp:
                 time.strftime("%H:%M:%S"),
                 "ON ({} {})".format(*self.urgent_key) if self.urgent_on else "OFF",
             ))
+
+    def _urgent_check(self, now):
+        """End my urgent call when my F4 transmission ends."""
+        if not self.urgent_on:
+            return
+        mine = self._local_station()
+        tx = mine is not None and mine.tx
+        if tx:
+            self._urgent_tx_seen = True
+            if now - self.urgent_time <= URGENT_LIMIT:
+                return
+            why = "after {:g} s".format(URGENT_LIMIT)
+        elif self._urgent_tx_seen:
+            why = "transmission ended"
+        elif now - self.urgent_time > URGENT_WAIT:
+            why = "no transmission started (F4 has no message?)"
+        else:
+            return
+        self.urgent_on = False
+        self.urgent_time = now
+        self._key_event("urgent call ended: " + why)
+        self.hello_now.set()  # receivers stop flashing right away
 
     def _my_urgent_left(self, now):
         return max(0, int(URGENT_LIMIT - (now - self.urgent_time) + 0.999))
@@ -2057,10 +2085,9 @@ class DisplayApp:
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self._set_who("URGENT: " + self.peer_name(peer))
         self._freq_text = freq_khz(station.freq) if station is not None else ""
-        left = max(0, int(self._urgent_left(peer, now) + 0.999))
         self.info.configure(
-            text="URGENT call from {}  ·  {} {}  ·  {} s left  ·  click = silence".format(
-                self.peer_name(peer), peer.urgent_band, peer.urgent_mode, left,
+            text="URGENT call from {}  ·  {} {}  ·  while it transmits  ·  click = silence".format(
+                self.peer_name(peer), peer.urgent_band, peer.urgent_mode,
             )
         )
 
@@ -2441,11 +2468,7 @@ class DisplayApp:
         if warn != self._master_warn:
             self._key_event("master warning: {}".format(warn or "cleared"))
             self._master_warn = warn
-        if self.urgent_on and now - self.urgent_time > URGENT_LIMIT:
-            self.urgent_on = False  # urgent call ends by itself
-            self.urgent_time = now
-            self._key_event("urgent call ended after {:g} s".format(URGENT_LIMIT))
-            self.hello_now.set()
+        self._urgent_check(now)
         if self.alert_on and now - self.alert_time > self._my_limit():
             self.alert_on = False  # call time over: end my F12 call
             self.alert_time = now
@@ -2540,7 +2563,7 @@ class DisplayApp:
                     )
                 )
             elif self.urgent_on:
-                idle = "URGENT · {} s".format(self._my_urgent_left(now))
+                idle = "URGENT"
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
             if now - self._f12_refused <= 2.0 and self._band_busy is not None:
@@ -2556,8 +2579,8 @@ class DisplayApp:
                     self._my_call_left(now),
                 ) + header
             if self.urgent_on:
-                header = "URGENT call ON ({} {}) · {} s left – Shift+F4 = off  ·  ".format(
-                    self.urgent_key[0] or "?", self.urgent_key[1], self._my_urgent_left(now)
+                header = "URGENT call ON ({} {}) – until F4 has been sent  ·  ".format(
+                    self.urgent_key[0] or "?", self.urgent_key[1]
                 ) + header
             note = self._my_color_note(owners)
             if note:
