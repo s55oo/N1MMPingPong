@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.48 · Made by **S55OO** with AI assistance.
+> **Version:** 1.49 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -203,11 +203,12 @@ Warn the other operators on your band without transmitting.
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
 - The calling PC may itself be in Run or S&P.
-- **One call per band at a time.** While another PC's call runs on your
-  band, F12 on your PC is **ignored** (Run or S&P, also if you silenced
-  that call): the lamp shows `BLOCKED · F12` or `F12 busy · RUN1`, the line
+- **S&P stations can't answer a call with their own.** While another PC's
+  call runs on your band and you are in **S&P**, F12 on your PC is
+  **ignored** (also if you silenced that call): the lamp shows `BLOCKED · F12` or `F12 busy · RUN1`, the line
   under it `F12 ignored – RUN1 is calling on 14 MHz`. Once that call ends,
-  F12 works again. Ending your own call with F12 always works.
+  F12 works again. A station in **Run** can always press F12, and ending
+  your own call with F12 always works.
 - N1MM still gets F12 (PingPong only watches it). Tip: give F12 a message
   that sends nothing, e.g. `F12 NULL, ` (a single space), so N1MM ignores
   it. F12 in other programs is ignored by PingPong.

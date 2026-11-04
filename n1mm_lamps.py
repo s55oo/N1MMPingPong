@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.48
+Version: 1.49
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.48"
+__version__ = "1.49"
 
 import argparse
 import base64
@@ -2488,11 +2488,14 @@ class DisplayApp:
     def _band_call(self, now):
         """Another PC's F12 call still running on this PC's band, or None.
 
-        Run or S&P, silenced or not: one call per band at a time.
+        Only for S&P (the stations a call is aimed at), silenced or not:
+        an S&P station cannot start a call while one runs on its band.
+        A Run station is never stopped.
         """
-        band = self._my_band()
-        if not band:
+        mine = self._local_station()
+        if mine is None or not mine.key or mine.running is True:
             return None
+        band = mine.key[0]
         busy = [
             p for p in self._fresh_peers(now)
             if p.alert
