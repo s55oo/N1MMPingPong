@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.53
+Version: 1.54
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.53"
+__version__ = "1.54"
 
 import argparse
 import base64
@@ -684,46 +684,52 @@ def discovery_loop(
     next_refresh = 0.0
     next_hello = 0.0
     while not stop.is_set():
-        now = time.time()
-        if now >= next_refresh:
-            nets = local_networks()
-            wanted = set(ip for ip, _ in nets)
-            for ip in list(senders):
-                if ip not in wanted:
-                    try:
-                        senders.pop(ip).close()
-                    except OSError:
-                        pass
-            for ip in wanted:
-                if ip not in senders:
-                    try:
-                        senders[ip] = _sender_socket(ip)
-                    except OSError:
-                        pass
-            on_networks(nets)
-            if share is not None:
-                share["port"] = port
-                share["targets"] = [
-                    (senders[ip], bcast) for ip, bcast in nets if ip in senders
-                ]
-            next_refresh = now + NETWORK_REFRESH
-        if hello_now is not None and hello_now.is_set():
-            hello_now.clear()  # e.g. F12 pressed: announce right away
-            next_hello = 0.0
-        if now >= next_hello:
-            payload = make_hello(
-                node_id, host, [ip for ip, _ in nets], **get_state()
-            )
-            for ip, bcast in nets:
-                sock = senders.get(ip)
-                if sock is None:
-                    continue
-                for target in (bcast, "255.255.255.255"):
-                    try:
-                        sock.sendto(payload, (target, port))
-                    except OSError:
-                        pass
-            next_hello = now + HELLO_INTERVAL
+        try:
+            now = time.time()
+            if now >= next_refresh:
+                nets = local_networks()
+                wanted = set(ip for ip, _ in nets)
+                for ip in list(senders):
+                    if ip not in wanted:
+                        try:
+                            senders.pop(ip).close()
+                        except OSError:
+                            pass
+                for ip in wanted:
+                    if ip not in senders:
+                        try:
+                            senders[ip] = _sender_socket(ip)
+                        except OSError:
+                            pass
+                on_networks(nets)
+                if share is not None:
+                    share["port"] = port
+                    share["targets"] = [
+                        (senders[ip], bcast) for ip, bcast in nets if ip in senders
+                    ]
+                next_refresh = now + NETWORK_REFRESH
+            if hello_now is not None and hello_now.is_set():
+                hello_now.clear()  # e.g. F12 pressed: announce right away
+                next_hello = 0.0
+            if now >= next_hello:
+                payload = make_hello(
+                    node_id, host, [ip for ip, _ in nets], **get_state()
+                )
+                for ip, bcast in nets:
+                    sock = senders.get(ip)
+                    if sock is None:
+                        continue
+                    for target in (bcast, "255.255.255.255"):
+                        try:
+                            sock.sendto(payload, (target, port))
+                        except OSError:
+                            pass
+                next_hello = now + HELLO_INTERVAL
+        except Exception:
+            # Never let one error stop all lamp-to-lamp messages.
+            log_error("discovery send")
+            next_hello = time.time() + HELLO_INTERVAL
+            stop.wait(1.0)
         if recv is None:
             stop.wait(0.3)
             continue
@@ -747,6 +753,77 @@ def discovery_loop(
             sock.close()
         except OSError:
             pass
+
+
+PORT_CHECK = 30.0  # s: how often to look for other programs on N1MM's port
+
+
+def port_users(port):
+    """Names of other programs (not this one) listening on UDP port.
+
+    Windows only (GetExtendedUdpTable); [] elsewhere or on any error.
+    Two programs on N1MM's port means Windows gives each packet sent to
+    127.0.0.1 to only one of them - the lamp then misses N1MM data.
+    """
+    if sys.platform != "win32":
+        return []
+    import ctypes
+    from ctypes import wintypes
+
+    iphlp = ctypes.WinDLL("iphlpapi")
+    size = wintypes.DWORD(0)
+    AF_INET, UDP_TABLE_OWNER_PID = 2, 1
+    iphlp.GetExtendedUdpTable(None, ctypes.byref(size), False, AF_INET, UDP_TABLE_OWNER_PID, 0)
+    buf = ctypes.create_string_buffer(size.value + 1024)
+    size = wintypes.DWORD(len(buf))
+    if iphlp.GetExtendedUdpTable(buf, ctypes.byref(size), False, AF_INET, UDP_TABLE_OWNER_PID, 0):
+        return []
+    count = struct.unpack_from("<I", buf, 0)[0]
+    me = os.getpid()
+    pids = set()
+    for i in range(count):
+        _addr, rport, pid = struct.unpack_from("<III", buf, 4 + 12 * i)
+        if socket.ntohs(rport & 0xFFFF) == port and pid not in (me, 0):
+            pids.add(pid)
+    names = []
+    for pid in sorted(pids):
+        names.append(_process_name(pid) or "PID {}".format(pid))
+    # PyInstaller onefile: our own launcher process has the same exe name
+    # but owns no socket, so it never shows up here.
+    return sorted(set(names))
+
+
+def _process_name(pid):
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32")
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(len(buf))
+            if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                return os.path.basename(buf.value)
+            return ""
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        return ""
+
+
+def port_watch_loop(port, out, stop):
+    """Background: out[port] = other programs on the port, every 30 s."""
+    stop.wait(3.0)
+    while not stop.is_set():
+        try:
+            out[port] = port_users(port)
+        except Exception:
+            out[port] = []
+        stop.wait(PORT_CHECK)
 
 
 class Peer:
@@ -830,6 +907,8 @@ class DisplayApp:
         self._had_calls = False
         self._band_busy = None  # another PC's F12 call running on my band
         self._master_warn = ""  # "two masters" warning, empty = all fine
+        self._last_ui_error = 0.0
+        self._port_users = {}  # port -> other programs listening on it
         self._f12_refused = 0.0  # when my F12 was ignored (band busy)
         self.key_watcher = None
         self.alert_on = False
@@ -905,6 +984,11 @@ class DisplayApp:
                 daemon=True,
             )
             self.discovery.start()
+        threading.Thread(
+            target=port_watch_loop,
+            args=(self.port, self._port_users, self.stop),
+            daemon=True,
+        ).start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
         if (
@@ -1579,6 +1663,14 @@ class DisplayApp:
             self._key_event("PingPong master: {}".format(
                 "this PC" if self._i_am_master else self.peer_name(master)
             ))
+
+    def _port_warning(self):
+        """Text when another program listens on N1MM's port, else ""."""
+        names = self._port_users.get(self.port) or []
+        if not names:
+            return ""
+        return "UDP {} also used by {} – N1MM data may be missing here " \
+            "(see README: Another program on 12060)".format(self.port, ", ".join(names))
 
     def _master_warning(self, now):
         """Text when more than one PC acts or claims to be master, else "".
@@ -2326,6 +2418,18 @@ class DisplayApp:
         return ("Segoe UI", 16, "bold")
 
     def _update(self):
+        """Display loop: one error is logged, the loop always goes on."""
+        try:
+            self._update_body()
+        except Exception:
+            now = time.time()
+            if now - self._last_ui_error > 60:  # don't flood the log
+                self._last_ui_error = now
+                log_error("display")
+        finally:
+            self.root.after(120, self._update)
+
+    def _update_body(self):
         # Run finished background work as separate events, so a dialog it
         # opens never blocks this loop (the lamp keeps working meanwhile).
         while self._ui_calls:
@@ -2476,15 +2580,15 @@ class DisplayApp:
         self._update_tail()
 
     def _update_tail(self):
-        if self._master_warn:
+        warns = [w for w in (self._master_warn, self._port_warning()) if w]
+        if warns:
             self.info.configure(
-                text="⚠ " + self._master_warn + "  ·  " + self.info.cget("text"),
+                text="  ·  ".join("⚠ " + w for w in warns) + "  ·  " + self.info.cget("text"),
                 fg="#c00000",
             )
         elif self.info.cget("fg") != self._info_fg:
             self.info.configure(fg=self._info_fg)
         self._sync_compact()
-        self.root.after(120, self._update)
 
     def _local_station(self):
         """This PC's own N1MM station (most recently heard), or None."""

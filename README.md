@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.53 · Made by **S55OO** with AI assistance.
+> **Version:** 1.54 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -65,6 +65,26 @@ Two tools are provided:
 3. **Broadcast Port**: `12060` (default, do not change).
 4. **"Broadcast Data" must be enabled on every N1MM PC** (e.g. Run2 too),
    otherwise that PC sends nothing.
+
+### Another program on 12060
+
+Other programs may listen to N1MM's broadcast too (e.g. **Callbooker**).
+If two programs on one PC listen on UDP **12060**, Windows gives each
+packet N1MM sends to `127.0.0.1` to **only one** of them – the lamp then
+misses this PC's N1MM, and so do all other lamps (the lamp passes its own
+N1MM on). The line under the lamp then says, in red,
+`⚠ UDP 12060 also used by Callbooker.exe – N1MM data may be missing here`.
+
+Fix: let N1MM send to **two ports**. The Broadcast Address field takes
+several destinations separated by spaces, e.g.
+
+```
+127.0.0.1:12060 127.0.0.1:12061
+```
+
+and set the other program to **12061** (PingPong stays on 12060). If the
+other program can't change its port, start the lamp on its own port
+instead: `n1mm_lamps.exe --port 12061`.
 
 What N1MM reports – and therefore what PingPong can show:
 
@@ -356,7 +376,8 @@ when something doesn't work as expected. It changes nothing on the lamp.
   – for finding out which fields N1MM sends.
 
 Unexpected errors are always written to `pingpong_error.log` next to the
-exe (the lamp keeps running) – send that file if something stops working.
+exe – send that file if something stops working. The lamp keeps running:
+an error never stops its display or its messages to the other lamps.
 
 Always off after a restart, so the log only grows while you diagnose.
 Delete the file any time.
@@ -443,6 +464,7 @@ PC, kept by updates.
 
 | Problem | What to check |
 |---|---|
+| Red `⚠ UDP 12060 also used by …` | Another program takes N1MM's packets – see [Another program on 12060](#another-program-on-12060). |
 | Lamp never lights | **Broadcast Data** and **RadioInfo** enabled in N1MM, correct **Broadcast Address**; band/mode in the list above; the lamp only lights for N1MM-started transmissions (not mic PTT/paddle). |
 | My own transmissions don't show | The lamp shows only *your band and mode* – check the line under the lamp shows your station. |
 | A key doesn't show | That key sends nothing (empty message, `{WIPE}` …) – N1MM doesn't report it. |

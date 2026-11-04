@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.53</Version>
+  <Version>1.54</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -352,6 +352,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | N1MM relay | each own `RadioInfo` at once; direct N1MM data preferred if seen in the last 15 s |
 | Lamp considered gone | 12 s without a hello |
 | Network adapters re-read | every 30 s |
+| Check for other programs on 12060 | every 30 s (Windows' UDP table) |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
 | Blink rhythm | 0.4 s on / 0.4 s off; urgent call 0.15 s |
 | Urgent call time | 30 s |
@@ -370,6 +371,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Symptom | Likely link | Check |
 |---|---|---|
 | Lamp never lights | N1MM → lamp (12060) | N1MM *Broadcast Data*, *RadioInfo*, Broadcast Address; band/mode supported |
+| Red `⚠ UDP 12060 also used by …` | N1MM → lamp (12060) | another program on the PC (e.g. Callbooker) listens on 12060 and gets N1MM's `127.0.0.1` packets instead of the lamp – send N1MM to two ports (`127.0.0.1:12060 127.0.0.1:12061`) and move the other program |
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | RUN2's Broadcast Address |
 | Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
 | `PC5: no PingPong heard – firewall?` | lamp ↔ lamp (46070) | N1MM data arrives but no other lamp does: this PC's firewall blocks 46070 |
