@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.42
+Version: 1.43
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.42"
+__version__ = "1.43"
 
 import argparse
 import base64
@@ -94,7 +94,8 @@ STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
 # N1MM may also send its broadcasts to 127.0.0.1; such packets are
 # always from this PC's own N1MM.
 LOOPBACK = {"127.0.0.1"}
-BLOCK_LIMIT = 40.0  # s: F-key block ends by itself if the caller forgets
+BLOCK_LIMIT = 40.0  # s: default F-key block time (the master can change it)
+BLOCK_RANGE = (5, 600)  # s: allowed F12 block times
 PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
 ROLES = ("off", "RUN", "INB")
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
@@ -483,7 +484,7 @@ def listener_loop(bind_ip, port, on_packet, stop):
 def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
-    n1mm_master="", started=0.0, colors="",
+    n1mm_master="", started=0.0, colors="", block_time=0.0,
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -503,6 +504,7 @@ def make_hello(
         ("N1MMMaster", n1mm_master or ""),
         ("Started", "{:.3f}".format(started or 0.0)),
         ("Colors", colors or ""),
+        ("BlockTime", "{:g}".format(block_time) if block_time else ""),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -539,6 +541,7 @@ def parse_hello(data):
         "n1mm_master": get("N1MMMaster"),
         "started": _float(get("Started")),
         "colors": parse_colors(get("Colors")),
+        "block_time": _float(get("BlockTime")),
     }
 
 
@@ -732,6 +735,7 @@ class Peer:
         self.n1mm_master = None
         self.started = 0.0
         self.colors = {}
+        self.block_time = 0.0
         self.color = ""
         self.color_time = 0.0
         self.alert = False
@@ -810,6 +814,8 @@ class DisplayApp:
         self._ini_mtime = None
         self._ini_checked = 0.0
         self.color_map = {}  # automatic colors decided by the master
+        # F12 block time: set on the master, used by every lamp.
+        self.block_limit = _float(self.settings.get_text("network", "block_time", "")) or BLOCK_LIMIT
         self._i_am_master = False
         self._master_peer = None
         self.my_role = self.settings.get_text("station", "role", "off")
@@ -895,6 +901,19 @@ class DisplayApp:
             label="My name…  ({})".format(self.my_alias or "PC name"),
             command=self._choose_alias,
         )
+        if self._i_am_master:
+            menu.add_command(
+                label="F12 block time…  ({:g} s, for all PCs)".format(self.block_limit),
+                command=self._choose_block_time,
+            )
+        else:
+            menu.add_command(
+                label="F12 block time: {:g} s  (set on master {})".format(
+                    self.block_limit,
+                    self.peer_name(self._master_peer) if self._master_peer else "?",
+                ),
+                state=tk.DISABLED,
+            )
         menu.add_command(
             label="My color…  ({})".format(self.my_color or "automatic"),
             command=self._choose_color,
@@ -1282,6 +1301,7 @@ class DisplayApp:
         peer.n1mm_master = True if nm == "1" else (False if nm == "0" else None)
         peer.started = info.get("started", 0.0) or 0.0
         peer.colors = info.get("colors", {}) or {}
+        peer.block_time = info.get("block_time", 0.0) or 0.0
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -1358,6 +1378,7 @@ class DisplayApp:
             "n1mm_master": {True: "1", False: "0"}.get(self.n1mm_master, ""),
             "started": self.started,
             "colors": format_colors(self.color_map) if self._i_am_master else "",
+            "block_time": self.block_limit if self._i_am_master else 0.0,
         }
 
     # ---------------------------------------------------------- colors
@@ -1465,8 +1486,13 @@ class DisplayApp:
             if new != self.color_map:
                 self.color_map = new
                 self.hello_now.set()
-        elif master.colors:
-            self.color_map = dict(master.colors)
+        else:
+            if master.colors:
+                self.color_map = dict(master.colors)
+            if master.block_time and master.block_time != self.block_limit:
+                self.block_limit = master.block_time
+                # Remember it, so this PC keeps it if it becomes master.
+                self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
         if was != self._i_am_master:
             self._key_event("PingPong master: {}".format(
                 "this PC" if self._i_am_master else self.peer_name(master)
@@ -1648,6 +1674,26 @@ class DisplayApp:
             if st.ip in peer.ips and peer.alias:
                 return peer.alias
         return st.label
+
+    def _choose_block_time(self):
+        """Master only: how long an F12 call blocks F1-F11 on other PCs."""
+        if not self._i_am_master:
+            return
+        value = simpledialog.askinteger(
+            "PingPong - F12 block time",
+            "How many seconds an F12 call blocks the F-keys\n"
+            "on the other PCs ({}-{}). Used by all lamps.".format(*BLOCK_RANGE),
+            initialvalue=int(self.block_limit),
+            minvalue=BLOCK_RANGE[0],
+            maxvalue=BLOCK_RANGE[1],
+            parent=self.root,
+        )
+        if value is None:
+            return
+        self.block_limit = float(value)
+        self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
+        self._key_event("F12 block time set to {:g} s".format(self.block_limit))
+        self.hello_now.set()  # tell all lamps right away
 
     def _choose_alias(self):
         current = self.my_alias
@@ -2346,7 +2392,7 @@ class DisplayApp:
         if len(self._call_seen) > 50:  # forget old calls
             for old in sorted(self._call_seen, key=self._call_seen.get)[:-20]:
                 self._call_seen.pop(old, None)
-        return BLOCK_LIMIT - (now - start)
+        return self.block_limit - (now - start)
 
     def _peer_station(self, peer):
         for st in list(self.stations.values()):

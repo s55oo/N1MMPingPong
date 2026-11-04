@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.42 · Made by **S55OO** with AI assistance.
+> **Version:** 1.43 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -206,8 +206,13 @@ per PC, off by default).
   and forth.
 - **Esc**, Enter, letters, F12 and Alt combinations always work.
 - The block ends when the caller presses F12 again, when you click the
-  lamp, change band or go to Run – and **by itself after 40 s** if the
-  caller forgets (the lamp keeps blinking: `block expired`).
+  lamp, change band or go to Run – and **by itself after the F12 block
+  time** if the caller forgets (the lamp keeps blinking: `block expired`).
+- **F12 block time** (default 40 s) is set **on the master only**:
+  **Options ▾ → F12 block time…** (5–600 s). The value goes to all lamps
+  at once; on other PCs the menu shows it greyed out, e.g.
+  `F12 block time: 25 s (set on master RUN1)`. A new master keeps the
+  current value.
 - Only while N1MM is the active window. It does **not** stop mouse clicks
   on N1MM's buttons, microphone PTT, paddle or footswitch – it guards
   against accidental key presses, it is not a hardware interlock.
@@ -352,7 +357,7 @@ lamp and isn't in the master's list yet; **My color…** always wins.
 Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
 `block_keys`, `call_sound`, `share_n1mm`. `[station]` also has `role` (off / RUN /
-INB). `[window]`: `x`, `y`, `compact` (where the
+INB). `[network]` `block_time` = F12 block time (from the master). `[window]`: `x`, `y`, `compact` (where the
 lamp was and whether it was in compact mode). Optional `[n1mm]` `ini` =
 path of N1MM's settings file, if it isn't in the usual Documents folder. `[station]`: `alias` (My name), `color`, `color_time` (when the
 color was chosen – the earliest choice wins a conflict).

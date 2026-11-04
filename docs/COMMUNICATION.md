@@ -91,6 +91,7 @@ from.
   <N1MMMaster>1</N1MMMaster>       <!-- this PC's N1MM is network master: 1/0/empty -->
   <Started>1793824377.488</Started><!-- when this lamp started -->
   <Colors>pc:oo840g3=red;pc:oo840g4=light blue;…</Colors>  <!-- only from the master -->
+  <BlockTime>40</BlockTime>        <!-- F12 block time in s, only from the master -->
 </PingPongHello>
 ```
 
@@ -161,7 +162,7 @@ sequenceDiagram
     K1->>L1: F12 (N1MM active)
     Note over L1: call ON – border blinks in RUN1's color
     L1->>L2: PingPongHello · Alert=1 · AlertBand=14 (sent at once)
-    Note over L2: same band + S&P → blink "F12 · RUN1"<br/>double beep (once) · F-keys blocked, max 40 s
+    Note over L2: same band + S&P → blink "F12 · RUN1"<br/>double beep (once) · F-keys blocked, max F12 block time
     K2->>L2: F1
     L2--xN2: swallowed – lamp shows "BLOCKED · F1"
     K2->>L2: Esc / Enter / letters
@@ -319,7 +320,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Blink rhythm | 0.4 s on / 0.4 s off |
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
-| F-key block limit | 40 s after the call is first seen |
+| F-key block limit | F12 block time after the call is first seen (default 40 s, set on the master, sent as `<BlockTime>`) |
 | Ping-pong lock limit | 40 s without a RUN transmission |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
