@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.46</Version>
+  <Version>1.47</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -165,7 +165,7 @@ sequenceDiagram
     K1->>L1: F12 (N1MM active)
     Note over L1: call ON – border blinks in RUN1's color
     L1->>L2: PingPongHello · Alert=1 · AlertBand=14 (sent at once)
-    Note over L2: same band + S&P → blink "F12 · RUN1"<br/>double beep (once) · F-keys blocked, max F12 block time
+    Note over L2: same band + S&P → blink "F12 · RUN1 · 30 s" (counts down)<br/>double beep (once) · F-keys blocked, max F12 block time
     K2->>L2: F1
     L2--xN2: swallowed – lamp shows "BLOCKED · F1"
     K2->>L2: Esc / Enter / letters
@@ -212,7 +212,7 @@ sequenceDiagram
     R->>R: TX (CQ / exchange)
     Note over I1,I2: slot free
     I1->>I1: TX – takes the slot
-    Note over I2: locked: F1–F11, Enter, Insert<br/>lamp "WAIT"
+    Note over I2: locked: F1–F11, Enter, Insert<br/>lamp "WAIT · INB1 · 40 s" (counts down)
     I2--xI2: F1 pressed → BLOCKED
     I1->>I1: TX again (still its slot)
     R->>R: TX
@@ -341,7 +341,9 @@ release `v<version>` with notes from `releases/v<version>.md`.
 |---|---|---|
 | Lamp never lights | N1MM → lamp (12060) | N1MM *Broadcast Data*, *RadioInfo*, Broadcast Address; band/mode supported |
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | RUN2's Broadcast Address |
-| Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC, same version on all PCs; **Diagnostics** shows what each lamp reports |
+| Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
+| `PC5: no PingPong heard – firewall?` | lamp ↔ lamp (46070) | N1MM data arrives but no other lamp does: this PC's firewall blocks 46070 |
+| `RUN2: v1.45 – update it` | – | every lamp compares `<Version>` from the hellos with its own |
 | F12 does nothing locally | keyboard → lamp | N1MM must be the active window; if N1MM runs as administrator, run PingPong as administrator too |
 | A station seen only over a VPN is missing | relay (46070) | **Share my N1MM with other lamps** on on that PC; firewall allows UDP 46070 on that network |
 | Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |

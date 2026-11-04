@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.46
+Version: 1.47
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.46"
+__version__ = "1.47"
 
 import argparse
 import base64
@@ -104,6 +104,8 @@ def clamp_block(value):
         return BLOCK_LIMIT
     return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
 PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
+NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
+FIREWALL_RULE = "PingPong lamps UDP"
 ROLES = ("off", "RUN", "INB")
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
 HELP_ICON_B64 = (
@@ -832,6 +834,7 @@ class DisplayApp:
         self._slots = {}  # band -> [holder station ip, time of its last TX start]
         self._pp_locked = False
         self._pp_holder = None
+        self._pp_left = 0
         self.my_color = self.settings.get_text("station", "color", "")
         self.my_color_time = _float(
             self.settings.get_text("station", "color_time", "0")
@@ -989,6 +992,11 @@ class DisplayApp:
             ),
         )
         menu.add_separator()
+        menu.add_command(
+            label="Allow PingPong in Windows Firewall…",
+            state=tk.NORMAL if sys.platform == "win32" else tk.DISABLED,
+            command=self._allow_firewall,
+        )
         menu.add_checkbutton(
             label="Diagnostics (log to file)",
             variable=self.var_test,
@@ -1675,7 +1683,92 @@ class DisplayApp:
                 rows.append("{}: N1MM not reaching here".format(self.peer_name(peer)))
             else:
                 rows.append("{}: no N1MM".format(self.peer_name(peer)))
+        rows.extend(self._version_rows(now))
+        rows.extend(self._no_lamp_rows(now))
         return rows
+
+    def _version_rows(self, now):
+        """Footer notes for lamps running another PingPong version."""
+        mine = upd.parse_version(__version__)
+        rows = []
+        for peer in self._fresh_peers(now):
+            if getattr(peer, "same_pc", False) or not peer.version:
+                continue
+            theirs = upd.parse_version(peer.version)
+            if theirs and theirs < mine:
+                rows.append("{}: v{} – update it".format(self.peer_name(peer), peer.version))
+            elif theirs > mine:
+                rows.append("{}: v{} – update this PC".format(self.peer_name(peer), peer.version))
+        return rows
+
+    def _no_lamp_rows(self, now):
+        """Footer notes for N1MM PCs heard directly but without a lamp.
+
+        If other lamps are heard, that PC simply runs no PingPong. If no
+        lamp at all is heard, this PC's firewall probably drops port 46070.
+        """
+        if not self._share["port"] or now - self.started < NO_LAMP_AFTER:
+            return []
+        peers = self._fresh_peers(now)
+        lamp_ips = set()
+        for peer in peers:
+            lamp_ips |= peer.ips
+        rows = []
+        for st in list(self.stations.values()):
+            if (
+                st.ip in self.local
+                or st.ip in lamp_ips
+                or now - st.direct_seen > NO_LAMP_AFTER
+            ):
+                continue
+            if any(not getattr(p, "same_pc", False) for p in peers):
+                rows.append("{}: no PingPong lamp there".format(st.label))
+            else:
+                rows.append(
+                    "{}: no PingPong heard – firewall? Options ▾ → Allow PingPong in "
+                    "Windows Firewall".format(st.label)
+                )
+        return rows
+
+    def _allow_firewall(self):
+        """Add an inbound firewall rule for the lamp's UDP ports (asks UAC)."""
+        ports = ",".join(
+            str(p) for p in (self.port, self._share["port"]) if p
+        )
+        if not messagebox.askyesno(
+            "PingPong - Windows Firewall",
+            "Allow incoming UDP {} (N1MM data and the other lamps) on private "
+            "and domain networks?\n\nWindows asks for administrator rights. "
+            "The rule is called \"{}\"; an older rule with that name is "
+            "replaced.".format(ports, FIREWALL_RULE),
+            parent=self.root,
+        ):
+            return
+        rule = (
+            'netsh advfirewall firewall delete rule name="{0}" >nul 2>&1 & '
+            'netsh advfirewall firewall add rule name="{0}" dir=in action=allow '
+            "protocol=UDP localport={1} profile=private,domain"
+        ).format(FIREWALL_RULE, ports)
+        try:
+            import ctypes
+
+            result = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", "cmd.exe", '/c ' + rule, None, 0
+            )
+        except Exception as exc:
+            result, rule = 0, repr(exc)
+        if result > 32:
+            messagebox.showinfo(
+                "PingPong - Windows Firewall",
+                "Firewall rule \"{}\" added (UDP {}).".format(FIREWALL_RULE, ports),
+                parent=self.root,
+            )
+        else:
+            messagebox.showwarning(
+                "PingPong - Windows Firewall",
+                "The rule was not added (no administrator rights given).",
+                parent=self.root,
+            )
 
     def peer_name(self, peer):
         """Name to show for a PingPong PC: its alias, else its PC name."""
@@ -2146,7 +2239,12 @@ class DisplayApp:
             idle = "—"
             key, when = self._blocked_key
             if self._pp_locked:
-                idle = "BLOCKED · {}".format(key) if key and now - when <= 1.5 else "WAIT"
+                idle = "BLOCKED · {}".format(key) if key and now - when <= 1.5 else (
+                    "WAIT · {} · {} s".format(
+                        self.station_name(self._pp_holder) if self._pp_holder else "INB",
+                        self._pp_left,
+                    )
+                )
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
             if self.canvas.itemcget(self.text_id, "text") != idle:
@@ -2161,8 +2259,9 @@ class DisplayApp:
             if note:
                 header = note + "  ·  " + header
             if self._pp_locked:
-                header = "slot taken by {} – wait for RUN  ·  ".format(
-                    self.station_name(self._pp_holder) if self._pp_holder else "INB"
+                header = "slot taken by {} – wait for RUN (free in {} s at the latest)  ·  ".format(
+                    self.station_name(self._pp_holder) if self._pp_holder else "INB",
+                    self._pp_left,
                 ) + header
             if self._status:
                 header = self._status + "  ·  " + header
@@ -2354,6 +2453,7 @@ class DisplayApp:
         if self._run_on_band(band, now) is None:
             return False, None  # no RUN known on this band: no lock
         holder = self.stations.get(slot[0])
+        self._pp_left = max(0, int(PP_LIMIT - (now - slot[1]) + 0.999))
         return True, holder
 
     def _keys_to_block(self):
@@ -2463,7 +2563,8 @@ class DisplayApp:
         name = self.peer_name(peer) if peer.alias or station is None else self.station_name(station)
         lit = int(now / BLINK_HALF) % 2 == 0
         bg = color if lit else COLOR_IDLE
-        shown = "F12 · {}".format(name)
+        left = max(0, int(self._block_left(peer, now) + 0.999))
+        shown = "F12 · {} · {} s".format(name, left)
         key, when = self._blocked_key
         if self._block_active and key and now - when <= 1.5:
             shown = "BLOCKED · {}".format(key)
@@ -2472,9 +2573,10 @@ class DisplayApp:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
         self.info.configure(
-            text="{} calls (F12)  ·  {} MHz  ·  {}click = silence".format(
+            text="{} calls (F12)  ·  {} MHz  ·  {} s left  ·  {}click = silence".format(
                 self.peer_name(peer),
                 peer.alert_band,
+                left,
                 self._block_note(peer, now),
             )
         )
@@ -2488,7 +2590,7 @@ class DisplayApp:
             return ""
         left = self._block_left(peer, now)
         if left > 0 and self._block_active:
-            return "F-keys blocked {} s more  ·  ".format(int(left + 0.999))
+            return "F-keys blocked  ·  "
         return ""
 
     def _call_color(self, peer, owners, now):

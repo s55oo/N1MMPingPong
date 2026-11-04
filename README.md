@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.46 · Made by **S55OO** with AI assistance.
+> **Version:** 1.47 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -192,7 +192,8 @@ Warn the other operators on your band without transmitting.
   F12 = off` on the line under it.
 - Every other PingPong PC that is **on the same band** and in **S&P**
   (N1MM `IsRunning = False`) **blinks** in your color with
-  `F12 · <your station>`, framed by a wide border in your color.
+  `F12 · <your station> · 18 s` (counting down to the end of the call),
+  framed by a wide border in your color.
   PCs in **Run** or on another band are not affected.
 - Press **F12 again** → the call is off everywhere. It also ends when
   your lamp closes; on a receiving PC it ends when that PC changes band
@@ -213,9 +214,9 @@ Turn this on on the PCs that should be **stopped** during a call (saved
 per PC, off by default).
 
 - While this PC's lamp blinks for an F12 call, N1MM's function keys
-  **F1–F11** are swallowed. The lamp shows `BLOCKED · F1`, the line under
-  it `F-keys blocked 15 s more`, and lamp and border **swap colors** back
-  and forth.
+  **F1–F11** are swallowed. The lamp shows `BLOCKED · F1` when a key is
+  stopped, the line under it `RUN1 calls (F12) · 14 MHz · 15 s left ·
+  F-keys blocked`, and lamp and border **swap colors** back and forth.
 - **Esc**, Enter, letters, F12 and Alt combinations always work.
 - The block ends when the caller presses F12 again, when you click the
   lamp, change band or go to Run – and **by itself after the F12 block
@@ -249,9 +250,11 @@ changes):
 | **INB** | After RUN has transmitted, **the first INB that transmits takes the slot**; every other INB on that band is **locked until RUN transmits again**. The INB holding the slot may keep transmitting in it. |
 
 - While locked, the INB's **F1–F11, Enter and Insert** are swallowed (Esc,
-  letters, F12 and Alt combinations always work). The lamp shows `WAIT`
-  (`BLOCKED · F1` when a key is stopped) and the line under it
-  `slot taken by INB1 – wait for RUN`.
+  letters, F12 and Alt combinations always work). The lamp shows who holds
+  the slot and the seconds until the lock releases itself, e.g.
+  `WAIT · INB1 · 32 s` (`BLOCKED · F1` when a key is stopped); the line
+  under it says `slot taken by INB1 – wait for RUN (free in 32 s at the
+  latest)`. RUN transmitting frees it earlier.
 - **Several RUN stations** (e.g. a second RUN): give each the role
   **RUN** – they are treated exactly the same. None of them is ever
   locked, and a transmission from **any** RUN on the band frees the slot.
@@ -286,6 +289,13 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
   kept next to the exe (e.g. `n1mm_lamps.v1.45.exe`); double-click it to
   run it without installing.
 - Without internet access the check is silently skipped.
+
+### Windows Firewall (Options ▾ → Allow PingPong in Windows Firewall…)
+
+Adds an inbound rule `PingPong lamps UDP` for UDP **12060** and **46070**
+on private and domain networks. Windows asks for administrator rights
+(UAC); an older rule with the same name is replaced. Do it once per PC,
+if the lamp says `no PingPong heard – firewall?`.
 
 ### Diagnostics (Options ▾ → Diagnostics (log to file))
 
@@ -348,6 +358,12 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   |---|---|
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
+  | `RUN2: v1.45 – update it` | RUN2 runs an older PingPong – update it there |
+  | `RUN2: v1.48 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
+  | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
+
+  The last two notes appear only 30 s after the lamp started.
 
 ### lamps.cfg (optional)
 
@@ -389,7 +405,8 @@ PC, kept by updates.
 | My own transmissions don't show | The lamp shows only *your band and mode* – check the line under the lamp shows your station. |
 | A key doesn't show | That key sends nothing (empty message, `{WIPE}` …) – N1MM doesn't report it. |
 | Other PCs don't blink on F12 | All PCs on the same version; receiving PC in **S&P** on the **same band**; F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |
-| One PC never receives the other lamps | Windows Firewall on that PC must allow `n1mm_lamps.exe` (or UDP port 46070) on private networks, e.g. as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP 46070" dir=in action=allow protocol=UDP localport=46070 profile=private,domain` |
+| One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12060 and 46070: **Options ▾ → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12060,46070 profile=private,domain` |
+| Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all (**Options ▾ → Check for updates**). |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |
 | N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A very old lamp (it used port 12070, N1MM's multi-computer port) is still running somewhere – update it. |
 | Colors or F12 block time differ between PCs | All PCs on the same version; the master's title bar says `MASTER` – only one PC should. |
