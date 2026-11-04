@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.52 · Made by **S55OO** with AI assistance.
+> **Version:** 1.53 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -236,8 +236,7 @@ For when everybody on the band must look **now**.
   N1MM still gets the key and fires **F4 at the same time**, as usual.
 - **Every** other PingPong PC on the **same band and mode**, Run or S&P,
   **flashes fast**: the lamp and its border swap between your color and
-  white, it shows `!! <your station> !!` and gives **three high beeps**
-  (if **Sound on F12 call** is on). It takes over the lamp, even over a
+  white, and it shows `!! <your station> !!` (no sound). It takes over the lamp, even over a
   transmission or an F12 call. The line under it says
   `URGENT call from RUN1 · 14 CW · 25 s left · click = silence`.
 - Your own lamp's border flashes and counts down: `URGENT · 25 s`.

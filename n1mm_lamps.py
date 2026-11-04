@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.52
+Version: 1.53
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.52"
+__version__ = "1.53"
 
 import argparse
 import base64
@@ -1971,29 +1971,6 @@ class DisplayApp:
                 self.peer_name(peer), peer.urgent_band, peer.urgent_mode, left,
             )
         )
-        self._urgent_sound(peer)
-
-    def _urgent_sound(self, peer):
-        """Three high beeps once per urgent call (if sound is on)."""
-        key = ("urgent", peer.id, peer.urgent_time)
-        if key in self._beeped:
-            return
-        self._beeped.add(key)
-        if not self.var_sound.get():
-            return
-        self._key_event("urgent sound for {}".format(self.peer_name(peer)))
-
-        def beep():
-            try:
-                import winsound
-
-                for _ in range(3):
-                    winsound.Beep(1600, 180)
-                    time.sleep(0.06)
-            except Exception:
-                pass
-
-        threading.Thread(target=beep, daemon=True).start()
 
     def _my_limit(self):
         return self.block_limit_run if self.alert_run else self.block_limit

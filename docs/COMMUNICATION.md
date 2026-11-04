@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.52</Version>
+  <Version>1.53</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -204,8 +204,8 @@ everywhere and the caller's call switches itself off.
 Shift+F4 in N1MM is passed on to N1MM (F4 fires as usual) **and** turns
 on `<Urgent>` with this PC's band and mode. Every lamp on the **same band
 and mode** – Run or S&P – flashes fast (0.15 s, caller color ↔ white),
-shows `!! caller !!`, beeps three times and puts this above everything
-else on the lamp. No keys are blocked. It ends with Shift+F4 again, after
+shows `!! caller !!` (no sound) and puts this above everything else on
+the lamp. No keys are blocked. It ends with Shift+F4 again, after
 30 s (counted on each lamp's own clock), or on one PC with a click.
 
 ---
