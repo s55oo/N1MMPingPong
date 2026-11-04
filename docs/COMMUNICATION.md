@@ -161,7 +161,9 @@ Every lamp sees every transmission start (N1MM's `IsTransmitting`
 changing to True on port 12060), so each INB lamp keeps the same "slot"
 for its band without any extra messages:
 
-- **RUN starts transmitting** → the slot is free (new period).
+- **RUN starts transmitting** → the slot is free (new period). With
+  several RUN stations on the band, each of them does this – all RUNs are
+  equal and never locked.
 - **An INB starts transmitting** while the slot is free → it holds the
   slot. Any other INB on that band is locked until RUN transmits again.
 - The slot holder may transmit again in the same period.

@@ -211,6 +211,9 @@ changes):
   letters, F12 and Alt combinations always work). The lamp shows `WAIT`
   (`BLOCKED · F1` when a key is stopped) and the line under it
   `slot taken by INB1 – wait for RUN`.
+- **Several RUN stations** (e.g. a second RUN): give each the role
+  **RUN** – they are treated exactly the same. None of them is ever
+  locked, and a transmission from **any** RUN on the band frees the slot.
 - The lock applies only on the **same band**, and only when a station
   with role **RUN** is on that band. It releases itself if RUN stays
   silent for **40 s**.
