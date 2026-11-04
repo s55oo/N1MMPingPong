@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.50</Version>
+  <Version>1.51</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -363,5 +363,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | F12 does nothing locally | keyboard → lamp | N1MM must be the active window; if N1MM runs as administrator, run PingPong as administrator too |
 | A station seen only over a VPN is missing | relay (46070) | **Share my N1MM with other lamps** on on that PC; firewall allows UDP 46070 on that network |
 | Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |
+| Red `⚠ TWO MASTERS: …` | master (46070) | only the master sends `<BlockTime>`: if two lamps do, they don't hear each other – check the firewall on both |
+| Red `⚠ N1MM master on … and …` | N1MM settings | two N1MMs report `IsNetworkMaster=True` – check N1MM's Network Status |
 | Ping-pong lock never locks | 12060 + roles | a station with role **RUN** on the same band; roles set on every PC |
 | No update offered | lamp → GitHub | internet access to github.com |

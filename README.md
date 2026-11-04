@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.50 · Made by **S55OO** with AI assistance.
+> **Version:** 1.51 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -181,6 +181,12 @@ stations, and every other lamp uses its list.
 - The **title bar** of the master's lamp says `PingPong - MASTER v1.46`
   (the others just `PingPong v1.46`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
+- **Two-master warning** – the line under the lamp turns **red**:
+
+  | Warning | Meaning |
+  |---|---|
+  | `⚠ TWO MASTERS: RUN1, RUN2 – …` | two lamps both act as master: they don't hear each other (one-way firewall – **Allow PingPong in Windows Firewall…** on both), or one runs an old version. Colors and block times can differ until it's fixed. |
+  | `⚠ N1MM master on RUN1 and RUN2 – …` | two N1MMs say they are network master. PingPong still picks one, but check N1MM's **Network Status** window. |
 
 ### F12 call (Options ▾ → F12 call – blink stations on my band)
 
@@ -423,7 +429,7 @@ PC, kept by updates.
 | Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all (**Options ▾ → Check for updates**). |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |
 | N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A very old lamp (it used port 12070, N1MM's multi-computer port) is still running somewhere – update it. |
-| Colors or F12 block time differ between PCs | All PCs on the same version; the master's title bar says `MASTER` – only one PC should. |
+| Colors or F12 block time differ between PCs | All PCs on the same version; the master's title bar says `MASTER` – only one PC should. A red `⚠ TWO MASTERS` line under the lamp says which. |
 
 ---
 

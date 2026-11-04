@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.50
+Version: 1.51
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.50"
+__version__ = "1.51"
 
 import argparse
 import base64
@@ -814,6 +814,7 @@ class DisplayApp:
         self._call_seen = {}  # (peer id, call time) -> local time first seen
         self._had_calls = False
         self._band_busy = None  # another PC's F12 call running on my band
+        self._master_warn = ""  # "two masters" warning, empty = all fine
         self._f12_refused = 0.0  # when my F12 was ignored (band busy)
         self.key_watcher = None
         self.alert_on = False
@@ -1552,6 +1553,31 @@ class DisplayApp:
                 "this PC" if self._i_am_master else self.peer_name(master)
             ))
 
+    def _master_warning(self, now):
+        """Text when more than one PC acts or claims to be master, else "".
+
+        Only the master sends <BlockTime>, so two lamps sending it (or one
+        besides this master) means lamps that don't hear each other. Two
+        N1MMs saying IsNetworkMaster=True is a N1MM setup problem.
+        """
+        me = self.my_alias or socket.gethostname()
+        peers = [
+            p for p in self._fresh_peers(now) if not getattr(p, "same_pc", False)
+        ]
+        acting = ([me] if self._i_am_master else []) + [
+            self.peer_name(p) for p in peers if p.block_time
+        ]
+        if len(acting) > 1:
+            return "TWO MASTERS: {} – the lamps don't hear each other (firewall?) " \
+                "or run different versions".format(", ".join(sorted(acting)))
+        n1mm = ([me] if self.n1mm_master is True else []) + [
+            self.peer_name(p) for p in peers if p.n1mm_master is True
+        ]
+        if len(n1mm) > 1:
+            return "N1MM master on {} – check N1MM's Network Status".format(
+                " and ".join(sorted(n1mm)))
+        return ""
+
     def _color_for(self, station, owners, now):
         if station.ip in self.local:
             if self.my_color and owners.get(self.my_color.lower()) == "me":
@@ -2019,6 +2045,7 @@ class DisplayApp:
             frame, text="", font=("Segoe UI", 8), justify=tk.CENTER, wraplength=340
         )
         self.info.pack(fill=tk.X)
+        self._info_fg = self.info.cget("fg")
 
     def _rgb(self, color):
         """(r, g, b) 0-255 of any Tk color name or #rrggbb, or None."""
@@ -2209,6 +2236,10 @@ class DisplayApp:
         now = time.time()
         owners = self._color_owners(now)
         self._update_master(owners, now)
+        warn = self._master_warning(now)
+        if warn != self._master_warn:
+            self._key_event("master warning: {}".format(warn or "cleared"))
+            self._master_warn = warn
         if self.alert_on and now - self.alert_time > self._my_limit():
             self.alert_on = False  # call time over: end my F12 call
             self.alert_time = now
@@ -2329,6 +2360,13 @@ class DisplayApp:
             rows = "  ·  ".join(parts) if parts else "waiting for N1MM…"
             self.info.configure(text=header + rows)
 
+        if self._master_warn:
+            self.info.configure(
+                text="⚠ " + self._master_warn + "  ·  " + self.info.cget("text"),
+                fg="#c00000",
+            )
+        elif self.info.cget("fg") != self._info_fg:
+            self.info.configure(fg=self._info_fg)
         self._sync_compact()
         self.root.after(120, self._update)
 
