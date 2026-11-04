@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.38 · Made by **S55OO** with AI assistance.
+> **Version:** 1.39 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -44,9 +44,11 @@ Two tools are provided:
 1. On each N1MM Logger+ PC: **File → Settings → Configurer →
    External Broadcast**, enable **RadioInfo** (required) and any other
    reports you want (ContactInfo, Spot, AppInfo, dynamicresults …).
-2. **Broadcast Address**: your subnet broadcast (e.g. `192.168.178.255`)
-   so every PC sees every station. Use the address of the network you
-   run on – **LAN or VPN** – and the same setting on every PC.
+2. **Broadcast Address**: `127.0.0.1:12060` is enough – the lamp on the
+   same PC passes this PC's N1MM data on to all other lamps, on **every**
+   network both PCs are on (LAN, Wi-Fi, ZeroTier, other VPNs; v1.39+).
+   You can also send to your subnet broadcast (e.g. `192.168.178.255`)
+   as before; then lamps on that LAN get it directly, which they prefer.
 3. **Broadcast Port**: `12060` (default, do not change).
 4. **"Broadcast Data" must be enabled on every N1MM PC** (e.g. Run2 too),
    otherwise that PC sends nothing.
@@ -280,7 +282,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - `--no-discovery` – no lamp-to-lamp messages (no colors, F12 call or
   network notes).
 
-### How the lamps find each other
+### How the lamps find each other and share N1MM data
 
 - Every lamp sends a small `PingPongHello` message every 3 s (at once
   after an F12 press) as a broadcast on every network adapter of the PC –
@@ -289,12 +291,19 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
 - The lamp reads all of the PC's IPv4 addresses directly from Windows and
   re-checks them every 30 s, so it always recognises its **own** N1MM
   station (also when N1MM sends to `127.0.0.1`).
+- **Sharing N1MM data (v1.39+):** each lamp forwards its **own** N1MM's
+  `RadioInfo` to the other lamps on port 46070, on every network. So a
+  station is seen even if its N1MM only sends to `127.0.0.1`, or to a LAN
+  the other PC isn't on (e.g. over ZeroTier). If N1MM's own broadcast also
+  arrives, the lamp uses that and ignores the forwarded copy; every PC
+  appears once. **Options ▾ → Share my N1MM with other lamps** (on by
+  default).
 - A PC running PingPong whose N1MM traffic doesn't arrive is listed under
   the lamp:
 
   | Note | Meaning |
   |---|---|
-  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its broadcast doesn't reach this PC – check RUN2's **Broadcast Address** |
+  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – update RUN2's lamp to v1.39+ (sharing on), or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
 
 ### lamps.cfg (optional)
@@ -317,7 +326,7 @@ to the file automatically with its palette color. A color chosen with
 
 Written next to the exe when you change something in **Options**; one per
 PC. `[update]`: `check_at_startup`, `install_automatically`, `f12_call`,
-`block_keys`, `call_sound`. `[station]` also has `role` (off / RUN /
+`block_keys`, `call_sound`, `share_n1mm`. `[station]` also has `role` (off / RUN /
 INB). `[window]`: `x`, `y`, `compact` (where the
 lamp was and whether it was in compact mode). `[station]`: `alias` (My name), `color`, `color_time` (when the
 color was chosen – the earliest choice wins a conflict).

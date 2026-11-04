@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.38
+Version: 1.39
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.38"
+__version__ = "1.39"
 
 import argparse
 import base64
@@ -522,8 +522,36 @@ def _sender_socket(ip):
     return sock
 
 
+RELAY_MAGIC = b"PPR1"  # lamp-to-lamp copy of this PC's N1MM RadioInfo
+DIRECT_RECENT = 15.0  # s: prefer N1MM's own broadcast over a relayed copy
+
+
+def make_relay(node_id, data):
+    return RELAY_MAGIC + node_id.encode("ascii") + b"\n" + data
+
+
+def parse_relay(data):
+    """(node_id, N1MM packet) of a relay message, or None."""
+    if not data.startswith(RELAY_MAGIC):
+        return None
+    head, sep, payload = data[len(RELAY_MAGIC):].partition(b"\n")
+    if not sep or not head:
+        return None
+    return head.decode("ascii", errors="replace"), payload
+
+
+def send_relay(share, payload):
+    """Broadcast a relay message on every network (any thread)."""
+    for sock, bcast in list(share.get("targets", ())):
+        try:
+            sock.sendto(payload, (bcast, share["port"]))
+        except OSError:
+            pass
+
+
 def discovery_loop(
-    port, node_id, get_state, on_networks, on_hello, stop, hello_now=None
+    port, node_id, get_state, on_networks, on_hello, stop, hello_now=None,
+    share=None, on_relay=None,
 ):
     """Active discovery between PCs running PingPong.
 
@@ -560,6 +588,11 @@ def discovery_loop(
                     except OSError:
                         pass
             on_networks(nets)
+            if share is not None:
+                share["port"] = port
+                share["targets"] = [
+                    (senders[ip], bcast) for ip, bcast in nets if ip in senders
+                ]
             next_refresh = now + NETWORK_REFRESH
         if hello_now is not None and hello_now.is_set():
             hello_now.clear()  # e.g. F12 pressed: announce right away
@@ -587,6 +620,11 @@ def discovery_loop(
             continue
         except OSError:
             stop.wait(0.3)
+            continue
+        relay = parse_relay(data)
+        if relay is not None:
+            if on_relay is not None:
+                on_relay(addr[0], relay[0], relay[1])
             continue
         info = parse_hello(data)
         if info:
@@ -629,6 +667,7 @@ class Station:
         self.mode = ""
         self.key = None
         self.running = None  # True = Run, False = S&P, None = unknown
+        self.direct_seen = 0.0  # last packet straight from N1MM (not relayed)
 
 
 class DisplayApp:
@@ -672,6 +711,9 @@ class DisplayApp:
         self.silenced = set()  # (peer id, call time) clicked away here
         self._shown_call = None
         self.hello_now = threading.Event()
+        self._share = {"targets": [], "port": discovery_port or 0}
+        self.var_relay = tk.BooleanVar(value=self.settings.get("share_n1mm", True))
+        self.relay_on = bool(self.var_relay.get())
         self.test_on = False  # plain copy, safe to read from the UDP thread
         self.test_log_path = os.path.join(app_dir(), TEST_LOG)
         self.my_alias = self.settings.get_text("station", "alias", "")[:MAX_ALIAS]
@@ -712,6 +754,8 @@ class DisplayApp:
                     self.on_hello,
                     self.stop,
                     self.hello_now,
+                    self._share,
+                    self.on_relay,
                 ),
                 daemon=True,
             )
@@ -774,6 +818,11 @@ class DisplayApp:
             label="Sound on F12 call",
             variable=self.var_sound,
             command=lambda: self.settings.set("call_sound", self.var_sound.get()),
+        )
+        menu.add_checkbutton(
+            label="Share my N1MM with other lamps (all networks)",
+            variable=self.var_relay,
+            command=self._relay_toggled,
         )
         menu.add_separator()
         for value, text in (
@@ -1050,11 +1099,46 @@ class DisplayApp:
         self.stations[ip] = station
         return station
 
-    def on_packet(self, src, data):
+    def on_relay(self, src, node_id, data):
+        """Discovery thread: another lamp passed on its own N1MM's packet."""
+        if node_id == self.node_id:
+            return  # our own relay came back
+        peer = self.peers.get(node_id)
+        if peer is not None and getattr(peer, "same_pc", False):
+            return
+        if src in self.local:
+            return
+        ip = self._canon_ip(src)
+        station = self.stations.get(ip)
+        if station is not None and time.time() - station.direct_seen < DIRECT_RECENT:
+            return  # N1MM's own broadcast reaches us: use that
+        self.on_packet(ip, data, relayed=True)
+
+    def _canon_ip(self, src):
+        """One station per PC: map any address of a PingPong PC to the
+        address its station is already known under."""
+        if src in self.local:
+            return src
+        for peer in self._fresh_peers(time.time()):
+            if src in peer.ips:
+                for ip in sorted(peer.ips - self.local):
+                    if ip in self.stations:
+                        return ip
+        return src
+
+    def on_packet(self, src, data, relayed=False):
         is_radio, caption, station_name, is_tx, freq, mode = packet_info(data)
         if self.test_on and src in self.local:
             self._test_log(src, data)
+        if not relayed:
+            if src in self.local:
+                if is_radio and self.relay_on:
+                    send_relay(self._share, make_relay(self.node_id, data))
+            else:
+                src = self._canon_ip(src)
         station = self._station(src, station_name)
+        if not relayed:
+            station.direct_seen = time.time()
         station.count += 1
         if not station.label or station.label == station.ip:
             station.label = station_name or station.label
@@ -1899,6 +1983,10 @@ class DisplayApp:
         self.settings.set("block_keys", block)
 
     # ---------------------------------------------------------- ping-pong
+
+    def _relay_toggled(self):
+        self.relay_on = bool(self.var_relay.get())
+        self.settings.set("share_n1mm", self.relay_on)
 
     def _role_changed(self):
         role = self.var_role.get()

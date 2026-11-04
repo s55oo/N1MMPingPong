@@ -25,7 +25,10 @@ are three kinds of traffic:
 1. **N1MM → all lamps** (UDP 12060): N1MM's own External Broadcast.
    PingPong only listens to it and never sends anything on this port.
 2. **Lamp ↔ lamp** (UDP 46070): small `PingPongHello` messages with each
-   PC's name, color, F12 call and state.
+   PC's name, color, F12 call and state – and (v1.39+) a **copy of each
+   PC's own N1MM `RadioInfo`**, so every lamp sees every station on any
+   network the lamps share (LAN, ZeroTier, VPN), even if N1MM only sends to
+   `127.0.0.1`.
 3. **Lamp → GitHub** (HTTPS): only to check for and download updates.
 
 On its own PC the lamp also **watches the keyboard** while N1MM is the
@@ -45,7 +48,7 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
 | **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
-| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello` |
+| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay) |
 | HTTPS 443 | lamp → `api.github.com`, `github.com` | PingPong | release list, exe download |
 
 Port 46070 is deliberately far away from N1MM's ports: N1MM parses
@@ -74,7 +77,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.36</Version>
+  <Version>1.39</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -90,6 +93,27 @@ from.
 
 A lamp sends this every **3 s**, and **at once** when F12 is pressed or the
 name changes. A lamp not heard for **12 s** is considered gone.
+
+### Relay: a lamp passes on its own N1MM's data
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant N as N1MM on S51CAB
+    participant LS as Lamp on S51CAB
+    participant LG as Lamp on OO840G4 (only reachable over ZeroTier)
+
+    N->>LS: RadioInfo to 127.0.0.1:12060
+    LS->>LG: UDP 46070 broadcast on every network:<br/>"PPR1" + lamp id + the same RadioInfo
+    Note over LG: treated exactly like N1MM's own packet<br/>(station keyed to S51CAB's lamp addresses)
+```
+
+- Only packets from the lamp's **own** N1MM are relayed (never relays of
+  relays), and only `RadioInfo`.
+- If N1MM's broadcast from that PC also arrives directly (same LAN) within
+  the last 15 s, the relayed copy is ignored.
+- Every address of a PingPong PC maps to one station, so a PC seen over
+  both LAN and ZeroTier is listed once.
 
 ---
 
@@ -279,6 +303,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | What | Value |
 |---|---|
 | Lamp-to-lamp hello | every 3 s, immediately on F12 / name change |
+| N1MM relay | each own `RadioInfo` at once; direct N1MM data preferred if seen in the last 15 s |
 | Lamp considered gone | 12 s without a hello |
 | Network adapters re-read | every 30 s |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
