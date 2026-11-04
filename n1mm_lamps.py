@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.40
+Version: 1.41
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.40"
+__version__ = "1.41"
 
 import argparse
 import base64
@@ -1973,6 +1973,20 @@ class DisplayApp:
             )
         else:
             self._test_write("{}  {}  {}  ({} bytes)".format(stamp, src, kind, len(data)))
+        if via or kind.lower() == "spot":
+            return
+        # Full text of this PC's N1MM packets, to find fields such as a
+        # network-master flag. RadioInfo only when something other than
+        # transmit state / key caption changed, to keep the log readable.
+        flat = re.sub(r">\s+<", "><", raw[raw.find("<"):]).strip()
+        if kind == "RadioInfo":
+            stable = re.sub(
+                r"<(IsTransmitting|FunctionKeyCaption|Timestamp)>.*?</\1>", "", flat, flags=re.S
+            )
+            if stable == getattr(self, "_last_radio_xml", None):
+                return
+            self._last_radio_xml = stable
+        self._test_write("      XML: " + flat)
 
     # ---------------------------------------------------------- F12 call
 

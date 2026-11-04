@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.40 · Made by **S55OO** with AI assistance.
+> **Version:** 1.41 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -264,6 +264,9 @@ when something doesn't work as expected. It changes nothing on the lamp.
   block options, calls it sees, whether its F-keys are blocked, **which
   stations it sees**, whether it shares its N1MM);
 - F12 presses, blocked keys and keyboard-watcher events.
+- the **full text** of this PC's N1MM packets (`XML: …` lines; RadioInfo
+  only when something besides transmit state/key changed; spots skipped)
+  – for finding out which fields N1MM sends.
 
 Unexpected errors are always written to `pingpong_error.log` next to the
 exe (the lamp keeps running) – send that file if something stops working.
