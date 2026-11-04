@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.56</Version>
+  <Version>1.57</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -97,7 +97,7 @@ from.
   <BlockTime>30</BlockTime>        <!-- S&P-call block time in s (1-30), only from the master -->
   <AlertRun>0</AlertRun>           <!-- 1 = the call was started in Run: reaches all stations -->
   <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
-  <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F4) on -->
+  <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F2 or Shift+F4) on -->
   <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
   <UrgentMode>CW</UrgentMode>
   <UrgentTime>1793127941.120</UrgentTime>
@@ -199,16 +199,16 @@ has not been heard for 12 s, and in any case after the call's **block
 time** (1–30 s each, set on the master): then blinking and block stop
 everywhere and the caller's call switches itself off.
 
-### Urgent call (Shift+F4)
+### Urgent call (Shift+F2 / Shift+F4)
 
-Shift+F4 in N1MM is passed on to N1MM (F4 fires as usual) **and** turns
+Shift+F2 or Shift+F4 in N1MM is passed on to N1MM (F2/F4 fires as usual) **and** turns
 on `<Urgent>` with this PC's band and mode. Every lamp on the **same band
 and mode** – Run or S&P – flashes fast (0.15 s, caller color ↔ white),
-shows `<caller name> · <F4 caption>` (e.g. `RUN1 · QRL?`, `MSG` until the
+shows `<caller name> · <F2/F4 caption>` (e.g. `RUN1 · QRL?`, `MSG` until the
 caption arrives; no sound) and puts this above everything else on
 the lamp. No keys are blocked.
 
-The urgent call lasts **while the caller's F4 message is transmitted**:
+The urgent call lasts **while the caller's F2/F4 message is transmitted**:
 the caller's lamp watches its own N1MM's `IsTransmitting` and sends
 `<Urgent>0` at once when that transmission ends. If no transmission
 starts within 3 s, it ends too. No other time limit (a lamp not heard for 12 s is dropped anyway); a click silences it on
@@ -361,7 +361,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Check for other programs on 12060 | every 30 s (Windows' UDP table) |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
 | Blink rhythm | 0.4 s on / 0.4 s off; urgent call 0.15 s |
-| Urgent call time | while the caller's F4 transmits; ends if no TX starts within 3 s |
+| Urgent call time | while the caller's F2/F4 transmits; ends if no TX starts within 3 s |
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
 | F12 call time | S&P call: 1–30 s, default 30 (`<BlockTime>`); Run call: 1–30 s, default 5 (`<BlockTimeRun>`); both set on the master. Then blinking and block end on the receivers and the caller's call switches off |

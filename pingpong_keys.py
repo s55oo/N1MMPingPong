@@ -16,6 +16,8 @@ import threading
 
 VK_F12 = 0x7B
 VK_F4 = 0x73
+VK_F2 = 0x71
+URGENT_KEYS = {VK_F2: "F2", VK_F4: "F4"}  # Shift+ these = urgent call
 VK_SHIFT = 0x10
 N1MM_EXE = "n1mmlogger.net.exe"
 
@@ -124,8 +126,8 @@ class KeyWatcher:
         self.on_event = on_event or (lambda text: None)
         self.should_block = should_block
         self.on_blocked = on_blocked
-        self.on_urgent = on_urgent  # Shift+F4: urgent call
-        self._u_down = False
+        self.on_urgent = on_urgent  # Shift+F2 / Shift+F4: urgent call(key name)
+        self._u_down = set()
         self.vk = vk
         self.only_exe = only_exe
         self.error = None
@@ -161,17 +163,17 @@ class KeyWatcher:
         """
         fg = foreground or foreground_exe
         down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
-        if vk == VK_F4 and self.on_urgent is not None and not (flags & LLKHF_ALTDOWN):
-            # Shift+F4 starts PingPong's urgent call. The key is only
-            # watched: N1MM still gets it and fires F4 at the same time
-            # (unless F-keys are blocked right now, see below).
+        if vk in URGENT_KEYS and self.on_urgent is not None and not (flags & LLKHF_ALTDOWN):
+            # Shift+F2 / Shift+F4 start PingPong's urgent call. The key is
+            # only watched: N1MM still gets it and fires F2/F4 at the same
+            # time (unless F-keys are blocked right now, see below).
             if down:
-                if not self._u_down and (shift or shift_down)():
-                    self._u_down = True  # ignore auto-repeat
+                if vk not in self._u_down and (shift or shift_down)():
+                    self._u_down.add(vk)  # ignore auto-repeat
                     if not self.only_exe or fg() == self.only_exe:
-                        self.on_urgent()
+                        self.on_urgent(URGENT_KEYS[vk])
             elif wparam in (WM_KEYUP, WM_SYSKEYUP):
-                self._u_down = False
+                self._u_down.discard(vk)
         blocked = None
         if vk in KEY_NAMES and self.should_block is not None:
             # should_block() returns the keys to block now: a set of

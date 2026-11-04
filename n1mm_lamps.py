@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.56
+Version: 1.57
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.56"
+__version__ = "1.57"
 
 import argparse
 import base64
@@ -913,10 +913,11 @@ class DisplayApp:
         self.key_watcher = None
         self.alert_on = False
         self.alert_run = False  # my call was started in Run (blocks every station)
-        self.urgent_on = False  # my urgent call (Shift+F4)
+        self.urgent_on = False  # my urgent call (Shift+F2 / Shift+F4)
+        self.urgent_fkey = "F4"  # which key started it
         self.urgent_time = 0.0
         self.urgent_key = ("", "")  # (band, mode) of my urgent call
-        self._urgent_tx_seen = False  # my F4 transmission has started
+        self._urgent_tx_seen = False  # my F2/F4 transmission has started
         self._shown_urgent = None
         self.alert_time = 0.0
         self.silenced = set()  # (peer id, call time) clicked away here
@@ -1053,7 +1054,7 @@ class DisplayApp:
             command=self._choose_color,
         )
         menu.add_checkbutton(
-            label="F12 call – blink stations on my band (Shift+F4 = urgent)",
+            label="F12 call – blink stations on my band (Shift+F2/F4 = urgent)",
             variable=self.var_keys,
             command=self._keys_toggled,
         )
@@ -1995,31 +1996,32 @@ class DisplayApp:
             "Run" if run else "S&P", value))
         self.hello_now.set()  # tell all lamps right away
 
-    def _urgent_pressed(self):
-        """Keyboard thread: Shift+F4 in N1MM starts an urgent call.
+    def _urgent_pressed(self, fkey="F4"):
+        """Keyboard thread: Shift+F2 / Shift+F4 in N1MM start an urgent call.
 
-        It lasts while N1MM transmits the F4 message N1MM fires at the same
+        It lasts while N1MM transmits the F2/F4 message N1MM fires at the same
         time; it ends when that transmission ends (see _urgent_check).
         """
         if not self.f12_on:
             return
         mine = self._local_station()
         if mine is None or not mine.key:
-            self._key_event("Shift+F4 ignored - this PC's band/mode unknown")
+            self._key_event("Shift+{} ignored - this PC's band/mode unknown".format(fkey))
             return
         self.urgent_on = True
+        self.urgent_fkey = fkey
         self.urgent_key = (mine.key[0], mine.key[1])
         self._urgent_tx_seen = False
         self.urgent_time = time.time()
         self.hello_now.set()
         if self.test_on:
-            self._test_write("{}  Shift+F4  urgent call {}".format(
-                time.strftime("%H:%M:%S"),
+            self._test_write("{}  Shift+{}  urgent call {}".format(
+                time.strftime("%H:%M:%S"), fkey,
                 "ON ({} {})".format(*self.urgent_key) if self.urgent_on else "OFF",
             ))
 
     def _urgent_check(self, now):
-        """End my urgent call when my F4 transmission ends."""
+        """End my urgent call when my F2/F4 transmission ends."""
         if not self.urgent_on:
             return
         mine = self._local_station()
@@ -2030,7 +2032,7 @@ class DisplayApp:
         if self._urgent_tx_seen:
             why = "transmission ended"
         elif now - self.urgent_time > URGENT_WAIT:
-            why = "no transmission started (F4 has no message?)"
+            why = "no transmission started ({} has no message?)".format(self.urgent_fkey)
         else:
             return
         self.urgent_on = False
@@ -2044,7 +2046,7 @@ class DisplayApp:
         return True
 
     def _incoming_urgent(self, now):
-        """Urgent calls (Shift+F4) from other PCs on this PC's band and
+        """Urgent calls (Shift+F2/F4) from other PCs on this PC's band and
         mode - Run or S&P, every station is called."""
         mine = self._local_station()
         if mine is None or not mine.key:
@@ -2072,7 +2074,7 @@ class DisplayApp:
         want = "white" if lit else color
         if self.canvas.cget("highlightbackground") != want:
             self.canvas.configure(highlightbackground=want, highlightcolor=want)
-        # Caller's alias + the F4 message caption it is sending right now
+        # Caller's alias + the F2/F4 message caption it is sending right now
         # (N1MM's FunctionKeyCaption); "MSG" until the caption arrives.
         msg = ""
         seen = self._call_seen.get(("urgent", peer.id, peer.urgent_time), now)
@@ -2580,8 +2582,8 @@ class DisplayApp:
                     self._my_call_left(now),
                 ) + header
             if self.urgent_on:
-                header = "URGENT call ON ({} {}) – until F4 has been sent  ·  ".format(
-                    self.urgent_key[0] or "?", self.urgent_key[1]
+                header = "URGENT call ON ({} {}) – until {} has been sent  ·  ".format(
+                    self.urgent_key[0] or "?", self.urgent_key[1], self.urgent_fkey
                 ) + header
             note = self._my_color_note(owners)
             if note:
