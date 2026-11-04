@@ -73,7 +73,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.34</Version>
+  <Version>1.35</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -132,7 +132,7 @@ sequenceDiagram
     K1->>L1: F12 (N1MM active)
     Note over L1: call ON – border blinks in RUN1's color
     L1->>L2: PingPongHello · Alert=1 · AlertBand=14 (sent at once)
-    Note over L2: same band + S&P → blink "F12 · RUN1"<br/>F-keys blocked, max 40 s
+    Note over L2: same band + S&P → blink "F12 · RUN1"<br/>double beep (once) · F-keys blocked, max 40 s
     K2->>L2: F1
     L2--xN2: swallowed – lamp shows "BLOCKED · F1"
     K2->>L2: Esc / Enter / letters
@@ -238,6 +238,8 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Network adapters re-read | every 30 s |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
 | Blink rhythm | 0.4 s on / 0.4 s off |
+| Call sound | double beep once when a call starts blinking (option) |
+| Window place saved | 1.5 s after the lamp was moved, and on close |
 | F-key block limit | 40 s after the call is first seen |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
