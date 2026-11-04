@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.47
+Version: 1.48
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.47"
+__version__ = "1.48"
 
 import argparse
 import base64
@@ -805,6 +805,8 @@ class DisplayApp:
         self._blocked_key = ("", 0.0)
         self._call_seen = {}  # (peer id, call time) -> local time first seen
         self._had_calls = False
+        self._band_busy = None  # another PC's F12 call running on my band
+        self._f12_refused = 0.0  # when my F12 was ignored (band busy)
         self.key_watcher = None
         self.alert_on = False
         self.alert_time = 0.0
@@ -2190,6 +2192,7 @@ class DisplayApp:
             )
         self._block_active = block
         self._had_calls = bool(all_calls)
+        self._band_busy = self._band_call(now)
         locked, holder = self._pingpong_state(now)
         if locked != self._pp_locked:
             self._key_event("ping-pong lock {}{}".format(
@@ -2247,6 +2250,8 @@ class DisplayApp:
                 )
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
+            if now - self._f12_refused <= 2.0 and self._band_busy is not None:
+                idle = "F12 busy · {}".format(self.peer_name(self._band_busy))
             if self.canvas.itemcget(self.text_id, "text") != idle:
                 self.canvas.itemconfigure(self.text_id, text=idle)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(idle))
@@ -2262,6 +2267,10 @@ class DisplayApp:
                 header = "slot taken by {} – wait for RUN (free in {} s at the latest)  ·  ".format(
                     self.station_name(self._pp_holder) if self._pp_holder else "INB",
                     self._pp_left,
+                ) + header
+            if now - self._f12_refused <= 4.0 and self._band_busy is not None:
+                header = "F12 ignored – {} is calling on {} MHz  ·  ".format(
+                    self.peer_name(self._band_busy), self._band_busy.alert_band
                 ) + header
             if self._status:
                 header = self._status + "  ·  " + header
@@ -2476,9 +2485,37 @@ class DisplayApp:
                 "{}  {} key  BLOCKED (call active)".format(time.strftime("%H:%M:%S"), name)
             )
 
+    def _band_call(self, now):
+        """Another PC's F12 call still running on this PC's band, or None.
+
+        Run or S&P, silenced or not: one call per band at a time.
+        """
+        band = self._my_band()
+        if not band:
+            return None
+        busy = [
+            p for p in self._fresh_peers(now)
+            if p.alert
+            and p.alert_band == band
+            and not getattr(p, "same_pc", False)
+            and self._block_left(p, now) > 0
+        ]
+        return min(busy, key=lambda p: p.alert_time) if busy else None
+
     def _f12_pressed(self):
         """Keyboard thread: F12 in N1MM toggles this PC's call."""
         if not self.f12_on:
+            return
+        busy = self._band_busy
+        if not self.alert_on and busy is not None:
+            # Another station's call runs on this band: F12 is not a call.
+            self._f12_refused = time.time()
+            if self.test_on:
+                self._test_write(
+                    "{}  F12 key  ignored - {} is calling on this band".format(
+                        time.strftime("%H:%M:%S"), self.peer_name(busy)
+                    )
+                )
             return
         self.alert_on = not self.alert_on
         self.alert_time = time.time()
@@ -2568,6 +2605,8 @@ class DisplayApp:
         key, when = self._blocked_key
         if self._block_active and key and now - when <= 1.5:
             shown = "BLOCKED · {}".format(key)
+        if now - self._f12_refused <= 1.5:
+            shown = "BLOCKED · F12"
         self._set_bg(bg)
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)

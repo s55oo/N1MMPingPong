@@ -80,7 +80,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.47</Version>
+  <Version>1.48</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -174,6 +174,10 @@ sequenceDiagram
     L1->>L2: PingPongHello · Alert=0
     Note over L2: blinking and block end
 ```
+
+Only **one call per band** runs at a time: while a call from another PC
+is running on this PC's band (Run or S&P, silenced or not), F12 on this PC
+is ignored and the lamp shows `F12 busy · <caller>`.
 
 The call also ends on the receiving lamp when its operator **clicks the
 lamp**, changes band or switches to Run, when the calling lamp has not
