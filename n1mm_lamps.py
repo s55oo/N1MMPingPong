@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.44
+Version: 1.45
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.44"
+__version__ = "1.45"
 
 import argparse
 import base64
@@ -2137,13 +2137,15 @@ class DisplayApp:
             key, when = self._blocked_key
             if self._pp_locked:
                 idle = "BLOCKED · {}".format(key) if key and now - when <= 1.5 else "WAIT"
+            elif self.alert_on:
+                idle = "F12 · {} s".format(self._my_call_left(now))
             if self.canvas.itemcget(self.text_id, "text") != idle:
                 self.canvas.itemconfigure(self.text_id, text=idle)
                 self.canvas.itemconfigure(self.text_id, font=self._font_for(idle))
             header = ""
             if self.alert_on:
-                header = "F12 call ON ({} MHz) – F12 = off  ·  ".format(
-                    self._my_band() or "?"
+                header = "F12 call ON ({} MHz) · {} s left – F12 = off  ·  ".format(
+                    self._my_band() or "?", self._my_call_left(now)
                 ) + header
             note = self._my_color_note(owners)
             if note:
@@ -2466,6 +2468,10 @@ class DisplayApp:
                 self._block_note(peer, now),
             )
         )
+
+    def _my_call_left(self, now):
+        """Whole seconds my own F12 call still runs."""
+        return max(0, int(self.block_limit - (now - self.alert_time) + 0.999))
 
     def _block_note(self, peer, now):
         if not self.block_on:

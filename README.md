@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.44 · Made by **S55OO** with AI assistance.
+> **Version:** 1.45 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -176,8 +176,9 @@ Warn the other operators on your band without transmitting.
 
 - Turn the option on on **every PC that may call** (saved per PC).
 - Press **F12 while N1MM is the active window** → your call is **on**:
-  your lamp gets a wide **blinking border** in your color and the line
-  under it shows `F12 call ON (14 MHz) – F12 = off`.
+  your lamp gets a wide **blinking border** in your color and counts
+  down: `F12 · 18 s` on the lamp, `F12 call ON (14 MHz) · 18 s left –
+  F12 = off` on the line under it.
 - Every other PingPong PC that is **on the same band** and in **S&P**
   (N1MM `IsRunning = False`) **blinks** in your color with
   `F12 · <your station>`, framed by a wide border in your color.
