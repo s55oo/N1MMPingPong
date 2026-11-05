@@ -39,7 +39,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.95`.
+  `PingPong - MASTER UDP 12062 v1.96`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -82,8 +82,8 @@ Full manual: [README](../README.md). How it talks on the network:
   transmits again.
 - **Switched on or off for all PCs on the master** – off means nobody is
   locked and every station may transmit without priority.
-- When RUN's transmission ends, the inband lamps turn **black with a
-  white GO** (visual only). The locked lamp shows `WAIT · INB1 · 32 s`; the
+- When RUN's transmission ends, the inband lamps show a white **GO** on
+  the grey idle lamp (visual only). The locked lamp shows `WAIT · INB1 · 32 s`; the
   lock releases itself after the release time set on the master
   (0–40 s, default 40 s; 0 = only RUN frees it).
 - An inband lamp warns when there is no RUN on its band (lock off).

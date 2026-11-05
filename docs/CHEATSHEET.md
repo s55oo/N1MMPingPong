@@ -10,7 +10,7 @@ One page for every operating position. **Printable PDF:**
 |---|---|---|
 | dark, `—` | Nobody on your band and mode is transmitting. | Operate normally. |
 | **station color** + message, e.g. `CQ` | A station on your band and mode is transmitting: its color, its message, its name (top left) and frequency (top right). | Inband: don't transmit over it. |
-| black, white **`GO`** | RUN has just finished (3 s): the slot is free for the inband stations. | Now is the moment. The first inband to transmit gets the slot. |
+| grey, white **`GO`** | RUN has just finished (3 s): the slot is free for the inband stations. | Now is the moment. The first inband to transmit gets the slot. |
 | `WAIT · INB1 · 32 s` | Another inband holds the slot. Your **F1–F11, Enter, Insert** are blocked. | Wait for RUN to transmit. The slot frees itself after the release time. |
 | `BLOCKED · F1` | You pressed a blocked key, so nothing was sent. | Wait, then press it again. |
 | blinking border, `F12 · RUN1 · 25 s` | F12 call: the border blinks in the caller's color ("hold off, please"). Your F-keys may be blocked meanwhile. | Stop transmitting. A left click on the lamp stops the blinking. |
