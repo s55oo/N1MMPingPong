@@ -194,7 +194,11 @@ The **addresses** are shown in the lamp's top line, left of **Options ▾**:
 `192.168.1.20:8047 · 10.147.17.3:8047` – the LAN address and, if this PC
 is on **ZeroTier**, its ZeroTier address too (otherwise only the LAN one).
 **Options ▾ → Phone lamp QR code…** shows a **QR code** for each address –
-scan it with the phone's camera and the page opens, no typing. Click it to open
+scan it with the phone's camera and the page opens, no typing. The menu
+item shows the addresses as well; it is greyed out when the phone lamp is
+off or its port is busy.
+
+![Phone lamp QR code (example addresses)](docs/phone-qr.png) Click it to open
 the page in this PC's browser. Other devices need the firewall rule:
 **Options ▾ → Allow PingPong in Windows Firewall…** (adds TCP 8047). If
 another program already uses 8047, the line says `phone lamp: TCP 8047
@@ -868,6 +872,7 @@ PingPong.png        – screenshot of the lamp
 docs/overview.png   – screenshot of the Overview (stations)
 docs/overview-function-keys.png – screenshot of the Overview (function keys)
 docs/phone-lamp.png – screenshot of the phone lamp
+docs/phone-qr.png   – the phone lamp QR code window (example addresses)
 docs/n1mm-broadcast-data.png – N1MM Broadcast Data setup
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version

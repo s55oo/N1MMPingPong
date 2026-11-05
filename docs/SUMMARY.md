@@ -48,6 +48,8 @@ Full manual: [README](../README.md). How it talks on the network:
   is on it). **Options ▾ → Phone lamp QR code…** shows it as a QR code to
   scan with the phone.
 
+  ![Phone lamp QR code (example addresses)](phone-qr.png)
+
   ![Phone lamp – RUN1 on an iPhone over ZeroTier](phone-lamp.png)
 
 ### Warn other operators without transmitting
