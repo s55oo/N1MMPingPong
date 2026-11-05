@@ -2,6 +2,7 @@
 
 > **Version:** 1.62 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
+> **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
 PingPong shows which computer/station on the network is currently
 **transmitting**. It listens to the N1MM Logger+ external UDP broadcast
@@ -650,6 +651,7 @@ help.png            – help icon (embedded in the lamp)
 PingPong.png        – screenshot
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
+docs/SUMMARY.md     – what PingPong does, on one page
 docs/COMMUNICATION.md – how it communicates (diagrams)
 docs/communication.svg – overview diagram
 .github/workflows/build-exe.yml – automatic build and release
