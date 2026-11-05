@@ -505,7 +505,7 @@ put it anywhere and start it – no setup.
 
 *Ready check before the start: RUN1 (master ★, in Run) and the inband
 stations INB1 and INB2 (in S&P) on 7 MHz CW – all green, `✔ READY`,
-ping-pong lock ON.*
+ping-pong lock ON, every lamp on the newest version (`All lamps v1.68 ✔`).*
 
 | Column | Shows |
 |---|---|
