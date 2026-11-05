@@ -172,6 +172,10 @@ class OptionsMixin:
             state=tk.NORMAL if sys.platform == "win32" else tk.DISABLED,
             command=self._allow_firewall,
         )
+        menu.add_command(
+            label="Network password…  ({})".format("ON ✔" if AUTH["key"] else "off"),
+            command=self._choose_network_password,
+        )
         menu.add_checkbutton(
             label="Diagnostics (log to file)",
             variable=self.var_test,
@@ -293,6 +297,41 @@ class OptionsMixin:
         tk.Button(buttons, text="Close", width=10, command=closed).pack(
             side=tk.LEFT, padx=4
         )
+
+    def _choose_network_password(self):
+        """Same password on every PC (and in the Overview): the lamps then
+        sign their messages and ignore any without the right signature."""
+        text = simpledialog.askstring(
+            "PingPong - network password",
+            "Network password – the SAME on every PingPong PC and in the Overview.\n"
+            "With it, lamps ignore messages from anyone without it.\n"
+            "PC clocks must agree within 5 minutes.\n\n"
+            "Empty = off (currently: {}).".format("ON" if AUTH["key"] else "off"),
+            show="*", parent=self.root)
+        if text is None:
+            return
+        text = text.strip()
+        if text:
+            again = simpledialog.askstring("PingPong - network password", "Type it again:",
+                                           show="*", parent=self.root)
+            if again is None:
+                return
+            if again.strip() != text:
+                messagebox.showwarning("PingPong", "The two passwords differ – nothing changed.",
+                                       parent=self.root)
+                return
+        elif not AUTH["key"]:
+            return
+        key = derive_key(text)
+        set_network_key(key)
+        self.settings.set_text("network", "auth_key", key.hex())
+        self._key_event("network password {}".format("set" if key else "off"))
+        self.hello_now.set()
+        messagebox.showinfo(
+            "PingPong",
+            "Network password {}.\n\nSet the same on every PC (Options ▾ → Network password…) "
+            "and in the Overview (Setup ▾ → Network password…).".format("set" if key else "off"),
+            parent=self.root)
 
     def _firewall_rules(self):
         return [FIREWALL_RULE] + ([FIREWALL_PHONE_RULE] if self.phone_port else [])

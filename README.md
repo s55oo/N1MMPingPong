@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.90 · Made by **S55OO** with AI assistance.
+> **Version:** 1.91 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -260,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.90`
-  (the others just `PingPong UDP 12062 v1.90`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.91`
+  (the others just `PingPong UDP 12062 v1.91`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -463,6 +463,39 @@ PingPong allowed ✔** (click it to add the rules again, e.g. after a port
 change), and a PC that is not heard is reported as
 `no PingPong heard – check that PC's lamp and firewall` instead.
 
+### Network password (Options ▾ → Network password…)
+
+By default every PingPong PC trusts any message on UDP 46070, so any
+device on the same LAN or ZeroTier network could pretend to be a lamp or
+the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
+**network password** that can't happen:
+
+- Set the **same password on every PC** (Options ▾ → **Network
+  password…**, typed twice) and in the Overview (**Setup ▾ → Network
+  password…**; on the master PC it also takes the lamp's setting from
+  `pingpong.ini` next to it).
+- Every hello, relay, command and ping answer then carries a time stamp
+  and an **HMAC-SHA256** signature. Messages without it, with a different
+  password, changed on the way, or **older than 5 minutes** (a recorded
+  command played back later) are ignored. The PC clocks must agree within
+  5 minutes (NTP).
+- Only a key made from the password is stored (`pingpong.ini`, section
+  `[network]`), never the password itself.
+- The lamp says what it ignores, in red: `10.0.0.5: different network
+  password – ignored`, `… no network password – ignored`,
+  `… wrong time (check the PC clock) – ignored`. A lamp **without** a
+  password still hears a protected group and says
+  `other lamps use a network password – set it…`.
+- Empty password = off (the default) – exactly as before; lamps older
+  than v1.91 only work together with lamps that have no password.
+- Not covered (read-only, nothing can be changed there): the Overview's
+  web page (TCP 8046) and the phone lamp (TCP 8047). N1MM's own data on
+  12062 stays local to each PC.
+
+Also keep a **ZeroTier network Private** (members approved by hand) and
+use **two-factor login on the GitHub account** that publishes the
+releases.
+
 ### Diagnostics (Options ▾ → Diagnostics (log to file))
 
 Writes what the lamp sees to `pingpong_test.log` next to the exe – use it
@@ -615,7 +648,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.90 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.91 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -645,7 +678,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.90 ✔** when every lamp is current – then a
+lists them), **All lamps v1.91 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -747,7 +780,9 @@ made, its total **TX time**, its **ping** (average, maximum, lost) – and a cha
 (darker = more transmitting; the last 12 hours with activity). Reset and
 **Save CSV…** on the Function keys tab cover these too.
 
-**Event log.** The Overview writes the contest timeline to
+**Event log.** (Station names and details that start with `= + - @` are
+written with a leading `'`, so Excel shows them as text and never runs
+them as a formula – the same in **Save CSV…**.) The Overview writes the contest timeline to
 `pingpong_events.csv` next to the exe (`;`-separated – opens in Excel):
 `date;time;station;event;details`, e.g.
 

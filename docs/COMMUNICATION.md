@@ -89,6 +89,14 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
 | TCP 8047 | phone / browser → any lamp PC | PingPong lamp | phone lamp (`/`, `/state`), read only |
 
+**Network password (optional, v1.91+).** When a password is set on the
+PCs, every message on UDP 46070 (hello, `PPR1`, `PPC1`, `PPP1`) ends in
+`\n#PPS1 <unix time> <HMAC-SHA256>` – the first 32 hex digits of
+HMAC-SHA256(key, `<unix time> <message>`), key = PBKDF2-SHA256(password).
+Receivers with the password accept only messages with a valid signature
+not older than 5 minutes; without a password nothing is added (and old
+lamps work as before).
+
 Port 46070 is deliberately far away from N1MM's ports: N1MM parses
 anything that arrives on its multi-computer port (12070), and older
 PingPong versions that used 12070 made N1MM show an

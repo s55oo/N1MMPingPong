@@ -192,6 +192,10 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.used_colors = set(color for _, color in self.hints.values() if color)
         self.tracked = None
         self.settings = upd.Settings(app_dir())
+        try:  # network password (stored only as the derived key)
+            set_network_key(bytes.fromhex(self.settings.get_text("network", "auth_key", "")))
+        except ValueError:
+            set_network_key(b"")
         self.var_check = tk.BooleanVar(
             value=self.settings.get("check_at_startup", True)
         )
@@ -1090,6 +1094,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
     def _update_tail(self):
         self._phone_tail()
         warns = [w for w in (self._master_warn, self._port_warning()) if w]
+        warns += auth_problems(time.time(), self.local)
         if warns:
             self.info.configure(
                 text="  ·  ".join("⚠ " + w for w in warns) + "  ·  " + self.info.cget("text"),

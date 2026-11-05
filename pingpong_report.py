@@ -45,6 +45,10 @@ def read_events(path, since):
             continue
         if when >= int(since):  # the log has whole seconds
             row["when"] = when
+            for k in ("station", "details"):  # undo the spreadsheet guard for display
+                v = row.get(k) or ""
+                if v.startswith("'") and v[1:2] in ("=", "+", "-", "@"):
+                    row[k] = v[1:]
             rows.append(row)
     return rows
 

@@ -38,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.90`.
+  `PingPong - MASTER UDP 12062 v1.91`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -90,6 +90,10 @@ Full manual: [README](../README.md). How it talks on the network:
 - **Shares this PC's N1MM data** with the other lamps, so stations are
   seen even if N1MM only sends to `127.0.0.1` or the PCs only meet over
   ZeroTier.
+- **Network password (optional):** the same password on every PC and in
+  the Overview signs every lamp message (HMAC-SHA256 with a time stamp);
+  messages from anyone without it are ignored – nobody else on the LAN or
+  ZeroTier can fake calls or stop the lamps.
 - **Warnings on the lamp:**
   - other PCs on a different version;
   - two masters;
@@ -251,7 +255,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 145 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 157 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

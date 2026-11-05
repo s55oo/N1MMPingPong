@@ -263,6 +263,7 @@ class Overview:
             self.cfg.add_section("window")
         if not self.cfg.has_section("stats"):
             self.cfg.add_section("stats")
+        self._load_network_key()
         try:
             self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
         except ValueError:
@@ -293,6 +294,9 @@ class Overview:
             except OSError:
                 self.stop.wait(0.3)
                 continue
+            data, status = pp.unseal(data, addr[0])
+            if not pp.accepted(status):
+                continue  # network password: not ours
             try:
                 self._packet(addr[0], data)
             except Exception:
@@ -514,7 +518,7 @@ class Overview:
             return  # lamps answer only the master PC
         self._ping_seq += 1
         seq = self._ping_seq
-        payload = pp.make_command("ping", seq=seq)
+        payload = pp.seal(pp.make_command("ping", seq=seq))
         socks = []
         for ip, bcast in pp.local_networks():
             try:
@@ -540,7 +544,8 @@ class Overview:
                         data, _addr = sock.recvfrom(4096)
                     except OSError:
                         continue
-                    pong = pp.parse_pong(data)
+                    data, status = pp.unseal(data, _addr[0])
+                    pong = pp.parse_pong(data) if pp.accepted(status) else None
                     if pong and pong["seq"] == seq and pong["id"] not in replies:
                         replies[pong["id"]] = (time.time() - sent) * 1000.0
         finally:
@@ -568,6 +573,7 @@ class Overview:
                     self._event(lamp.name(), "no ping reply")
 
     def _send_command(self, payload):
+        payload = pp.seal(payload)
         sent = 0
         try:
             nets = pp.local_networks()
@@ -620,6 +626,47 @@ class Overview:
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
             return
         messagebox.showinfo(TITLE, "{}: sent to all lamps.".format(title), parent=self.root)
+
+    # ------------------------------------------------------------ network password
+
+    def _load_network_key(self):
+        """Own setting, else the lamp's (pingpong.ini next to the exe)."""
+        key = self.cfg.get("network", "auth_key", fallback="") if self.cfg.has_section("network") else ""
+        if not key:
+            lamp_ini = configparser.ConfigParser()
+            try:
+                lamp_ini.read(os.path.join(app_dir(), "pingpong.ini"), encoding="utf-8")
+                key = lamp_ini.get("network", "auth_key", fallback="")
+            except (OSError, configparser.Error):
+                key = ""
+        try:
+            pp.set_network_key(bytes.fromhex(key))
+        except ValueError:
+            pp.set_network_key(b"")
+
+    def _choose_network_password(self):
+        text = simpledialog.askstring(
+            TITLE, "Network password – the same as on the lamps (Options ▾ → Network password…).\n"
+            "Empty = off (currently: {}).".format("ON" if pp.AUTH["key"] else "off"),
+            show="*", parent=self.root)
+        if text is None:
+            return
+        text = text.strip()
+        if text:
+            again = simpledialog.askstring(TITLE, "Type it again:", show="*", parent=self.root)
+            if again is None:
+                return
+            if again.strip() != text:
+                messagebox.showwarning(TITLE, "The two passwords differ – nothing changed.",
+                                       parent=self.root)
+                return
+        key = pp.derive_key(text)
+        pp.set_network_key(key)
+        if not self.cfg.has_section("network"):
+            self.cfg.add_section("network")
+        self.cfg.set("network", "auth_key", key.hex())
+        self._save()
+        self._event("-", "network password", "set" if key else "off")
 
     # ------------------------------------------------------------ setup
 
@@ -845,7 +892,8 @@ class Overview:
                     fh.write("date;time;station;event;details\r\n")
                 fh.write("{};{};{};{};{}\r\n".format(
                     time.strftime("%Y-%m-%d"), time.strftime("%H:%M:%S"),
-                    station.replace(";", ","), what, str(detail).replace(";", ",")))
+                    pp.csv_safe(station.replace(";", ",")), what,
+                    pp.csv_safe(str(detail).replace(";", ",")).replace("\n", " ")))
         except OSError:
             pass
 
@@ -1130,15 +1178,15 @@ class Overview:
                 writer = csv.writer(fh, delimiter=";")
                 writer.writerow(["since", time.strftime("%Y-%m-%d %H:%M", time.localtime(self.stats_since))])
                 writer.writerow(cols)
-                writer.writerows(rows)
+                writer.writerows([[pp.csv_safe(v) for v in row] for row in rows])
                 act = self._activity_table()
                 writer.writerow([])
                 writer.writerow(act["columns"])
-                writer.writerows(act["rows"])
+                writer.writerows([[pp.csv_safe(v) for v in row] for row in act["rows"]])
                 writer.writerow([])
                 writer.writerow(["TX minutes per hour"] + act["hours"])
                 for name, mins in act["heat"]:
-                    writer.writerow([name] + [str(v).replace(".", ",") for v in mins])
+                    writer.writerow([pp.csv_safe(name)] + [str(v).replace(".", ",") for v in mins])
         except OSError as exc:
             messagebox.showerror(TITLE, "Could not save:\n{}".format(exc), parent=self.root)
 
@@ -1424,6 +1472,8 @@ class Overview:
         setup_menu.add_command(label="Save setup… (names, colors, master settings)",
                                command=self._save_setup)
         setup_menu.add_command(label="Restore setup…", command=self._restore_setup)
+        setup_menu.add_separator()
+        setup_menu.add_command(label="Network password…", command=self._choose_network_password)
         setup.configure(menu=setup_menu)
         setup.pack(**pad)
         # Statistics: reset now, or at the contest start (planned, shown on the button).
@@ -1726,6 +1776,9 @@ class Overview:
         for band, slot in sorted(slots.items(), key=lambda s: band_sort(s[0])):
             if not pp.pp_expired(slot[1], now, self._pp_limit()) and slot[0] in self.lamps:
                 notes.append("ping-pong {} MHz: slot held by {}".format(band, self.lamps[slot[0]].name()))
+        for text in pp.auth_problems(now, where="Setup ▾ → Network password…"):
+            warn = True
+            notes.insert(0, "⚠ " + text)
         no_relay = [l.name() for l in live if now - l.radio_seen > 30]
         if no_relay:
             notes.append("no N1MM data from: {} (N1MM not running, or 'Share my N1MM' off)".format(

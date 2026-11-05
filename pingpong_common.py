@@ -199,6 +199,14 @@ def group_of(freq, mode):
         return None
     return band, mode
 
+def csv_safe(value):
+    """A text cell that Excel must not run as a formula: a value from the
+    network (station name, details) starting with = + - @ gets a leading
+    apostrophe. A lone "-" stays as it is."""
+    if isinstance(value, str) and value not in ("-", "") and value[0] in "=+-@\t\r":
+        return "'" + value
+    return value
+
 def band_sort_key(band):
     """'1.8' < '7' < '14' (numeric; unknown last)."""
     try:

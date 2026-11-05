@@ -364,6 +364,114 @@ def _sender_socket(ip):
     sock.bind((ip, 0))
     return sock
 
+
+# ----- network password (optional): signed messages on the lamps' port -----
+#
+# With a password set on every PC, each message on UDP 46070 (hello, relay,
+# command, ping answer) ends in  "\n#PPS1 <unix time> <HMAC-SHA256>"  over the
+# time and the message. Messages without a valid signature, or more than
+# AUTH_WINDOW seconds old (replay), are dropped. Without a password nothing
+# is added, so lamps that have none work exactly as before.
+
+AUTH_MARK = b"\n#PPS1 "
+AUTH_WINDOW = 300.0  # s: accepted age of a signed message (PC clocks must agree)
+AUTH = {"key": b""}  # derived key; b"" = no password
+AUTH_SEEN = {}  # (status, src ip) -> last time; for the warnings on the lamp / Overview
+
+
+def derive_key(password):
+    """Key from the password (only this is stored, never the password)."""
+    import hashlib
+
+    if not password:
+        return b""
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), b"PingPong-N1MM-46070", 20000)
+
+
+def set_network_key(key):
+    AUTH["key"] = key or b""
+
+
+def _mac(key, ts, payload):
+    import hashlib
+    import hmac
+
+    return hmac.new(key, ts + b" " + payload, hashlib.sha256).hexdigest()[:32].encode("ascii")
+
+
+def seal(payload, now=None, key=None):
+    """Add the signature (only when a password is set)."""
+    key = AUTH["key"] if key is None else key
+    if not key:
+        return payload
+    ts = str(int(now if now is not None else time.time())).encode("ascii")
+    return payload + AUTH_MARK + ts + b" " + _mac(key, ts, payload)
+
+
+def unseal(data, src="", now=None, key=None):
+    """(payload, status). status: "ok" (valid signature), "none" (unsigned),
+    "bad" (wrong password), "old" (time outside AUTH_WINDOW), "foreign"
+    (signed, but this PC has no password). The caller accepts the payload
+    only if accepted(status)."""
+    key = AUTH["key"] if key is None else key
+    now = time.time() if now is None else now
+    i = data.rfind(AUTH_MARK)
+    if i < 0:
+        status, payload = ("none", data)
+    else:
+        payload = data[:i]
+        parts = data[i + len(AUTH_MARK):].strip().split(b" ")
+        if not key:
+            status = "foreign"
+        elif len(parts) != 2:
+            status = "bad"
+        else:
+            import hmac
+
+            ts, mac = parts
+            if not hmac.compare_digest(mac, _mac(key, ts, payload)):
+                status = "bad"
+            else:
+                try:
+                    age = abs(now - int(ts))
+                except ValueError:
+                    age = AUTH_WINDOW + 1
+                status = "ok" if age <= AUTH_WINDOW else "old"
+    if src and status not in ("ok", "none"):
+        AUTH_SEEN[(status, src)] = now
+    elif src and status == "none" and key:
+        AUTH_SEEN[("none", src)] = now
+    return payload, status
+
+
+def accepted(status):
+    """With a password only valid signatures count; without one, anything
+    (a signed message from a protected group is then read but unchecked)."""
+    if AUTH["key"]:
+        return status == "ok"
+    return status in ("none", "foreign")
+
+
+def auth_problems(now, local=(), within=30.0, where="Options ▾ → Network password…"):
+    """Short texts about rejected messages in the last `within` seconds."""
+    out = []
+    labels = {
+        "bad": "different network password",
+        "none": "no network password",
+        "old": "wrong time (check the PC clock)",
+    }
+    for (status, src), when in sorted(AUTH_SEEN.items()):
+        if now - when > within or src in local:
+            continue
+        if status == "foreign":
+            continue
+        if status in labels and AUTH["key"]:
+            out.append("{}: {} – ignored".format(src, labels[status]))
+    if not AUTH["key"] and any(st == "foreign" and now - w <= within
+                               for (st, _), w in AUTH_SEEN.items()):
+        out.append("other lamps use a network password – set it: " + where)
+    return out
+
 PONG_MAGIC = b"PPP1"  # lamp -> Overview: answer to a ping (round-trip time)
 
 
@@ -431,7 +539,7 @@ def send_relay(share, payload):
     """Broadcast a relay message on every network (any thread)."""
     for sock, bcast in list(share.get("targets", ())):
         try:
-            sock.sendto(payload, (bcast, share["port"]))
+            sock.sendto(seal(payload), (bcast, share["port"]))
         except OSError:
             pass
 
@@ -485,9 +593,9 @@ def discovery_loop(
                 hello_now.clear()  # e.g. F12 pressed: announce right away
                 next_hello = 0.0
             if now >= next_hello:
-                payload = make_hello(
+                payload = seal(make_hello(
                     node_id, host, [ip for ip, _ in nets], **get_state()
-                )
+                ))
                 for ip, bcast in nets:
                     sock = senders.get(ip)
                     if sock is None:
@@ -512,6 +620,9 @@ def discovery_loop(
             continue
         except OSError:
             stop.wait(0.3)
+            continue
+        data, status = unseal(data, addr[0])
+        if not accepted(status):
             continue
         command = parse_command(data)
         if command is not None:

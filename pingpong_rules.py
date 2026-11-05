@@ -36,7 +36,7 @@ class RulesMixin:
             return
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            sock.sendto(make_pong(command.get("seq", 0), self.node_id, socket.gethostname()),
+            sock.sendto(seal(make_pong(command.get("seq", 0), self.node_id, socket.gethostname())),
                         (src, port))
         except OSError:
             pass
