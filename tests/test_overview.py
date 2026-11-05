@@ -436,5 +436,40 @@ class SetupSaveTest(unittest.TestCase):
         self.assertIn("ping-pong lock ON", text)
 
 
+class TablesCacheTest(unittest.TestCase):
+    def test_tables_built_at_most_once_per_second(self):
+        o = make_overview()
+        calls = []
+        orig = o._stats_table
+        o._stats_table = lambda: calls.append(1) or orig()
+        now = time.time()
+        o._tables(now)
+        o._tables(now + 0.3)
+        self.assertEqual(len(calls), 1)
+        o._tables(now + 1.1)
+        self.assertEqual(len(calls), 2)
+
+    def test_tree_filled_only_on_change(self):
+        o = make_overview()
+
+        class Tree:
+            def __init__(self):
+                self.inserts = 0
+
+            def get_children(self):
+                return []
+
+            def delete(self, *items):
+                pass
+
+            def insert(self, *a, **kw):
+                self.inserts += 1
+
+        tree = Tree()
+        self.assertTrue(o._fill_tree(tree, "_shown_x", [["RUN1", 1], ["All", 1]]))
+        self.assertFalse(o._fill_tree(tree, "_shown_x", [("RUN1", 1), ("All", 1)]))
+        self.assertEqual(tree.inserts, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

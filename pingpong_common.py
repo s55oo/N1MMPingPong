@@ -375,3 +375,49 @@ def app_dir():
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
+
+
+# ----- one program per PC (Windows mutex) -----
+
+_instance_mutex = None  # Windows mutex: one lamp (one Overview) per PC
+LAMP_MUTEX = "Local\\PingPongLamp"
+OVERVIEW_MUTEX = "Local\\PingPongOverview"
+OVERVIEW_EXE = "pingpong_overview.exe"
+
+
+def instance_running(name):
+    """True when a program holding mutex `name` runs on this PC."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenMutexW.restype = ctypes.c_void_p
+    handle = kernel32.OpenMutexW(0x00100000, False, name)  # SYNCHRONIZE
+    if handle:
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return True
+    return False
+
+
+def claim_single_instance(wait, name=LAMP_MUTEX):
+    """Only one lamp per PC. Waits up to `wait` s for an old one to exit
+    (after an update the old lamp closes a moment after starting us)."""
+    global _instance_mutex
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    deadline = time.time() + wait
+    while True:
+        handle = kernel32.CreateMutexW(None, False, name)
+        if handle and ctypes.get_last_error() != 183:  # ERROR_ALREADY_EXISTS
+            _instance_mutex = handle  # held until this process exits
+            return True
+        if handle:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.25)

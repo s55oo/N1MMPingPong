@@ -45,6 +45,7 @@ FORGET_SILENT = 3600.0  # s: an operating station that went silent stays this lo
 ALARM_BEEP = 5.0  # s: alarm beep interval
 PP_LIMIT = pp.PP_LIMIT  # s: ping-pong slot frees itself
 REFRESH_MS = 250
+TABLES_EVERY = 1.0  # s: function key / activity tables are rebuilt at most this often
 FIREWALL_RULE = "PingPong Overview web page"
 EVENTS_FILE = "pingpong_events.csv"  # contest timeline, ";"-separated (Excel)
 STATS_FILE = "pingpong_stats.json"  # function key counts, kept over restarts
@@ -1040,6 +1041,7 @@ class Overview:
         with self.lock:
             self.stats = {}
             self.stats_since = time.time()
+        self._tables_cache = None  # show the empty tables at once
         self._save_stats()
 
     def _pp_limit(self):
@@ -1121,18 +1123,7 @@ class Overview:
             return
 
         def work():
-            import subprocess
-
-            try:
-                done = subprocess.run(
-                    ["netsh", "advfirewall", "firewall", "show", "rule",
-                     "name={}".format(FIREWALL_RULE)],
-                    capture_output=True, timeout=15,
-                    creationflags=0x08000000,  # CREATE_NO_WINDOW
-                )
-                found = done.returncode == 0
-            except Exception:
-                found = None
+            found = pp.firewall_rule_exists(FIREWALL_RULE)
             self.root.after(0, lambda: self._firewall_checked(found))
 
         threading.Thread(target=work, daemon=True).start()
@@ -1339,6 +1330,17 @@ class Overview:
         geo = self.cfg.get("window", "geometry", fallback="")
         self.root.geometry(geo or "900x400")
 
+    def _fill_tree(self, tree, attr, rows):
+        """Put rows into a Treeview, but only if they differ from what it shows."""
+        rows = [list(r) for r in rows]
+        if getattr(self, attr, None) == rows:
+            return False
+        setattr(self, attr, rows)
+        tree.delete(*tree.get_children())
+        for row in rows:
+            tree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        return True
+
     def _draw_heat(self, act):
         """TX minutes per hour: one row per station, darker = more TX."""
         key = repr((act["hours"], act["heat"], self.heat.winfo_width()))
@@ -1540,13 +1542,10 @@ class Overview:
         notes.append("★ = master")
         for r in rows:
             r.pop("sort")
-        stat_cols, stat_rows = self._stats_table()
+        activity, stats = self._tables(now)
         return {
-            "activity": self._activity_table(),
-            "stats": {
-                "columns": stat_cols, "rows": stat_rows,
-                "since": time.strftime("%d.%m. %H:%M", time.localtime(self.stats_since)),
-            },
+            "activity": activity,
+            "stats": stats,
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
             "alarm": alarm,
@@ -1559,6 +1558,21 @@ class Overview:
             "columns": [[cid, dict((c[0], c[1]) for c in COLUMNS)[cid]] for cid in WEB_ORDER],
             "time": time.strftime("%H:%M:%S"),
         }
+
+    def _tables(self, now):
+        """Function key and Activity tables: they change slowly, so they are
+        built at most once per TABLES_EVERY instead of on every refresh."""
+        cached = getattr(self, "_tables_cache", None)
+        if cached is not None and now - cached[0] < TABLES_EVERY:
+            return cached[1], cached[2]
+        stat_cols, stat_rows = self._stats_table()
+        stats = {
+            "columns": stat_cols, "rows": stat_rows,
+            "since": time.strftime("%d.%m. %H:%M", time.localtime(self.stats_since)),
+        }
+        activity = self._activity_table()
+        self._tables_cache = (now, activity, stats)
+        return activity, stats
 
     def _refresh(self):
         try:
@@ -1617,15 +1631,13 @@ class Overview:
             "#c00000" if snap["warn"] or snap["ready"] == "bad"
             else "#1f8a3b" if snap["ready"] == "ok" else "black"))
         self._show_alarm(snap.get("alarm") or [])
-        self.stats_label.configure(
-            text="Transmissions started by each function key, since {}".format(snap["stats"]["since"]))
-        self.stree.delete(*self.stree.get_children())
-        for row in snap["stats"]["rows"]:
-            self.stree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        label = "Transmissions started by each function key, since {}".format(snap["stats"]["since"])
+        if self.stats_label.cget("text") != label:
+            self.stats_label.configure(text=label)
+        # Rebuild the two tables only when their content changed.
+        self._fill_tree(self.stree, "_shown_stats", snap["stats"]["rows"])
         act = snap["activity"]
-        self.atree.delete(*self.atree.get_children())
-        for row in act["rows"]:
-            self.atree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        self._fill_tree(self.atree, "_shown_activity", act["rows"])
         self._draw_heat(act)
         if time.time() - self._stats_saved > STATS_SAVE:
             self._save_stats()

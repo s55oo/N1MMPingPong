@@ -444,6 +444,10 @@ class RulesMixin:
                 continue
             if any(not getattr(p, "same_pc", False) for p in peers):
                 rows.append("{}: no PingPong lamp there".format(st.label))
+            elif getattr(self, "_fw_ok", None):
+                # Our rule is there: the other PC's firewall or the network.
+                rows.append("{}: no PingPong heard – check that PC's lamp and "
+                            "firewall".format(st.label))
             else:
                 rows.append(
                     "{}: no PingPong heard – firewall? Options ▾ → Allow PingPong in "

@@ -147,6 +147,24 @@ def _windows_adapters():
     return result
 
 
+def firewall_rule_exists(name):
+    """Is there a Windows Firewall rule with this name? True / False;
+    None when it can't be checked (not Windows, netsh failed)."""
+    if sys.platform != "win32":
+        return None
+    import subprocess
+
+    try:
+        done = subprocess.run(
+            ["netsh", "advfirewall", "firewall", "show", "rule", "name={}".format(name)],
+            capture_output=True, timeout=15,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+    except Exception:
+        return None
+    return done.returncode == 0
+
+
 def phone_addresses():
     """{"lan": ip, "zt": ip} - where a phone can reach this PC (the
     ZeroTier one only when this PC is on ZeroTier)."""

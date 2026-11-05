@@ -530,15 +530,19 @@ class OpenOverviewTest(unittest.TestCase):
 
     def setUp(self):
         self.started = []
-        self.saved = (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile, m.instance_running)
+        import pingpong_lamp_menu as menu
+
+        self.menu = menu
+        self.saved = (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile, menu.instance_running)
         m.upd.is_frozen = lambda: True
         m.upd.relaunch = lambda exe, args, after_update=True: self.started.append(
             (exe, after_update))
         m.os.path.isfile = lambda path: True
-        m.instance_running = lambda name: False
+        menu.instance_running = lambda name: False
 
     def tearDown(self):
-        (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile, m.instance_running) = self.saved
+        (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile,
+         self.menu.instance_running) = self.saved
 
     def test_not_master_does_nothing(self):
         app = make_lamp(_i_am_master=False)
