@@ -51,6 +51,7 @@ import webbrowser
 from tkinter import colorchooser, messagebox, simpledialog
 
 import pingpong_keys as keys
+import pingpong_phone as phone
 import pingpong_update as upd
 from pingpong_common import *  # noqa: F401,F403
 from pingpong_common import _float, guarded, log_error  # noqa: F401
@@ -159,9 +160,16 @@ FONT_SIZES = [(4, 34), (8, 29), (12, 23), (9999, 21)]  # +30 % (v1.30)
 
 
 class DisplayApp(RulesMixin):
-    def __init__(self, root, config_path, port, stale, discovery_port=None):
+    def __init__(self, root, config_path, port, stale, discovery_port=None,
+                 phone_port=phone.PHONE_PORT):
         self.root = root
         self.port = port
+        self.phone_port = phone_port
+        self._phone_req = 0.0  # last request from a phone (state built only then)
+        self._phone_state = {}
+        self._phone_addrs = {}
+        self._phone_error = ""
+        self._hexcache = {}
         self.stale = stale
         self.config_path = config_path
         self.hints = read_config(config_path)
@@ -296,6 +304,10 @@ class DisplayApp(RulesMixin):
             args=(self.port, self._port_users, self.stop),
             daemon=True,
         ).start()
+        if phone_port:
+            self._phone_server, self._phone_error = phone.start_server(
+                phone_port, lambda: self._phone_state, self._phone_seen)
+            threading.Thread(target=self._phone_address_loop, daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
         if keys.supported():
@@ -994,12 +1006,13 @@ class DisplayApp(RulesMixin):
         ports = ",".join(
             str(p) for p in (self.port, self._share["port"]) if p
         )
+        tcp = " and TCP {} (phone lamp)".format(self.phone_port) if self.phone_port else ""
         if not messagebox.askyesno(
             "PingPong - Windows Firewall",
-            "Allow incoming UDP {} (N1MM data and the other lamps) on private "
+            "Allow incoming UDP {} (N1MM data and the other lamps){} on private "
             "and domain networks?\n\nWindows asks for administrator rights. "
             "The rule is called \"{}\"; an older rule with that name is "
-            "replaced.".format(ports, FIREWALL_RULE),
+            "replaced.".format(ports, tcp, FIREWALL_RULE),
             parent=self.root,
         ):
             return
@@ -1008,6 +1021,12 @@ class DisplayApp(RulesMixin):
             'netsh advfirewall firewall add rule name="{0}" dir=in action=allow '
             "protocol=UDP localport={1} profile=private,domain"
         ).format(FIREWALL_RULE, ports)
+        if self.phone_port:
+            rule += (
+                ' & netsh advfirewall firewall delete rule name="{0}" >nul 2>&1 & '
+                'netsh advfirewall firewall add rule name="{0}" dir=in action=allow '
+                "protocol=TCP localport={1} profile=private,domain"
+            ).format(FIREWALL_PHONE_RULE, self.phone_port)
         try:
             import ctypes
 
@@ -1019,7 +1038,10 @@ class DisplayApp(RulesMixin):
         if result > 32:
             messagebox.showinfo(
                 "PingPong - Windows Firewall",
-                "Firewall rule \"{}\" added (UDP {}).".format(FIREWALL_RULE, ports),
+                "Firewall rule \"{}\" added (UDP {}){}.".format(
+                    FIREWALL_RULE, ports,
+                    " and \"{}\" (TCP {})".format(FIREWALL_PHONE_RULE, self.phone_port)
+                    if self.phone_port else ""),
                 parent=self.root,
             )
         else:
@@ -1243,6 +1265,12 @@ class DisplayApp(RulesMixin):
         )
         self.options_link.pack(side=tk.RIGHT, padx=(0, 6))
         self.options_link.bind("<Button-1>", self._show_options)
+        # Phone lamp address(es), left of Options: click opens the page.
+        self.phone_label = tk.Label(top, text="", font=("Segoe UI", 8), fg="#555555",
+                                    cursor="hand2", anchor="w", justify=tk.LEFT,
+                                    wraplength=230)
+        self.phone_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.phone_label.bind("<Button-1>", lambda e: self._open_phone_page())
         self.canvas = tk.Canvas(
             frame,
             width=330,
@@ -1705,6 +1733,7 @@ class DisplayApp(RulesMixin):
         self._update_tail()
 
     def _update_tail(self):
+        self._phone_tail()
         warns = [w for w in (self._master_warn, self._port_warning()) if w]
         if warns:
             self.info.configure(
@@ -1714,6 +1743,93 @@ class DisplayApp(RulesMixin):
         elif self.info.cget("fg") != self._info_fg:
             self.info.configure(fg=self._info_fg)
         self._sync_compact()
+
+    # ----- phone lamp (web page on TCP 8047) -----
+
+    def _phone_seen(self):
+        self._phone_req = time.time()  # called from the web server thread
+
+    def _phone_address_loop(self):
+        while not self.stop.is_set():
+            try:
+                self._phone_addrs = phone_addresses()
+            except Exception:
+                log_error("phone addresses")
+            self.stop.wait(60.0)
+
+    def _phone_tail(self):
+        """Lamp header text; the phone page's state while someone watches."""
+        label = getattr(self, "phone_label", None)
+        if label is not None:
+            if self._phone_error:
+                text = "phone lamp: " + self._phone_error
+            elif self.phone_port:
+                text = phone.address_text(self._phone_addrs, self.phone_port)
+            else:
+                text = ""
+            if label.cget("text") != text:
+                label.configure(text=text, fg="#c00000" if self._phone_error else "#555555")
+        if self.phone_port and time.time() - self._phone_req < 10.0:
+            self._phone_state = self._phone_snapshot(time.time())
+
+    def _open_phone_page(self):
+        addrs = self._phone_addrs or {}
+        ip = addrs.get("lan") or addrs.get("zt") or "127.0.0.1"
+        if self.phone_port and not self._phone_error:
+            webbrowser.open("http://{}:{}/".format(ip, self.phone_port))
+
+    def _hex(self, color):
+        """Any Tk color as #rrggbb for the web page ("" if unknown)."""
+        if not color:
+            return ""
+        if color not in self._hexcache:
+            try:
+                r, g, b = self.root.winfo_rgb(color)
+                self._hexcache[color] = "#{:02x}{:02x}{:02x}".format(r >> 8, g >> 8, b >> 8)
+            except Exception:
+                self._hexcache[color] = ""
+        return self._hexcache[color]
+
+    def _phone_snapshot(self, now):
+        """What the phone page shows: the lamp as it is now, plus one tile
+        per band with who transmits there (UI thread, lock held)."""
+        border = self.canvas.cget("highlightbackground")
+        lamp = {
+            "bg": self._hex(self.canvas.cget("bg")),
+            "text": self.canvas.itemcget(self.text_id, "text"),
+            "who": self._who_text,
+            "freq": self._freq_text,
+            "border": "" if border == self._window_bg else self._hex(border),
+            "info": self.info.cget("text")[:300],
+        }
+        owners = self._color_owners(now)
+        groups = {}
+        for st in list(self.stations.values()):
+            if st.key is None or now - st.last_seen > 60:
+                continue
+            groups.setdefault(st.key, []).append(st)
+        bands = []
+        for key in sorted(groups, key=lambda k: (band_sort_key(k[0]), k[1])):
+            sts = groups[key]
+            tx = [st for st in sts if st.tx and now - st.last_seen <= self.stale]
+            active = max(tx, key=lambda st: st.last_seen) if tx else None
+            bands.append({
+                "band": "{} MHz {}".format(*key),
+                "mine": key == self.tracked,
+                "who": self.station_name(active) if active else "",
+                "msg": (active.msg or "") if active else "",
+                "color": self._hex(self._color_for(active, owners, now) or "red") if active else "",
+                "stations": ", ".join(sorted(
+                    "{} {}".format(self.station_name(st), self.role_label(st)).strip()
+                    for st in sts)),
+            })
+        return {
+            "name": self.my_alias or socket.gethostname(),
+            "version": __version__,
+            "time": time.strftime("%H:%M:%S"),
+            "lamp": lamp,
+            "bands": bands,
+        }
 
     def _test_toggled(self):
         self.test_on = bool(self.var_test.get())
@@ -2093,6 +2209,10 @@ def main():
     parser.add_argument(
         "--no-discovery", action="store_true", help="disable active discovery"
     )
+    parser.add_argument(
+        "--phone-port", type=int, default=phone.PHONE_PORT,
+        help="TCP port of the phone lamp web page (default 8047, 0 = off)",
+    )
     args = parser.parse_args()
 
     after_update = os.environ.pop("PINGPONG_AFTER_UPDATE", "") == "1"
@@ -2110,7 +2230,7 @@ def main():
 
     root = tk.Tk()
     discovery_port = 0 if args.no_discovery else args.discovery_port
-    DisplayApp(root, args.config, args.port, args.stale, discovery_port)
+    DisplayApp(root, args.config, args.port, args.stale, discovery_port, args.phone_port)
     root.mainloop()
 
 if __name__ == "__main__":

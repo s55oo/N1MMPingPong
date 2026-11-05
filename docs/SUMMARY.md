@@ -37,10 +37,16 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.80`.
+  `PingPong - MASTER UDP 12062 v1.81`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
+- **Phone lamp:** every lamp is also a web page on **TCP 8047** – the same
+  big lamp on a phone or tablet, plus a tile per band showing who
+  transmits. The top line of the lamp shows the address to open, e.g.
+  `phone 192.168.1.20:8047 · ZT 10.147.17.3:8047` (LAN and ZeroTier).
+
+  ![Phone lamp](phone-lamp.png)
 
 ### Warn other operators without transmitting
 - **F12 call:** "hold off, please".
@@ -125,6 +131,13 @@ the lamp downloads it if it is missing. One Overview per PC.
 - **Ping:** every 5 minutes (or **Ping now**) the round-trip time to every
   lamp in ms; no answer or over 500 ms turns the row red.
 - **Test all lamps:** every lamp flashes its own name and role for 3 s.
+- **Alarm – station not heard:** a station that has been operating and is
+  not heard for 30 s (PC crashed, lamp closed, cable out) turns its row
+  red, the status line flashes `🔔 NOT HEARD: INB2` and it beeps until
+  **Silence alarm** – or until the station is back.
+- **Setup ▾:** **save** every PC's name and color (by Windows computer
+  name) plus the master's F12 times and ping-pong settings to a file, and
+  **restore** them to all lamps before the next contest.
 - **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,
   lamps lost or restarted, setting changes, commands).
 - **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
@@ -201,6 +214,7 @@ the lamp downloads it if it is missing. One Overview per PC.
   - N1MM's broadcast to the lamp on **UDP 12062**, which PingPong only reads;
   - lamp-to-lamp messages on **UDP 46070**;
   - the Overview's web page on **TCP 8046**;
+  - each lamp's phone page on **TCP 8047**;
   - GitHub, over HTTPS, for updates only.
 - **Code:**
   - `n1mm_lamps.py`: the window;
@@ -209,9 +223,10 @@ the lamp downloads it if it is missing. One Overview per PC.
   - `pingpong_common.py`: shared constants and parsing;
   - `pingpong_keys.py`: the keyboard watcher;
   - `pingpong_update.py`: updates;
+  - `pingpong_phone.py`: the phone lamp page;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 100 tests) run on every push before
+- **Automated tests** (`tests/`, 116 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

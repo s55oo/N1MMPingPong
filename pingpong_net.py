@@ -71,6 +71,98 @@ def _windows_ipv4_table():
         result.append((ip, mask))
     return result
 
+def _windows_adapters():
+    """[(ip, adapter description)] of every IPv4 address (Windows), e.g.
+    ("10.147.17.3", "ZeroTier Virtual Port")."""
+    import ctypes
+    from ctypes import wintypes
+
+    class MIB_IPADDRROW(ctypes.Structure):
+        _fields_ = [
+            ("dwAddr", wintypes.DWORD),
+            ("dwIndex", wintypes.DWORD),
+            ("dwMask", wintypes.DWORD),
+            ("dwBCastAddr", wintypes.DWORD),
+            ("dwReasmSize", wintypes.DWORD),
+            ("unused1", ctypes.c_ushort),
+            ("wType", ctypes.c_ushort),
+        ]
+
+    class MIB_IFROW(ctypes.Structure):
+        _fields_ = [
+            ("wszName", ctypes.c_wchar * 256),
+            ("dwIndex", wintypes.DWORD),
+            ("dwType", wintypes.DWORD),
+            ("dwMtu", wintypes.DWORD),
+            ("dwSpeed", wintypes.DWORD),
+            ("dwPhysAddrLen", wintypes.DWORD),
+            ("bPhysAddr", ctypes.c_ubyte * 8),
+            ("dwAdminStatus", wintypes.DWORD),
+            ("dwOperStatus", wintypes.DWORD),
+            ("dwLastChange", wintypes.DWORD),
+            ("dwInOctets", wintypes.DWORD),
+            ("dwInUcastPkts", wintypes.DWORD),
+            ("dwInNUcastPkts", wintypes.DWORD),
+            ("dwInDiscards", wintypes.DWORD),
+            ("dwInErrors", wintypes.DWORD),
+            ("dwInUnknownProtos", wintypes.DWORD),
+            ("dwOutOctets", wintypes.DWORD),
+            ("dwOutUcastPkts", wintypes.DWORD),
+            ("dwOutNUcastPkts", wintypes.DWORD),
+            ("dwOutDiscards", wintypes.DWORD),
+            ("dwOutErrors", wintypes.DWORD),
+            ("dwOutQLen", wintypes.DWORD),
+            ("dwDescrLen", wintypes.DWORD),
+            ("bDescr", ctypes.c_ubyte * 256),
+        ]
+
+    iphlpapi = ctypes.windll.iphlpapi
+    size = wintypes.ULONG(0)
+    iphlpapi.GetIpAddrTable(None, ctypes.byref(size), False)
+    if not size.value:
+        return []
+    buf = ctypes.create_string_buffer(size.value)
+    if iphlpapi.GetIpAddrTable(buf, ctypes.byref(size), False) != 0:
+        return []
+    count = ctypes.cast(buf, ctypes.POINTER(wintypes.DWORD))[0]
+    rows = ctypes.cast(
+        ctypes.addressof(buf) + ctypes.sizeof(wintypes.DWORD),
+        ctypes.POINTER(MIB_IPADDRROW),
+    )
+    result = []
+    for i in range(count):
+        row = rows[i]
+        if row.wType & (0x0008 | 0x0040):  # disconnected / deleted
+            continue
+        ip = socket.inet_ntoa(struct.pack("<I", row.dwAddr))
+        if not _usable_ip(ip):
+            continue
+        descr = ""
+        ifrow = MIB_IFROW()
+        ifrow.dwIndex = row.dwIndex
+        if iphlpapi.GetIfEntry(ctypes.byref(ifrow)) == 0:
+            n = min(ifrow.dwDescrLen, 256)
+            descr = bytes(ifrow.bDescr[:n]).split(b"\0")[0].decode("latin-1", "replace")
+        result.append((ip, descr))
+    return result
+
+
+def phone_addresses():
+    """{"lan": ip, "zt": ip} - where a phone can reach this PC (the
+    ZeroTier one only when this PC is on ZeroTier)."""
+    from pingpong_phone import pick_addresses
+
+    adapters = []
+    if sys.platform == "win32":
+        try:
+            adapters = _windows_adapters()
+        except Exception:
+            adapters = []
+    if not adapters:
+        adapters = [(ip, "") for ip in local_interfaces()]
+    return pick_addresses(adapters, _route_ip())
+
+
 def _route_ip():
     """IP of the adapter holding the default route (no packet is sent)."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

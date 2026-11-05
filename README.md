@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.80 · Made by **S55OO** with AI assistance.
+> **Version:** 1.81 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -175,6 +175,26 @@ frequency are on the lamp anyway), so no information is lost.
   brightness, so a blinking or flashing lamp doesn't dazzle at night.
   Saved per PC.
 
+### Phone lamp (TCP 8047)
+
+Every lamp also serves **itself as a web page** for a phone or tablet:
+`http://<this PC>:8047`. The phone shows the same big lamp as the PC –
+color, message, who sends, frequency, the F12 call border – plus one tile
+per band with who is transmitting there (in their color) and the stations
+on it; this PC's band is outlined. Read only: nothing can be changed from
+the phone. It refreshes about 3 times a second and says
+`connection to the lamp lost` if the PC is gone.
+
+![Phone lamp](docs/phone-lamp.png)
+
+The **addresses** are shown in the lamp's top line, left of **Options ▾**:
+`phone 192.168.1.20:8047 · ZT 10.147.17.3:8047` – the LAN address and,
+if this PC is on **ZeroTier**, its ZeroTier address too. Click it to open
+the page in this PC's browser. Other devices need the firewall rule:
+**Options ▾ → Allow PingPong in Windows Firewall…** (adds TCP 8047). If
+another program already uses 8047, the line says `phone lamp: TCP 8047
+busy`; start the lamp with `--phone-port <n>` (or `0` = off).
+
 ### Band + mode group
 
 A lamp shows **only transmissions on the same band and mode as its own
@@ -230,8 +250,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.80`
-  (the others just `PingPong UDP 12062 v1.80`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.81`
+  (the others just `PingPong UDP 12062 v1.81`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -421,8 +441,9 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
 
 ### Windows Firewall (Options ▾ → Allow PingPong in Windows Firewall…)
 
-Adds an inbound rule `PingPong lamps UDP` for UDP **12062** (N1MM data) and **46070**
-on private and domain networks. Windows asks for administrator rights
+Adds an inbound rule `PingPong lamps UDP` for UDP **12062** (N1MM data) and **46070**,
+and `PingPong phone lamp TCP` for TCP **8047** (phone lamp), on private and
+domain networks. Windows asks for administrator rights
 (UAC); an older rule with the same name is replaced. Do it once per PC,
 if the lamp says `no PingPong heard – firewall?`.
 
@@ -455,7 +476,7 @@ Delete the file any time.
 
 ```bat
 n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
-               [--discovery-port 46070] [--no-discovery]
+               [--discovery-port 46070] [--no-discovery] [--phone-port 8047]
 ```
 
 - `--port` – UDP port for this PC's N1MM data (default 12062; N1MM's
@@ -467,6 +488,7 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
   (default 46070, `0` = off). Must be the same on all PCs.
 - `--no-discovery` – no lamp-to-lamp messages (no colors, F12 call or
   network notes).
+- `--phone-port` – TCP port of the phone lamp page (default 8047, `0` = off).
 
 ### How the lamps find each other and share N1MM data
 
@@ -577,7 +599,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.80 ✔`), the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.81 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -607,7 +629,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.80 ✔** when every lamp is current – then a
+lists them), **All lamps v1.81 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -642,6 +664,32 @@ commands they are accepted only from the master PC (lamps v1.71+).
 you see at a glance that every PC is reachable and which lamp is which –
 nothing is transmitted, nothing is blocked (lamps v1.72+).
 
+**Alarm: station not heard.** During the contest, when a station that
+has already transmitted (it left the ready check) is **not heard for
+30 s** – PC crashed, lamp closed, network cable out – the Overview
+sounds an **alarm**: the status line starts with
+`🔔 NOT HEARD: INB2 45 s` and flashes, the station's row turns **red**, it
+beeps every 5 s and the web page flashes too. **🔔 Silence alarm** (shown
+only then, row 1) stops the beeping for those stations; the line keeps
+`(silenced)`. As soon as the station is heard again – also after a
+restart of its lamp – the alarm ends by itself, and a new silence alarms
+again. Such a station stays in the table (up to 1 hour) instead of
+being dropped after 2 minutes. **Ready check** clears it all. The alarm
+goes into the event log (`ALARM lamp not heard`, `alarm silenced`).
+
+**Setup ▾ – save and restore the station setup** (e.g. from one CQ WW to
+the next):
+
+- **Save setup…** writes `pingpong_setup.json`: every PC heard now, by its
+  **Windows computer name**, with its **name** (My name) and **color**
+  (My color, or automatic), plus the master's **F12 call times**,
+  **ping-pong lock** and **release time**. The dialog shows what was saved.
+- **Restore setup…** (master PC only) reads such a file, shows it and,
+  after **Yes**, sends it to all lamps: each lamp takes its own name and
+  color, the master's lamp also takes the master settings and passes them
+  on. PCs not heard right now are listed and keep their settings – restore
+  again once they are on. Lamps v1.81+.
+
 **Ping.** Every **5 minutes** – and at once with **Ping now** on the
 Activity tab – the Overview sends a ping to all lamps over PingPong's own
 protocol (UDP 46070); each lamp answers at once and the Overview measures
@@ -670,7 +718,8 @@ made, its total **TX time**, its **ping** (average, maximum, lost) – and a cha
 2026-11-28;03:20:30;INB1;lamp restarted;v1.72
 ```
 
-Logged: lamps on / restarted / not heard / heard again, F12 and urgent
+Logged: lamps on / restarted / not heard / heard again, alarms, setup
+saved / restored, F12 and urgent
 calls, ping-pong WAIT and free, master changes, ping-pong lock and
 release time changes, and the commands sent from the Overview (update,
 test, ping-pong, emergency). **Open event log** on the Activity tab
@@ -796,6 +845,7 @@ n1mm_lamps.py       – lamp: window, Options menu, updates (start here)
 pingpong_rules.py   – lamp rules: calls, urgent calls, ping-pong lock, master
 pingpong_net.py     – messages and UDP loops (N1MM 12062, lamps 46070)
 pingpong_common.py  – constants, N1MM packet parsing, station records
+pingpong_phone.py   – phone lamp: web page on TCP 8047
 pingpong_keys.py    – keyboard watcher: F12, F-key block, Shift+F2/F4
 pingpong_update.py  – self-update / switch-version logic (lamp and Overview)
 pingpong_version.py – the version number (one place)
@@ -811,6 +861,8 @@ help.png            – help icon (embedded in the lamp)
 PingPong.png        – screenshot of the lamp
 docs/overview.png   – screenshot of the Overview (stations)
 docs/overview-function-keys.png – screenshot of the Overview (function keys)
+docs/phone-lamp.png – screenshot of the phone lamp
+docs/n1mm-broadcast-data.png – N1MM Broadcast Data setup
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
 docs/SUMMARY.md     – what PingPong does, on one page

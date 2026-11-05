@@ -134,6 +134,7 @@ def pp_expired(slot_time, now, limit):
 NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
 
 FIREWALL_RULE = "PingPong lamps UDP"
+FIREWALL_PHONE_RULE = "PingPong phone lamp TCP"
 
 # Ping-pong role: always from N1MM (Run = RUN, S&P = INB); announced to
 # the other lamps in the hello.
@@ -197,6 +198,13 @@ def group_of(freq, mode):
     if not band or mode not in MODES_ALLOWED:
         return None
     return band, mode
+
+def band_sort_key(band):
+    """'1.8' < '7' < '14' (numeric; unknown last)."""
+    try:
+        return float(band)
+    except (TypeError, ValueError):
+        return 999.0
 
 def group_label(key):
     if not key:

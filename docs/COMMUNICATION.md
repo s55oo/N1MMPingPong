@@ -21,7 +21,7 @@ using the programs see the [README](../README.md); in short:
 ## 1. Overview
 
 Every operating PC runs **N1MM Logger+** and one **PingPong lamp**; the
-master PC can also run the **PingPong Overview**. There are four kinds of
+master PC can also run the **PingPong Overview**. There are five kinds of
 traffic:
 
 1. **N1MM → lamp** (UDP 12062): N1MM's own External Broadcast; the
@@ -55,7 +55,15 @@ traffic:
    `{"cmd": "test"}` – **Test all lamps**: each lamp (v1.72+) flashes its
    name and role for 3 s;
    `{"cmd": "restart"}` / `{"cmd": "stop"}` – **Emergency**: every lamp
-   (v1.71+) starts itself again / closes (the Overview asks twice first).
+   (v1.71+) starts itself again / closes (the Overview asks twice first);
+   `{"cmd": "setup", "pcs": {"<pc name>": {"alias", "color"}}, "master":
+   {"block_time", "block_time_run", "pingpong", "pp_limit"}}` – **Restore
+   setup**: each lamp (v1.81+) takes the entry of its own Windows computer
+   name; the master's lamp also takes `master` and passes it on in its hello.
+5. **Phone lamp** (optional, every lamp): a web page on **TCP 8047**
+   (`http://<this PC>:8047`, `/state` = JSON) with the lamp as it is now
+   and one tile per band. Read only; the lamp builds the state only while
+   a phone asks for it.
 
 On its own PC the lamp also **watches the keyboard** while N1MM is the
 active window: F12 starts or ends a call, during a call it can swallow
@@ -76,9 +84,10 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
 | **UDP 12062** | N1MM → lamp (and LAN, if a subnet broadcast is added) | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
-| **UDP 46070** | lamp ↔ lamp, Overview → lamps | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, lamp test, ping, emergency restart/stop); `PPP1` + JSON ping answer (lamp → Overview, unicast) |
+| **UDP 46070** | lamp ↔ lamp, Overview → lamps | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, lamp test, ping, emergency restart/stop, restore setup); `PPP1` + JSON ping answer (lamp → Overview, unicast) |
 | HTTPS 443 | lamp / Overview → `api.github.com`, `github.com` | PingPong | release list, exe download |
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
+| TCP 8047 | phone / browser → any lamp PC | PingPong lamp | phone lamp (`/`, `/state`), read only |
 
 Port 46070 is deliberately far away from N1MM's ports: N1MM parses
 anything that arrives on its multi-computer port (12070), and older

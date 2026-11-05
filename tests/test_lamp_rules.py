@@ -566,5 +566,56 @@ class TitleTest(unittest.TestCase):
                                   "PingPong  UDP 12062  v" + m.__version__])
 
 
+class FakeSettings:
+    def __init__(self):
+        self.values = {}
+
+    def set_text(self, section, key, value):
+        self.values[(section, key)] = value
+
+    def set(self, key, value):
+        self.values[key] = value
+
+
+class SetupRestoreTest(unittest.TestCase):
+    """Restore setup (Overview, master PC): name/color by PC name, master settings."""
+
+    def setUp(self):
+        import socket
+
+        self.host = socket.gethostname().lower()
+
+    def command(self, **kw):
+        return m.parse_command(m.make_command("setup", **kw))
+
+    def test_restores_my_name_and_color(self):
+        app = make_lamp(settings=FakeSettings(), my_alias="X", my_color="")
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        color = m.COLOR_PALETTE[2]
+        app.on_command("10.0.0.9", self.command(
+            pcs={self.host: {"alias": "INB2", "color": color}, "other": {"alias": "RUN1"}},
+            master={"block_time": "20"}))
+        self.assertEqual(len(app._ui_calls), 1)
+        app._ui_calls.pop()()
+        self.assertEqual((app.my_alias, app.my_color), ("INB2", color))
+        self.assertEqual(app.settings.values[("station", "alias")], "INB2")
+        self.assertEqual(app.block_limit, 30.0)  # not master: master settings ignored
+        self.assertTrue(app.hello_now.is_set())
+
+    def test_master_takes_master_settings(self):
+        app = make_lamp(settings=FakeSettings(), _i_am_master=True)
+        app.on_command(MY_IP, self.command(pcs={}, master={
+            "block_time": "20", "block_time_run": "99", "pingpong": "0", "pp_limit": "15"}))
+        app._ui_calls.pop()()
+        self.assertEqual((app.block_limit, app.block_limit_run), (20.0, 30.0))  # 99 clamped
+        self.assertFalse(app.pp_enabled)
+        self.assertEqual(app.pp_limit, 15.0)
+
+    def test_unknown_color_ignored(self):
+        app = make_lamp(settings=FakeSettings(), my_color="")
+        app._apply_setup({self.host: {"alias": "", "color": "not-a-color"}}, None)
+        self.assertEqual(app.my_color, "")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -40,6 +40,9 @@ SETTINGS_FILE = "pingpong_overview.ini"
 WEB_PORT = 8046
 GONE_AFTER = pp.PEER_TIMEOUT  # s: lamp shown grey
 FORGET_AFTER = 120.0  # s: lamp removed from the table
+SILENT_AFTER = 30.0  # s: an operating station not heard this long raises the alarm
+FORGET_SILENT = 3600.0  # s: an operating station that went silent stays this long
+ALARM_BEEP = 5.0  # s: alarm beep interval
 PP_LIMIT = pp.PP_LIMIT  # s: ping-pong slot frees itself
 REFRESH_MS = 250
 FIREWALL_RULE = "PingPong Overview web page"
@@ -74,6 +77,7 @@ WEB_ORDER = ["station", "check", "band", "mode", "run", "role", "tx", "calls", "
              "freq", "last", "pc", "ver", "ping", "seen"]
 ROW_STYLE = {  # tag -> (background, text); "tx" uses the station color
     "gone": ("", "#999999"),
+    "silent": ("#c00000", "#ffffff"),  # operating station not heard (alarm)
     "urgent": ("#ff3030", "#ffffff"),
     "call": ("#ffe08a", "#000000"),
     "ready_ok": ("#3fb950", "#ffffff"),   # before the station starts operating
@@ -202,6 +206,9 @@ class Overview:
         self.fw_open = None  # web page's firewall rule: True / False / None = unknown
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
         self.operating = set()  # stats keys of PCs that transmitted since the ready check
+        self.silenced = set()  # stats keys whose "not heard" alarm was acknowledged
+        self._alarm_beeped = 0.0
+        self._alarm_logged = set()
         self.newest = ""  # newest release on GitHub ("" = unknown)
         self._ping_now = threading.Event()
         self._ping_seq = 0
@@ -579,6 +586,104 @@ class Overview:
             return
         messagebox.showinfo(TITLE, "{}: sent to all lamps.".format(title), parent=self.root)
 
+    # ------------------------------------------------------------ setup
+
+    def _setup_data(self):
+        """The station setup as heard now: every PC's name and color (by
+        Windows computer name) and the master's settings."""
+        now = time.time()
+        with self.lock:
+            live = [l for l in self.lamps.values()
+                    if now - l.hello_seen <= GONE_AFTER and l.hello.get("host")]
+            masters = self._masters(now)
+        pcs = {}
+        for lamp in sorted(live, key=lambda l: l.hello_seen):
+            h = lamp.hello
+            pcs[h["host"].lower()] = {"alias": h.get("alias", ""), "color": h.get("color", "")}
+        master = {}
+        if len(masters) == 1:
+            h = masters[0].hello
+            master = {
+                "name": masters[0].name(),
+                "block_time": "{:g}".format(h.get("block_time") or pp.BLOCK_LIMIT),
+                "block_time_run": "{:g}".format(h.get("block_time_run") or pp.BLOCK_LIMIT_RUN),
+                "pingpong": h.get("pingpong", ""),
+                "pp_limit": h.get("pp_limit", ""),
+            }
+        return {"saved": time.strftime("%Y-%m-%d %H:%M"), "version": pp.__version__,
+                "pcs": pcs, "master": master}
+
+    @staticmethod
+    def _setup_summary(data):
+        lines = ["{:<16} {:<12} {}".format(host, v.get("alias") or "(PC name)",
+                                          v.get("color") or "automatic")
+                 for host, v in sorted(data.get("pcs", {}).items())]
+        m = data.get("master") or {}
+        if m:
+            lines.append("")
+            lines.append("Master settings: F12 S&P {} s, Run {} s, ping-pong lock {}{}".format(
+                m.get("block_time", "?"), m.get("block_time_run", "?"),
+                {"1": "ON", "0": "OFF"}.get(m.get("pingpong", ""), "?"),
+                ", release {} s".format(m["pp_limit"]) if m.get("pp_limit", "") != "" else ""))
+        return "\n".join(lines)
+
+    def _save_setup(self):
+        data = self._setup_data()
+        if not data["pcs"]:
+            messagebox.showinfo(TITLE, "No lamps heard – nothing to save.", parent=self.root)
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self.root, title="Save station setup", initialdir=app_dir(),
+            initialfile="pingpong_setup.json", defaultextension=".json",
+            filetypes=[("PingPong setup", "*.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2, ensure_ascii=False)
+        except OSError as exc:
+            messagebox.showerror(TITLE, "Could not save:\n{}".format(exc), parent=self.root)
+            return
+        self._event("-", "setup saved", os.path.basename(path))
+        messagebox.showinfo(TITLE, "Saved {} PCs to\n{}\n\n{}".format(
+            len(data["pcs"]), path, self._setup_summary(data)), parent=self.root)
+
+    def _restore_setup(self):
+        if not self._on_master_pc(time.time()):
+            messagebox.showwarning(TITLE, "This PC is not the master PC – the lamps take this "
+                                   "only from the master PC.", parent=self.root)
+            return
+        path = filedialog.askopenfilename(
+            parent=self.root, title="Restore station setup", initialdir=app_dir(),
+            filetypes=[("PingPong setup", "*.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, dict) or not isinstance(data.get("pcs"), dict):
+                raise ValueError("not a PingPong setup file")
+        except (OSError, ValueError) as exc:
+            messagebox.showerror(TITLE, "Could not read the setup:\n{}".format(exc),
+                                 parent=self.root)
+            return
+        now = time.time()
+        with self.lock:
+            heard = {(l.hello.get("host") or "").lower() for l in self.lamps.values()
+                     if now - l.hello_seen <= GONE_AFTER}
+        missing = sorted(h for h in data["pcs"] if h not in heard)
+        text = "Restore the setup saved {}?\n\n{}".format(
+            data.get("saved", "?"), self._setup_summary(data))
+        if missing:
+            text += "\n\nNot heard now (they keep their settings): " + ", ".join(missing)
+        if not messagebox.askyesno(TITLE, text, parent=self.root):
+            return
+        command = pp.make_command("setup", pcs=data["pcs"], master=data.get("master") or {})
+        if not self._send_command(command):
+            messagebox.showerror(TITLE, "Could not send the setup (no network).", parent=self.root)
+            return
+        self._event("-", "setup restored (sent)", os.path.basename(path))
+
     def _test_lamps(self):
         """Every lamp flashes its own name and role for 3 s."""
         if not self._on_master_pc(time.time()):
@@ -726,6 +831,88 @@ class Overview:
             if now - lamp.hello_seen > GONE_AFTER and lamp.hello_seen and not getattr(lamp, "gone", False):
                 lamp.gone = True
                 self._event(lamp.name(), "lamp not heard", "for {:.0f} s".format(now - lamp.hello_seen))
+
+    # ------------------------------------------------------------ alarm
+
+    def _forget(self, lamp, now, heard_keys):
+        """Drop a lamp from the table? An operating station that went
+        silent stays (and keeps the alarm) until it is heard again under
+        any lamp id, or for FORGET_SILENT."""
+        quiet = now - max(lamp.hello_seen, lamp.radio_seen)
+        if quiet <= FORGET_AFTER:
+            return False
+        key = lamp.stats_key()
+        if key in self.operating and key not in heard_keys:
+            return quiet > FORGET_SILENT
+        return True
+
+    def _silent(self, lamps, now):
+        """[(name, seconds, acknowledged)] of operating stations whose lamp
+        has not been heard for SILENT_AFTER (caller holds the lock)."""
+        newest = {}
+        for lamp in lamps:
+            key = lamp.stats_key()
+            if key in self.operating and lamp.hello_seen:
+                if key not in newest or lamp.hello_seen > newest[key].hello_seen:
+                    newest[key] = lamp
+        result = []
+        for key, lamp in sorted(newest.items()):
+            quiet = now - lamp.hello_seen
+            if quiet > SILENT_AFTER:
+                result.append((lamp.name(), quiet, key in self.silenced))
+            else:
+                self.silenced.discard(key)  # heard again: a new silence alarms again
+                self._alarm_logged.discard(key)
+        return result
+
+    def _show_alarm(self, alarm):
+        """Flash the status text, beep, offer 'Silence alarm' (UI thread)."""
+        now = time.time()
+        if not alarm:
+            if self.alarm_button.winfo_ismapped():
+                self.alarm_button.pack_forget()
+            if self.head.cget("bg") != self._head_bg:
+                self.head.configure(bg=self._head_bg)
+            return
+        if not self.alarm_button.winfo_ismapped():
+            self.alarm_button.pack(side=tk.LEFT, padx=(0, 6), before=self.pp_button)
+        flash = int(now * 2) % 2 == 0
+        self.head.configure(bg="#ffd0d0" if flash else self._head_bg)
+        with self.lock:
+            new = [l for l in self.lamps.values()
+                   if l.name() in alarm and l.stats_key() not in self._alarm_logged]
+            for lamp in new:
+                self._alarm_logged.add(lamp.stats_key())
+        for lamp in new:
+            self._event(lamp.name(), "ALARM lamp not heard",
+                        "for {:.0f} s".format(now - lamp.hello_seen))
+        if now - self._alarm_beeped >= ALARM_BEEP:
+            self._alarm_beeped = now
+            self._beep()
+
+    def _beep(self):
+        def run():
+            try:
+                import winsound
+
+                for _ in range(2):
+                    winsound.Beep(1000, 180)
+                    time.sleep(0.08)
+            except Exception:
+                pass
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _silence_alarm(self):
+        now = time.time()
+        with self.lock:
+            names = []
+            for lamp in self.lamps.values():
+                key = lamp.stats_key()
+                if key in self.operating and now - lamp.hello_seen > SILENT_AFTER:
+                    self.silenced.add(key)
+                    names.append(lamp.name())
+        self._event("-", "alarm silenced", ", ".join(sorted(set(names))))
 
     def _open_events(self):
         if not os.path.exists(self.events_path):
@@ -1034,12 +1221,16 @@ class Overview:
         self.head = tk.Label(line1, text="", anchor="w", justify=tk.LEFT,
                              font=("Segoe UI", 10, "bold"))
         self.head.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._head_bg = self.head.cget("bg")
         # The status text wraps in whatever room the buttons leave.
         line1.bind("<Configure>", lambda e: self.head.configure(
             wraplength=max(200, e.width - row1.winfo_reqwidth() - 12)))
         row2 = tk.Frame(top, pady=2)
         row2.pack(fill=tk.X)
         pad = {"side": tk.LEFT, "padx": (0, 6)}
+        # Shown only while an operating station is not heard (alarm).
+        self.alarm_button = tk.Button(row1, text="🔔 Silence alarm", bg="#c00000", fg="white",
+                                      activebackground="#c00000", command=self._silence_alarm)
         self.pp_button = tk.Button(row1, text="Ping-pong lock: ?", width=20,
                                    command=self._toggle_pingpong)
         self.pp_button.pack(**pad)
@@ -1054,6 +1245,13 @@ class Overview:
         emergency.pack(**pad)
         self.update_all_button = tk.Button(row2, text="Update all lamps…", command=self._update_all)
         self.update_all_button.pack(**pad)
+        setup = tk.Menubutton(row2, text="Setup ▾", relief=tk.RAISED)
+        setup_menu = tk.Menu(setup, tearoff=0)
+        setup_menu.add_command(label="Save setup… (names, colors, master settings)",
+                               command=self._save_setup)
+        setup_menu.add_command(label="Restore setup…", command=self._restore_setup)
+        setup.configure(menu=setup_menu)
+        setup.pack(**pad)
         # Shown only when a newer Overview is on GitHub (exe only).
         self.update_button = tk.Button(row2, text="Update Overview…", command=self._update_self,
                                        bg="#ffe08a")
@@ -1245,6 +1443,8 @@ class Overview:
         if ready_mode:
             # Before this station starts operating: green = ready, red = not.
             tag = "ready_bad" if problems else "ready_ok"
+        elif lamp.stats_key() in self.operating and now - lamp.hello_seen > SILENT_AFTER:
+            tag = "silent"
         elif live > GONE_AFTER:
             tag = "gone"
         elif h.get("urgent"):
@@ -1267,9 +1467,11 @@ class Overview:
     def _make_snapshot(self):
         now = time.time()
         with self.lock:
+            heard_keys = {l.stats_key() for l in self.lamps.values()
+                          if now - l.hello_seen <= SILENT_AFTER}
             for node_id in [
                 k for k, l in self.lamps.items()
-                if now - max(l.hello_seen, l.radio_seen) > FORGET_AFTER
+                if self._forget(l, now, heard_keys)
             ]:
                 del self.lamps[node_id]
             lamps = list(self.lamps.values())
@@ -1279,6 +1481,7 @@ class Overview:
             rows = [self._row(lamp, now, masters, target) for lamp in lamps]
             waiting = [l for l in lamps if l.stats_key() not in self.operating]
             slots = dict(self.slots)
+            silent = self._silent(lamps, now)
         rows.sort(key=lambda r: r["sort"])
         live = [l for l in lamps if now - l.hello_seen <= GONE_AFTER]
         warn = False
@@ -1305,6 +1508,12 @@ class Overview:
         if self.fw_open and self.web_port:
             head += "  ·  web 0.0.0.0:{}".format(self.web_port)
         ready = None
+        alarm = [name for name, _secs, acked in silent if not acked]
+        if silent:
+            warn = True
+            head = "🔔 NOT HEARD: {}  ·  ".format(", ".join(
+                "{} {}{}".format(name, ago(secs), " (silenced)" if acked else "")
+                for name, secs, acked in silent)) + head
         if waiting:
             bad = [r for r in rows if r["tag"] == "ready_bad"]
             if bad:
@@ -1340,6 +1549,7 @@ class Overview:
             },
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
+            "alarm": alarm,
             "pingpong": pp_state,
             "master_name": masters[0].name() if len(masters) == 1 else "",
             "pp_limit": "{:g}".format(self._pp_limit()) if pp_state else "",
@@ -1406,6 +1616,7 @@ class Overview:
         self.head.configure(text=snap["head"], fg=(
             "#c00000" if snap["warn"] or snap["ready"] == "bad"
             else "#1f8a3b" if snap["ready"] == "ok" else "black"))
+        self._show_alarm(snap.get("alarm") or [])
         self.stats_label.configure(
             text="Transmissions started by each function key, since {}".format(snap["stats"]["since"]))
         self.stree.delete(*self.stree.get_children())
@@ -1443,6 +1654,9 @@ PAGE = """<!doctype html>
   #head { font-weight:600; }
   #head.warn { color:var(--warn); }
   #head.ok { color:#1f8a3b; }
+  #head.alarm { color:#fff; background:#c00000; padding:2px 6px; border-radius:4px;
+                animation: alarm 1s steps(1) infinite; }
+  @keyframes alarm { 50% { background:#ff7070; } }
   #status { color:var(--muted); font-size:12px; }
   #status.lost { color:var(--warn); font-weight:600; }
   .wrap { overflow-x:auto; margin:0 16px; background:var(--card);
@@ -1499,7 +1713,8 @@ function render(d) {
   document.title = d.title;
   const head = document.getElementById("head");
   head.textContent = d.head;
-  head.className = (d.warn || d.ready === "bad") ? "warn" : (d.ready === "ok" ? "ok" : "");
+  head.className = (d.alarm && d.alarm.length) ? "alarm" :
+    ((d.warn || d.ready === "bad") ? "warn" : (d.ready === "ok" ? "ok" : ""));
   if (cols.length !== d.columns.length) {
     cols = d.columns;
     const tr = document.getElementById("cols"); tr.innerHTML = "";

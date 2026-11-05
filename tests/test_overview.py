@@ -39,6 +39,8 @@ def make_overview():
     o._stats_saved = time.time()
     o.web_port = 8046
     o.fw_open = None
+    o.silenced = set()
+    o._alarm_logged = set()
     return o
 
 
@@ -364,6 +366,74 @@ class SnapshotTest(unittest.TestCase):
         self.assertTrue(s["rows"][0]["bg"].startswith("#"))
         import json
         json.dumps(s)  # must be serialisable for /data.json
+
+
+class SilentAlarmTest(unittest.TestCase):
+    """An operating station whose lamp is not heard for 30 s raises the alarm."""
+
+    def setUp(self):
+        self.o = make_overview()
+        hello(self.o, "A", "PC1", "RUN1", block_time=30)
+        hello(self.o, "B", "PC2", "INB1")
+        self.o.operating.add("pc:pc1")  # RUN1 has transmitted; INB1 has not
+
+    def test_operating_station_silent_alarms(self):
+        self.o.lamps["A"].hello_seen -= 40
+        self.o.lamps["B"].hello_seen -= 40  # not operating yet: no alarm
+        snap = self.o._make_snapshot()
+        self.assertEqual(snap["alarm"], ["RUN1"])
+        self.assertIn("NOT HEARD: RUN1", snap["head"])
+        self.assertTrue(snap["warn"])
+        row = [r for r in snap["rows"] if r["id"] == "A"][0]
+        self.assertEqual(row["tag"], "silent")
+
+    def test_no_alarm_when_heard(self):
+        snap = self.o._make_snapshot()
+        self.assertEqual(snap["alarm"], [])
+        self.assertNotIn("NOT HEARD", snap["head"])
+
+    def test_silenced_until_heard_again(self):
+        self.o.lamps["A"].hello_seen -= 40
+        self.o.silenced.add("pc:pc1")
+        snap = self.o._make_snapshot()
+        self.assertEqual(snap["alarm"], [])
+        self.assertIn("(silenced)", snap["head"])
+        hello(self.o, "A", "PC1", "RUN1", block_time=30)  # back
+        self.o._make_snapshot()
+        self.assertNotIn("pc:pc1", self.o.silenced)
+
+    def test_restarted_lamp_with_new_id_ends_alarm(self):
+        self.o.lamps["A"].hello_seen -= 40
+        hello(self.o, "A2", "PC1", "RUN1", block_time=30)  # same PC, new lamp id
+        self.assertEqual(self.o._make_snapshot()["alarm"], [])
+
+    def test_silent_station_kept_in_table(self):
+        self.o.lamps["A"].hello_seen -= 600
+        self.o.lamps["A"].radio_seen -= 600
+        self.o.lamps["B"].hello_seen -= 600
+        self.o.lamps["B"].radio_seen -= 600
+        snap = self.o._make_snapshot()
+        self.assertIn("A", self.o.lamps)  # operating: stays, alarm goes on
+        self.assertNotIn("B", self.o.lamps)  # never operated: forgotten
+        self.assertEqual(snap["alarm"], ["RUN1"])
+
+
+class SetupSaveTest(unittest.TestCase):
+    def test_setup_data_has_names_colors_and_master(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=20, block_time_run=4, pingpong="1",
+              pp_limit="25", color="#ff0000")
+        hello(o, "B", "PC2", "INB1")
+        data = o._setup_data()
+        self.assertEqual(data["pcs"]["pc1"], {"alias": "RUN1", "color": "#ff0000"})
+        self.assertEqual(data["pcs"]["pc2"]["alias"], "INB1")
+        self.assertEqual(data["master"]["block_time"], "20")
+        self.assertEqual(data["master"]["block_time_run"], "4")
+        self.assertEqual(data["master"]["pingpong"], "1")
+        self.assertEqual(data["master"]["pp_limit"], "25")
+        text = o._setup_summary(data)
+        self.assertIn("RUN1", text)
+        self.assertIn("ping-pong lock ON", text)
 
 
 if __name__ == "__main__":

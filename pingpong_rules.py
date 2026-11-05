@@ -82,10 +82,51 @@ class RulesMixin:
             self._ui_calls.append(self._remote_restart)
         elif command["cmd"] == "stop":  # emergency, from the Overview
             self._ui_calls.append(self._remote_stop)
+        elif command["cmd"] == "setup":  # "Restore setup…" in the Overview
+            pcs, master = command.get("pcs"), command.get("master")
+            self._ui_calls.append(lambda: self._apply_setup(pcs, master))
         elif command["cmd"] == "pingpong" and command.get("value") in ("1", "0"):
             if self._i_am_master:
                 on = command["value"] == "1"
                 self._ui_calls.append(lambda: self._set_pingpong(on))
+
+    def _apply_setup(self, pcs, master):
+        """Restore a saved station setup: this PC's name and color (found by
+        its Windows computer name); on the master also the F12 times and the
+        ping-pong lock and release time."""
+        changed = []
+        entry = (pcs or {}).get(socket.gethostname().lower()) if isinstance(pcs, dict) else None
+        if isinstance(entry, dict):
+            alias = " ".join(str(entry.get("alias", self.my_alias) or "").split())[:MAX_ALIAS]
+            if alias != self.my_alias:
+                self.my_alias = alias
+                self.settings.set_text("station", "alias", alias)
+                changed.append("name " + (alias or "(PC name)"))
+            color = str(entry.get("color", self.my_color) or "")
+            if color and color not in COLOR_PALETTE:
+                color = self.my_color
+            if color != self.my_color:
+                self.my_color = color
+                self.my_color_time = time.time() if color else 0.0
+                self.settings.set_text("station", "color", color)
+                self.settings.set_text("station", "color_time", "{:.3f}".format(self.my_color_time))
+                changed.append("color " + (color or "automatic"))
+        if self._i_am_master and isinstance(master, dict):
+            if master.get("block_time"):
+                self.block_limit = clamp_block(_float(str(master["block_time"])))
+                self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
+            if master.get("block_time_run"):
+                self.block_limit_run = clamp_block(_float(str(master["block_time_run"])), BLOCK_LIMIT_RUN)
+                self.settings.set_text("network", "block_time_run", "{:g}".format(self.block_limit_run))
+            if master.get("pingpong") in ("1", "0"):
+                self.pp_enabled = master["pingpong"] == "1"
+                self.settings.set_text("network", "pingpong", "yes" if self.pp_enabled else "no")
+            if master.get("pp_limit", "") != "":
+                self.pp_limit = clamp_pp(master["pp_limit"])
+                self.settings.set_text("network", "pp_limit", "{:g}".format(self.pp_limit))
+            changed.append("master settings")
+        self._key_event("setup restored: {}".format(", ".join(changed) or "nothing for this PC"))
+        self.hello_now.set()
 
     @locked
     def on_relay(self, src, node_id, data):
