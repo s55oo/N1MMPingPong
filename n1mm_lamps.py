@@ -495,7 +495,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                 continue
             if peer.local_n1mm:
                 # Its N1MM runs, but the broadcast does not reach this PC:
-                # usually a wrong Broadcast Address in that PC's N1MM.
+                # usually a wrong Broadcast Data → Radio line in that PC's N1MM.
                 rows.append("{}: N1MM not reaching here".format(self.peer_name(peer)))
             else:
                 rows.append("{}: no N1MM".format(self.peer_name(peer)))

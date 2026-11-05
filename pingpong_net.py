@@ -2,7 +2,7 @@
 
 - PingPongHello (every 3 s), relay of each lamp's own N1MM RadioInfo
   (PPR1) and commands from PingPong Overview (PPC1) on UDP 46070;
-- the N1MM listener (UDP 12062, N1MM's Broadcast Address must include it);
+- the N1MM listener (UDP 12062, N1MM's Broadcast Data → Radio line must include it);
 - this PC's network adapters and broadcast addresses (Windows API);
 - which other programs listen on N1MM's port.
 """

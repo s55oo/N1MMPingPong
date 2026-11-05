@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.85 · Made by **S55OO** with AI assistance.
+> **Version:** 1.86 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -89,8 +89,8 @@ Three tools are provided:
    otherwise that PC sends nothing.
 
 If the lamp hears nothing from its own N1MM for 30 s, the line under it
-says `no data from this PC's N1MM on UDP 12062 – N1MM Broadcast Address
-must include 127.0.0.1:12062` (and the Overview's ready check shows
+says `no data from this PC's N1MM on UDP 12062 – N1MM Broadcast Data →
+Radio must include 127.0.0.1:12062` (and the Overview's ready check shows
 `no N1MM data on UDP 12062`).
 
 ### Another program on the same port
@@ -259,8 +259,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.85`
-  (the others just `PingPong UDP 12062 v1.85`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.86`
+  (the others just `PingPong UDP 12062 v1.86`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -493,7 +493,7 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
 ```
 
 - `--port` – UDP port for this PC's N1MM data (default 12062; N1MM's
-  Broadcast Address must include `127.0.0.1:<port>`).
+  Broadcast Data → Radio line must include `127.0.0.1:<port>`).
 - `--stale` – safety fallback in seconds: if the transmitting station
   sends nothing for this long, the lamp turns off (default 5.0).
 - `--config` – path to `lamps.cfg` (default: next to the exe).
@@ -524,7 +524,7 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
 
   | Note | Meaning |
   |---|---|
-  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
+  | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check the **Broadcast Data → Radio** line in RUN2's N1MM |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
   | `RUN2: v1.77 – update this PC` | RUN2 is newer than this lamp – update this PC |
@@ -612,7 +612,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.85 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.86 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -642,7 +642,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.85 ✔** when every lamp is current – then a
+lists them), **All lamps v1.86 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -771,7 +771,7 @@ is open to the network.
 |---|---|
 | `no data from this PC's N1MM on UDP 12062` | N1MM's **Broadcast Data → Radio** line must include `127.0.0.1:12062` (e.g. `127.0.0.1:12060 127.0.0.1:12062`) – see [N1MM Logger+ setup](#1-n1mm-logger-setup). |
 | Red `⚠ UDP 12062 also used by …` | Another program takes N1MM's packets – see [Another program on the same port](#another-program-on-the-same-port). |
-| Lamp never lights | **Broadcast Data** and **RadioInfo** enabled in N1MM, correct **Broadcast Address**; band/mode in the list above; the lamp only lights for N1MM-started transmissions (not mic PTT/paddle). |
+| Lamp never lights | **Broadcast Data** and **RadioInfo** enabled in N1MM, **Radio** line including `127.0.0.1:12062`; band/mode in the list above; the lamp only lights for N1MM-started transmissions (not mic PTT/paddle). |
 | My own transmissions don't show | The lamp shows only *your band and mode* – check the line under the lamp shows your station. |
 | A key doesn't show | That key sends nothing (empty message, `{WIPE}` …) – N1MM doesn't report it. |
 | Other PCs don't blink on F12 | All PCs on the same version; same **band**; an F12 from S&P reaches only **S&P** stations (from Run: all); **F12 call** option on, F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |

@@ -612,8 +612,8 @@ class RulesMixin:
         mine = self._local_station()
         if mine is not None and now - mine.last_seen < 30:
             return ""
-        return ("no data from this PC's N1MM on UDP {0} – N1MM Broadcast Address "
-                "must include 127.0.0.1:{0}".format(self.port))
+        return ("no data from this PC's N1MM on UDP {0} – N1MM Broadcast Data → "
+                "Radio must include 127.0.0.1:{0}".format(self.port))
 
     def _pingpong_note(self, now):
         """Why the ping-pong lock does nothing for this INB, or ""."""
