@@ -118,6 +118,7 @@ class RulesMixin:
         peer.block_time = info.get("block_time", 0.0) or 0.0
         peer.block_time_run = info.get("block_time_run", 0.0) or 0.0
         peer.pingpong = info.get("pingpong", "")
+        peer.pp_limit = info.get("pp_limit", "")
         peer.alert_run = info.get("alert_run", False)
         peer.urgent = info.get("urgent", False)
         peer.urgent_band = info.get("urgent_band", "")
@@ -204,6 +205,7 @@ class RulesMixin:
             "alert_run": self.alert_on and self.alert_run,
             "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
             "pingpong": ("1" if self.pp_enabled else "0") if self._i_am_master else "",
+            "pp_limit": "{:g}".format(self.pp_limit) if self._i_am_master else "",
             "problems": "|".join(self._problems(time.time())),
             "urgent": self.urgent_on,
             "urgent_band": self.urgent_key[0],
@@ -505,7 +507,7 @@ class RulesMixin:
                 self._key_event("ping-pong {} MHz: RUN transmits - slot free".format(band))
         elif role == "INB":
             slot = self._slots.get(band)
-            if slot is None or now - slot[1] > PP_LIMIT:
+            if slot is None or pp_expired(slot[1], now, self.pp_limit):
                 self._slots[band] = [st.ip, now]
                 self._key_event(
                     "ping-pong {} MHz: slot taken by {}".format(band, self.station_name(st))
@@ -578,14 +580,15 @@ class RulesMixin:
             return False, None
         band = mine.key[0]
         slot = self._slots.get(band)
-        if slot is None or now - slot[1] > PP_LIMIT:
+        if slot is None or pp_expired(slot[1], now, self.pp_limit):
             return False, None
         if slot[0] in self.local:
             return False, None  # this PC holds the slot
         if self._run_on_band(band, now) is None:
             return False, None  # no RUN known on this band: no lock
         holder = self.stations.get(slot[0])
-        self._pp_left = max(0, int(PP_LIMIT - (now - slot[1]) + 0.999))
+        self._pp_left = (  # 0 = no time release: no countdown
+            max(1, int(self.pp_limit - (now - slot[1]) + 0.999)) if self.pp_limit > 0 else 0)
         return True, holder
 
     def _keys_to_block(self):

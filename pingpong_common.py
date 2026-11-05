@@ -111,7 +111,22 @@ def clamp_block(value, default=BLOCK_LIMIT):
     return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
 
 GO_TIME = 3.0  # s: green GO on an inband lamp after RUN's transmission ends
-PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
+PP_LIMIT = 40.0  # s: default - ping-pong slot lock ends by itself if RUN stays silent
+PP_RANGE = (0, 40)  # s: release time set on the master; 0 = only RUN frees the slot
+
+
+def clamp_pp(value):
+    """Ping-pong release time within PP_RANGE (unparseable = default)."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return PP_LIMIT
+    return float(min(max(value, PP_RANGE[0]), PP_RANGE[1]))
+
+
+def pp_expired(slot_time, now, limit):
+    """Has a ping-pong slot released itself? (limit 0 = never by time)"""
+    return limit > 0 and now - slot_time > limit
 
 NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
 
@@ -312,6 +327,7 @@ class Peer:
         self.block_time = 0.0
         self.block_time_run = 0.0
         self.pingpong = ""  # master only: "1" ping-pong lock on, "0" off
+        self.pp_limit = ""  # master only: ping-pong release time in s ("0".."40")
         self.alert_run = False
         self.urgent = False
         self.urgent_band = ""

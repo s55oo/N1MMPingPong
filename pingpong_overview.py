@@ -526,7 +526,7 @@ class Overview:
             lamp.locked_since = now
             st["locked"] += 1
         elif not locked and lamp.locked_since:
-            st["locked_time"] += min(now - lamp.locked_since, PP_LIMIT + 10)
+            st["locked_time"] += now - lamp.locked_since
             lamp.locked_since = 0.0
         if info.get("alert") and info.get("alert_time") and info["alert_time"] != lamp.last_alert:
             lamp.last_alert = info["alert_time"]
@@ -648,6 +648,14 @@ class Overview:
             self.stats_since = time.time()
         self._save_stats()
 
+    def _pp_limit(self):
+        """Ping-pong release time the master reports (default 40 s)."""
+        now = time.time()
+        masters = self._masters(now)
+        if len(masters) == 1 and masters[0].hello.get("pp_limit", "") != "":
+            return pp.clamp_pp(masters[0].hello["pp_limit"])
+        return PP_LIMIT
+
     def _pingpong_tx(self, lamp, now):
         """Same slot rule as the lamps: RUN frees the band, the first INB
         after that holds the slot until RUN transmits again."""
@@ -660,7 +668,7 @@ class Overview:
             self.slots.pop(band, None)
         elif role == "INB":
             slot = self.slots.get(band)
-            if slot is None or now - slot[1] > PP_LIMIT:
+            if slot is None or pp.pp_expired(slot[1], now, self._pp_limit()):
                 self.slots[band] = [lamp.id, now]
             elif slot[0] == lamp.id:
                 slot[1] = now
@@ -943,7 +951,7 @@ class Overview:
         if "(LOCKED)" in status:
             keys.append("ping-pong WAIT")
         slot = self.slots.get(band)
-        if slot and slot[0] == lamp.id and now - slot[1] <= PP_LIMIT:
+        if slot and slot[0] == lamp.id and not pp.pp_expired(slot[1], now, self._pp_limit()):
             keys.append("holds slot")
         name = lamp.name() + ("  ★" if lamp in masters else "")
         values = {
@@ -1013,6 +1021,10 @@ class Overview:
             pp_state = pp_set
             if pp_set:
                 head += "  ·  ping-pong lock: " + ("ON" if pp_set == "1" else "OFF")
+                limit = m.hello.get("pp_limit", "")
+                if pp_set == "1" and limit != "":
+                    secs = pp.clamp_pp(limit)
+                    head += " (release {})".format("{:g} s".format(secs) if secs else "only by RUN")
         elif masters:
             warn = True
             head = "{} lamps  ·  ⚠ TWO MASTERS: {}".format(
@@ -1037,7 +1049,7 @@ class Overview:
         if len(versions) > 1:
             notes.append("⚠ different versions: " + ", ".join("v" + v for v in versions))
         for band, slot in sorted(slots.items(), key=lambda s: band_sort(s[0])):
-            if now - slot[1] <= PP_LIMIT and slot[0] in self.lamps:
+            if not pp.pp_expired(slot[1], now, self._pp_limit()) and slot[0] in self.lamps:
                 notes.append("ping-pong {} MHz: slot held by {}".format(band, self.lamps[slot[0]].name()))
         no_relay = [l.name() for l in live if now - l.radio_seen > 30]
         if no_relay:

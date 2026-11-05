@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.69 · Made by **S55OO** with AI assistance.
+> **Version:** 1.70 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -208,8 +208,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.69`
-  (the others just `PingPong v1.69`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.70`
+  (the others just `PingPong v1.70`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -349,7 +349,13 @@ keeps the current setting.
   locked, and a transmission from **any** RUN on the band frees the slot.
 - The lock applies only on the **same band**, only when a station in
   **Run** (role RUN) is on that band, and only while the lock is **ON** on
-  the master. It releases itself if RUN stays silent for **40 s**.
+  the master. It releases itself if RUN stays silent for the **release
+  time** – set on the master: **Options ▾ → Ping-pong release time…**,
+  **0–40 s** (default **40 s**; **0** = never by time, only a RUN
+  transmission frees the slot). The value reaches all lamps at once;
+  other PCs show it greyed out, the Overview in its top line
+  (`ping-pong lock: ON (release 40 s)`). With 0 the locked lamp shows
+  `WAIT · INB1` without a countdown.
 - **GO:** when RUN's transmission ends and the slot is free, every inband
   lamp shows a green **GO** for 3 s – the moment to transmit. It
   disappears as soon as an inband station takes the slot (the others then
@@ -360,7 +366,7 @@ keeps the current setting.
   shows it in red) – e.g. when the run station is in S&P by mistake.
 - RUN's transmissions must be started by N1MM (F-keys, Enter/Insert) –
   a CQ keyed by paddle or PTT is not reported, so it does not free the
-  slot (the 40 s release still does).
+  slot (the release time still does, unless it is set to 0).
 - Like the F-key block, it only stops key presses in N1MM (not mouse
   clicks, PTT or paddle).
 - How it works step by step: [docs/COMMUNICATION.md](docs/COMMUNICATION.md#5-ping-pong-lock).
@@ -464,7 +470,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.70 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.71 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -496,7 +502,7 @@ PC, kept by updates.
 |---|---|
 | `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
 | `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), (an old `role` entry is ignored – the role comes from N1MM) |
-| `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call); `pingpong` – ping-pong lock yes/no; all last received from the master |
+| `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call); `pingpong` – ping-pong lock yes/no; `pp_limit` – ping-pong release time (0–40 s); all last received from the master |
 | `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 
@@ -534,7 +540,7 @@ versions, who holds the ping-pong slot per band, and lamps whose N1MM data
 doesn't arrive.
 
 Buttons at the top: **Ready check**, **Ping-pong lock: ON/OFF**,
-**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.69 ✔`),
+**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.70 ✔`),
 **Allow web page in firewall…**, **Always on top** – and, only when a
 newer Overview exists, the yellow **Update Overview to vX…**.
 
@@ -564,7 +570,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.69 ✔** when every lamp is current – then a
+lists them), **All lamps v1.70 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -623,7 +629,7 @@ administrator rights; rule `PingPong Overview web page`, TCP 8046).
 | A key doesn't show | That key sends nothing (empty message, `{WIPE}` …) – N1MM doesn't report it. |
 | Other PCs don't blink on F12 | All PCs on the same version; same **band**; an F12 from S&P reaches only **S&P** stations (from Run: all); **F12 call** option on, F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |
 | Ping-pong lock never locks | **Ping-pong lock: ON** (Overview / master's Options); a station in **Run** on the same band; the inband stations in **S&P** – check the **Role** column in the Overview. |
-| An INB stays locked although RUN transmits | RUN's messages must be N1MM-started (F-keys, Enter) – paddle/PTT are not reported; the lock releases itself after 40 s. **Diagnostics** on the locked PC shows the slot events. |
+| An INB stays locked although RUN transmits | RUN's messages must be N1MM-started (F-keys, Enter) – paddle/PTT are not reported; the lock releases itself after the release time (master's Options, 0–40 s; 0 = never by time). **Diagnostics** on the locked PC shows the slot events. |
 | One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12060 and 46070: **Options ▾ → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12060,46070 profile=private,domain` |
 | Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all: **Update all lamps…** in the Overview (or **Options ▾ → Check for updates** on each PC). |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |

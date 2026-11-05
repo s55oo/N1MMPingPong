@@ -146,6 +146,32 @@ class PingPongTest(unittest.TestCase):
         self.assertTrue(self.state()[0])
         self.assertFalse(self.state(time.time() + m.PP_LIMIT + 1)[0])
 
+    def test_release_time_set_on_master(self):
+        app = self.app
+        app.pp_limit = 10.0
+        app._pingpong_tx(self.inb1)
+        self.assertTrue(self.state(time.time() + 9)[0])
+        self.assertFalse(self.state(time.time() + 11)[0])
+
+    def test_release_time_zero_means_only_run_frees(self):
+        app = self.app
+        app.pp_limit = 0.0
+        app._pingpong_tx(self.inb1)
+        self.assertTrue(self.state(time.time() + 55)[0])  # past 40 s: still locked
+        self.assertEqual(app._pp_left, 0)  # no countdown shown
+        app._pingpong_tx(self.run)
+        self.assertFalse(self.state()[0])
+
+    def test_master_sends_release_time(self):
+        master = make_lamp(_i_am_master=True, pp_limit=15.0)
+        master._status_text = lambda: ""
+        self.assertEqual(master._hello_state()["pp_limit"], "15")
+        info = m.parse_hello(m.make_hello("M", "PC9", ["10.0.0.9"], True, pp_limit="0"))
+        self.assertEqual(info["pp_limit"], "0")
+        self.assertEqual(m.clamp_pp("99"), 40.0)
+        self.assertEqual(m.clamp_pp("-5"), 0.0)
+        self.assertEqual(m.clamp_pp("x"), m.PP_LIMIT)
+
     def test_no_run_on_band_no_lock(self):
         app = self.app
         self.run.key = ("7", "CW")

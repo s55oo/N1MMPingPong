@@ -95,7 +95,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.69</Version>
+  <Version>1.70</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -113,6 +113,7 @@ from.
   <AlertRun>0</AlertRun>           <!-- 1 = the call was started in Run: reaches all stations -->
   <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
   <PingPong>1</PingPong>           <!-- ping-pong lock 1 = on / 0 = off, only from the master -->
+  <PPLimit>40</PPLimit>            <!-- ping-pong release time in s (0-40, 0 = only RUN frees), only from the master -->
   <Problems>UDP 12060 also used by Callbooker.exe</Problems>  <!-- what is wrong on this PC, "|"-separated -->
   <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F2 or Shift+F4) on -->
   <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
@@ -255,7 +256,8 @@ for its band without any extra messages:
 - **RUN stops transmitting** (`IsTransmitting` back to False) and the
   slot is free → each INB lamp on that band shows a green **GO** for 3 s,
   until an INB takes the slot.
-- No RUN on the band, RUN silent for 40 s, or the lock switched **OFF**
+- No RUN on the band, RUN silent for the release time (`<PPLimit>`, set on
+  the master, 0–40 s, default 40; 0 = never by time), or the lock switched **OFF**
   on the master (`<PingPong>0`, also from the Overview's button) → no lock.
 
 ```mermaid
@@ -399,7 +401,7 @@ Defender and publishes release `v<version>` with notes from
 | Call sound | double beep once when a call starts blinking (option) |
 | Window place saved | 1.5 s after the lamp was moved, and on close |
 | F12 call time | S&P call: 1–30 s, default 30 (`<BlockTime>`); Run call: 1–30 s, default 5 (`<BlockTimeRun>`); both set on the master. Then blinking and block end on the receivers and the caller's call switches off |
-| Ping-pong lock limit | 40 s without a RUN transmission |
+| Ping-pong release time | 0–40 s without a RUN transmission, default 40, set on the master (`<PPLimit>`); 0 = only RUN frees the slot |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
 | Update check | lamp: once, 3 s after start; Overview: 3 s after start, then every 30 min |

@@ -241,6 +241,7 @@ class DisplayApp(RulesMixin):
         self.var_go_sound = tk.BooleanVar(value=self.settings.get("go_sound", False))
         # Ping-pong lock on/off: set on the master, used by every lamp.
         self.pp_enabled = self.settings.get_text("network", "pingpong", "yes") != "no"
+        self.pp_limit = clamp_pp(self.settings.get_text("network", "pp_limit", "{:g}".format(PP_LIMIT)))
         self._slots = {}  # band -> [holder station ip, time of its last TX start]
         self._pp_locked = False
         self._pp_holder = None
@@ -408,11 +409,16 @@ class DisplayApp(RulesMixin):
                 label="Ping-pong lock (RUN first, inband stations take turns) – for all PCs",
                 variable=var, command=lambda: self._set_pingpong(bool(var.get())),
             )
+            menu.add_command(
+                label="Ping-pong release time…  ({})".format(self._pp_limit_text()),
+                command=self._choose_pp_limit,
+            )
         else:
             master = self.peer_name(self._master_peer) if self._master_peer else "?"
             menu.add_command(
-                label="Ping-pong lock: {}  (set on master {})".format(
-                    "ON" if self.pp_enabled else "OFF – everybody may transmit", master),
+                label="Ping-pong lock: {}, release time {}  (set on master {})".format(
+                    "ON" if self.pp_enabled else "OFF – everybody may transmit",
+                    self._pp_limit_text(), master),
                 state=tk.DISABLED,
             )
         now_role = self._my_role_now()
@@ -765,6 +771,10 @@ class DisplayApp(RulesMixin):
                 self.settings.set_text("network", "pingpong", "yes" if self.pp_enabled else "no")
                 self._key_event("ping-pong lock {} (set on the master)".format(
                     "ON" if self.pp_enabled else "OFF"))
+            if master.pp_limit != "" and clamp_pp(master.pp_limit) != self.pp_limit:
+                self.pp_limit = clamp_pp(master.pp_limit)
+                self.settings.set_text("network", "pp_limit", "{:g}".format(self.pp_limit))
+                self._key_event("ping-pong release time {:g} s (set on the master)".format(self.pp_limit))
             run = master.block_time_run
             if run and clamp_block(run, BLOCK_LIMIT_RUN) != self.block_limit_run:
                 self.block_limit_run = clamp_block(run, BLOCK_LIMIT_RUN)
@@ -972,6 +982,31 @@ class DisplayApp(RulesMixin):
                 "The rule was not added (no administrator rights given).",
                 parent=self.root,
             )
+
+    def _pp_limit_text(self):
+        return "{:g} s".format(self.pp_limit) if self.pp_limit > 0 else "off – only RUN frees"
+
+    def _choose_pp_limit(self):
+        """Master only: after how many seconds without RUN the slot frees itself."""
+        if not self._i_am_master:
+            return
+        value = simpledialog.askinteger(
+            "PingPong - ping-pong release time",
+            "After how many seconds without a RUN transmission does the\n"
+            "ping-pong slot free itself? {}-{} s.\n"
+            "0 = never by time - only RUN transmitting frees it.\n"
+            "Used by all lamps.".format(*PP_RANGE),
+            initialvalue=int(self.pp_limit),
+            minvalue=PP_RANGE[0],
+            maxvalue=PP_RANGE[1],
+            parent=self.root,
+        )
+        if value is None:
+            return
+        self.pp_limit = float(value)
+        self.settings.set_text("network", "pp_limit", "{:g}".format(value))
+        self._key_event("ping-pong release time set to {}".format(self._pp_limit_text()))
+        self.hello_now.set()  # tell all lamps right away
 
     def _choose_block_time(self, run=False):
         """Master only: how long an F12 call blocks the other PCs.
@@ -1504,9 +1539,9 @@ class DisplayApp(RulesMixin):
             key, when = self._blocked_key
             if self._pp_locked:
                 idle = "BLOCKED · {}".format(key) if key and now - when <= 1.5 else (
-                    "WAIT · {} · {} s".format(
+                    "WAIT · {}{}".format(
                         self.station_name(self._pp_holder) if self._pp_holder else "INB",
-                        self._pp_left,
+                        " · {} s".format(self._pp_left) if self._pp_left else "",
                     )
                 )
             elif self.urgent_on:
@@ -1544,9 +1579,9 @@ class DisplayApp(RulesMixin):
             if pp_note:
                 header = pp_note + "  ·  " + header
             if self._pp_locked:
-                header = "slot taken by {} – wait for RUN (free in {} s at the latest)  ·  ".format(
+                header = "slot taken by {} – wait for RUN{}  ·  ".format(
                     self.station_name(self._pp_holder) if self._pp_holder else "INB",
-                    self._pp_left,
+                    " (free in {} s at the latest)".format(self._pp_left) if self._pp_left else "",
                 ) + header
             if now - self._f12_refused <= 4.0 and self._band_busy is not None:
                 header = "F12 ignored – {} is calling on {} MHz  ·  ".format(

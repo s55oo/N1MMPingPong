@@ -174,6 +174,14 @@ class PingPongSettingTest(unittest.TestCase):
         self.assertIn("ping-pong lock: ON", o._make_snapshot()["head"])
         self.assertEqual(o._make_snapshot()["pingpong"], "1")
 
+    def test_head_shows_release_time(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1", pp_limit="20")
+        self.assertIn("release 20 s", o._make_snapshot()["head"])
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1", pp_limit="0")
+        self.assertIn("release only by RUN", o._make_snapshot()["head"])
+        self.assertEqual(o._pp_limit(), 0.0)
+
     def test_no_master_no_setting(self):
         o = make_overview()
         hello(o, "A", "PC1", "RUN1")  # no master heard

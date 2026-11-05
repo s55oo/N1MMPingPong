@@ -64,7 +64,8 @@ Full manual: [README](../README.md). How it talks on the network:
   locked and every station may transmit without priority.
 - When RUN's transmission ends, the inband lamps show a green **GO**
   (optional soft click). The locked lamp shows `WAIT · INB1 · 32 s`; the
-  lock releases itself after 40 s.
+  lock releases itself after the release time set on the master
+  (0–40 s, default 40 s; 0 = only RUN frees it).
 - An inband lamp warns when there is no RUN on its band (lock off).
 - Several RUN stations are allowed, and all of them are treated the same.
 
