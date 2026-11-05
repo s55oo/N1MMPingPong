@@ -991,16 +991,20 @@ class Overview:
 
     def _build(self):
         self.root.title("{}  v{}".format(TITLE, pp.__version__))
-        # Status line on its own row (wraps), buttons in two rows under it:
-        # contest controls first, then maintenance - the window stays narrow.
+        # Two rows: status text + contest controls, then maintenance -
+        # the window stays narrow.
         top = tk.Frame(self.root, padx=8, pady=4)
         top.pack(fill=tk.X)
-        self.head = tk.Label(top, text="", anchor="w", justify=tk.LEFT,
+        line1 = tk.Frame(top)  # status text left, contest buttons right
+        line1.pack(fill=tk.X)
+        row1 = tk.Frame(line1, pady=2)
+        row1.pack(side=tk.RIGHT)
+        self.head = tk.Label(line1, text="", anchor="w", justify=tk.LEFT,
                              font=("Segoe UI", 10, "bold"))
-        self.head.pack(fill=tk.X)
-        top.bind("<Configure>", lambda e: self.head.configure(wraplength=max(300, e.width - 16)))
-        row1 = tk.Frame(top, pady=2)
-        row1.pack(fill=tk.X)
+        self.head.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # The status text wraps in whatever room the buttons leave.
+        line1.bind("<Configure>", lambda e: self.head.configure(
+            wraplength=max(200, e.width - row1.winfo_reqwidth() - 12)))
         row2 = tk.Frame(top, pady=2)
         row2.pack(fill=tk.X)
         pad = {"side": tk.LEFT, "padx": (0, 6)}
@@ -1247,7 +1251,7 @@ class Overview:
         pp_state = ""  # ping-pong lock as the master reports it ("1", "0", "")
         if len(masters) == 1:
             m = masters[0]
-            head = "{} lamps  ·  master: {}  ·  F12 block time: S&P call {:g} s, Run call {:g} s".format(
+            head = "{} lamps  ·  master: {}  ·  F12: S&P {:g} s, Run {:g} s".format(
                 len(live), m.name(), m.hello.get("block_time", 0) or 30,
                 m.hello.get("block_time_run", 0) or 5)
             pp_set = m.hello.get("pingpong", "")
