@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.64 · Made by **S55OO** with AI assistance.
+> **Version:** 1.65 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -313,6 +313,14 @@ alternation.
 S&P = INB** – and changes the moment the operator switches mode in N1MM.
 Nothing to set; **Options ▾** only shows the current role.
 
+**On or off for everybody – on the master:** **Options ▾ → Ping-pong lock
+(RUN first, inband stations take turns) – for all PCs** (on by default).
+Untick it on the master and **nobody is locked** – every station may
+transmit without priority; the value reaches all lamps at once. Other
+PCs show it greyed out (`Ping-pong lock: OFF – everybody may transmit
+(set on master RUN1)`), the Overview shows it in its top line. A new
+master keeps the current setting.
+
 | Role | Behavior |
 |---|---|
 | **off** | N1MM's Run/S&P not known yet (e.g. just started): no lock. |
@@ -462,7 +470,7 @@ PC, kept by updates.
 |---|---|
 | `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
 | `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), (an old `role` entry is ignored – the role comes from N1MM) |
-| `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call) last received from the master |
+| `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call); `pingpong` – ping-pong lock yes/no; all last received from the master |
 | `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 

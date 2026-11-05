@@ -858,6 +858,9 @@ class Overview:
             head = "{} lamps  ·  master: {}  ·  F12 block time: S&P call {:g} s, Run call {:g} s".format(
                 len(live), m.name(), m.hello.get("block_time", 0) or 30,
                 m.hello.get("block_time_run", 0) or 5)
+            pp_set = m.hello.get("pingpong", "")
+            if pp_set:
+                head += "  ·  ping-pong lock: " + ("ON" if pp_set == "1" else "OFF")
         elif masters:
             warn = True
             head = "{} lamps  ·  ⚠ TWO MASTERS: {}".format(

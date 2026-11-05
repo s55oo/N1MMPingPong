@@ -152,6 +152,24 @@ class PingPongTest(unittest.TestCase):
         app._pingpong_tx(self.inb1)
         self.assertFalse(self.state()[0])
 
+    def test_lock_off_on_master_means_no_lock(self):
+        app = self.app
+        app._pingpong_tx(self.run)
+        app._pingpong_tx(self.inb1)
+        self.assertTrue(self.state()[0])
+        app.pp_enabled = False  # master switched the ping-pong lock off
+        self.assertFalse(self.state()[0])
+
+    def test_master_sends_lock_setting_and_others_follow(self):
+        master = make_lamp(_i_am_master=True, pp_enabled=False)
+        master._status_text = lambda: ""
+        self.assertEqual(master._hello_state()["pingpong"], "0")
+        info = m.parse_hello(m.make_hello("M", "PC9", ["10.0.0.9"], True, pingpong="0"))
+        self.assertEqual(info["pingpong"], "0")
+        other = make_lamp()
+        other._status_text = lambda: ""
+        self.assertEqual(other._hello_state()["pingpong"], "")  # only the master sends it
+
     def test_lock_keys_include_enter_insert(self):
         app = self.app
         app._pp_locked = True

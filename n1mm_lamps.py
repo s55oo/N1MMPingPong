@@ -235,6 +235,8 @@ class DisplayApp(RulesMixin):
         # The ping-pong role always follows N1MM (Run = RUN, S&P = INB);
         # an old fixed "role" in pingpong.ini is ignored.
         self._last_role = ""
+        # Ping-pong lock on/off: set on the master, used by every lamp.
+        self.pp_enabled = self.settings.get_text("network", "pingpong", "yes") != "no"
         self._slots = {}  # band -> [holder station ip, time of its last TX start]
         self._pp_locked = False
         self._pp_holder = None
@@ -391,6 +393,19 @@ class DisplayApp(RulesMixin):
             command=self._relay_toggled,
         )
         menu.add_separator()
+        if self._i_am_master:
+            var = tk.BooleanVar(value=self.pp_enabled)
+            menu.add_checkbutton(
+                label="Ping-pong lock (RUN first, inband stations take turns) – for all PCs",
+                variable=var, command=lambda: self._set_pingpong(bool(var.get())),
+            )
+        else:
+            master = self.peer_name(self._master_peer) if self._master_peer else "?"
+            menu.add_command(
+                label="Ping-pong lock: {}  (set on master {})".format(
+                    "ON" if self.pp_enabled else "OFF – everybody may transmit", master),
+                state=tk.DISABLED,
+            )
         now_role = self._my_role_now()
         menu.add_command(
             label="Ping-pong role: {}  (from N1MM: Run = RUN, S&P = INB)".format(
@@ -733,6 +748,11 @@ class DisplayApp(RulesMixin):
                 self.block_limit = clamp_block(master.block_time)
                 # Remember it, so this PC keeps it if it becomes master.
                 self.settings.set_text("network", "block_time", "{:g}".format(self.block_limit))
+            if master.pingpong in ("1", "0") and (master.pingpong == "1") != self.pp_enabled:
+                self.pp_enabled = master.pingpong == "1"
+                self.settings.set_text("network", "pingpong", "yes" if self.pp_enabled else "no")
+                self._key_event("ping-pong lock {} (set on the master)".format(
+                    "ON" if self.pp_enabled else "OFF"))
             run = master.block_time_run
             if run and clamp_block(run, BLOCK_LIMIT_RUN) != self.block_limit_run:
                 self.block_limit_run = clamp_block(run, BLOCK_LIMIT_RUN)
@@ -1618,6 +1638,15 @@ class DisplayApp(RulesMixin):
             self._block_active = False
         self.settings.set("f12_call", call)
         self.settings.set("block_keys", block)
+
+    def _set_pingpong(self, on):
+        """Master only: ping-pong lock on/off for every lamp."""
+        if not self._i_am_master:
+            return
+        self.pp_enabled = on
+        self.settings.set_text("network", "pingpong", "yes" if on else "no")
+        self._key_event("ping-pong lock {} (for all PCs)".format("ON" if on else "OFF"))
+        self.hello_now.set()  # tell all lamps right away
 
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())

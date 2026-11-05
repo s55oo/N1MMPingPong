@@ -91,7 +91,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.64</Version>
+  <Version>1.65</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -108,6 +108,7 @@ from.
   <BlockTime>30</BlockTime>        <!-- S&P-call block time in s (1-30), only from the master -->
   <AlertRun>0</AlertRun>           <!-- 1 = the call was started in Run: reaches all stations -->
   <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
+  <PingPong>1</PingPong>           <!-- ping-pong lock 1 = on / 0 = off, only from the master -->
   <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F2 or Shift+F4) on -->
   <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
   <UrgentMode>CW</UrgentMode>

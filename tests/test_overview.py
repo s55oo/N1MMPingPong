@@ -165,6 +165,15 @@ class RestartTest(unittest.TestCase):
         self.assertEqual(sorted(o.lamps), ["A", "B"])
 
 
+class PingPongSettingTest(unittest.TestCase):
+    def test_head_shows_lock_setting(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="0")
+        self.assertIn("ping-pong lock: OFF", o._make_snapshot()["head"])
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1")
+        self.assertIn("ping-pong lock: ON", o._make_snapshot()["head"])
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()

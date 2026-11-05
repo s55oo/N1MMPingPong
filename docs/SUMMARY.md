@@ -60,6 +60,8 @@ Full manual: [README](../README.md). How it talks on the network:
 - After RUN transmits, the **first INB that transmits takes the slot**.
   Every other INB is locked (F1–F11, Enter and Insert) until RUN
   transmits again.
+- **Switched on or off for all PCs on the master** – off means nobody is
+  locked and every station may transmit without priority.
 - The lock releases itself after 40 s. The locked lamp shows
   `WAIT · INB1 · 32 s`.
 - Several RUN stations are allowed, and all of them are treated the same.

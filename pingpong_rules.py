@@ -111,6 +111,7 @@ class RulesMixin:
         peer.colors = info.get("colors", {}) or {}
         peer.block_time = info.get("block_time", 0.0) or 0.0
         peer.block_time_run = info.get("block_time_run", 0.0) or 0.0
+        peer.pingpong = info.get("pingpong", "")
         peer.alert_run = info.get("alert_run", False)
         peer.urgent = info.get("urgent", False)
         peer.urgent_band = info.get("urgent_band", "")
@@ -196,6 +197,7 @@ class RulesMixin:
             "block_time": self.block_limit if self._i_am_master else 0.0,
             "alert_run": self.alert_on and self.alert_run,
             "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
+            "pingpong": ("1" if self.pp_enabled else "0") if self._i_am_master else "",
             "urgent": self.urgent_on,
             "urgent_band": self.urgent_key[0],
             "urgent_mode": self.urgent_key[1],
@@ -516,7 +518,7 @@ class RulesMixin:
 
     def _pingpong_state(self, now):
         """(locked, holder station) for this PC as an INB."""
-        if self._my_role_now() != "INB":
+        if not self.pp_enabled or self._my_role_now() != "INB":
             return False, None
         mine = self._local_station()
         if mine is None or not mine.key:

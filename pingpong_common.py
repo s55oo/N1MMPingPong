@@ -304,6 +304,7 @@ class Peer:
         self.colors = {}
         self.block_time = 0.0
         self.block_time_run = 0.0
+        self.pingpong = ""  # master only: "1" ping-pong lock on, "0" off
         self.alert_run = False
         self.urgent = False
         self.urgent_band = ""
