@@ -38,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.88`.
+  `PingPong - MASTER UDP 12062 v1.89`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -157,6 +157,8 @@ the lamp downloads it if it is missing. One Overview per PC.
   (`Update 2 lamps…` / `All lamps v1.68 ✔`). Every lamp that needs it
   downloads the newest release and restarts, and no one has to touch the
   other PCs. Lamps accept commands only from the master PC.
+- **Statistics ▾:** reset the counters now, or **planned at the contest
+  start** (e.g. Saturday 01:00) – so nobody has to remember it.
 - **Function key statistics:** per station, how many transmissions F1–F12
   started, plus total TX time. Kept over restarts, with CSV export.
 - **Activity:** per station, how often and how long it waited
@@ -189,7 +191,9 @@ the lamp downloads it if it is missing. One Overview per PC.
      if it is missing).
    - **Update all lamps…**.
    - Wait until every row is **green** (`✔ READY`).
-   - **Reset** the function key statistics.
+   - **Statistics ▾ → Reset at contest start…** – proposes the next
+     Saturday 01:00 local (CQ WW start); the counters go to zero by
+     themselves at that moment, and the yellow button shows the plan.
 3. **During the contest:**
    - Lamps show who is on the air.
    - F12 asks S&P stations to hold off. F12 from Run stops everyone for
@@ -245,7 +249,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 135 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 139 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

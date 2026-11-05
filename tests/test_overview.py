@@ -504,5 +504,63 @@ class RemoveStationTest(unittest.TestCase):
         self.assertIn(row["tag"], ("ready_ok", "ready_bad"))  # in the ready check again
 
 
+class PlannedResetTest(unittest.TestCase):
+    """Statistics ▾ → Reset at contest start (default: next Saturday 01:00)."""
+
+    def make(self):
+        import configparser
+
+        o = make_overview()
+        o.cfg = configparser.ConfigParser()
+        o.cfg.add_section("stats")
+        o.cfg_path = os.path.join(tempfile.mkdtemp(), "ov.ini")
+        o.reset_at = 0.0
+        return o
+
+    def test_next_contest_start_is_saturday_0100(self):
+        for day in range(1, 15):  # two weeks of starting points
+            now = time.mktime((2026, 11, day, 15, 30, 0, 0, 0, -1))
+            start = ov.next_contest_start(now)
+            t = time.localtime(start)
+            self.assertEqual((t.tm_wday, t.tm_hour, t.tm_min), (5, 1, 0))
+            self.assertTrue(0 < start - now <= 7 * 86400)
+        fri = time.mktime((2026, 11, 27, 23, 0, 0, 0, 0, -1))
+        self.assertEqual(time.strftime("%Y-%m-%d %H:%M", time.localtime(ov.next_contest_start(fri))),
+                         "2026-11-28 01:00")
+
+    def test_parse_when(self):
+        a = ov.parse_when("2026-11-28 01:00")
+        self.assertEqual(a, ov.parse_when("28.11.2026 01:00"))
+        self.assertEqual(time.strftime("%d %H:%M", time.localtime(a)), "28 01:00")
+        self.assertIsNone(ov.parse_when("Saturday"))
+
+    def test_reset_when_due(self):
+        o = self.make()
+        hello(o, "A", "PC1", "RUN1")
+        relay(o, "A", "RUN1", "True", "F1 CQ")
+        relay(o, "A", "RUN1", "False", "F1 CQ")
+        self.assertTrue(o.stats)
+        o.stats_since = time.time() - 100
+        o._set_reset_at(time.time() + 60)
+        self.assertFalse(o._check_planned_reset(time.time()))  # not yet
+        self.assertTrue(o.stats)
+        self.assertTrue(o._check_planned_reset(time.time() + 61))
+        self.assertEqual(o.stats, {})
+        self.assertEqual(o.reset_at, 0.0)
+        self.assertEqual(o.cfg.get("stats", "reset_at"), "")
+        log = open(o.events_path, encoding="utf-8-sig").read()
+        self.assertIn("statistics reset planned", log)
+        self.assertIn("statistics reset;planned for", log)
+
+    def test_no_reset_of_newer_statistics(self):
+        o = self.make()
+        o._set_reset_at(time.time() + 60)
+        o.stats = {"x": {"name": "RUN1"}}
+        o.stats_since = time.time() + 120  # already reset after the planned time
+        self.assertFalse(o._check_planned_reset(time.time() + 300))
+        self.assertTrue(o.stats)
+        self.assertEqual(o.reset_at, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

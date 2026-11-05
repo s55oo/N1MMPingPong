@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.88 · Made by **S55OO** with AI assistance.
+> **Version:** 1.89 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -260,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.88`
-  (the others just `PingPong UDP 12062 v1.88`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.89`
+  (the others just `PingPong UDP 12062 v1.89`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -613,7 +613,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.88 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.89 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -643,7 +643,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.88 ✔** when every lamp is current – then a
+lists them), **All lamps v1.89 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -661,6 +661,23 @@ number), **Total** and the total **TX time** – plus an **All** row.
   and on close), so a restart during the contest loses nothing.
 - **Save CSV…** exports the table (for Excel: `;`-separated);
   **Reset…** sets everything to zero, e.g. before the contest starts.
+
+**Statistics ▾ – reset now or at the contest start.** So nobody has to
+remember to reset the counters at 01:00 on Saturday night:
+
+- **Reset statistics now…** – the same as **Reset…** (asks first).
+- **Reset at contest start…** – asks for a date and time, proposing the
+  **next Saturday 01:00 local** (CQ WW starts Saturday 00:00 UTC = 01:00
+  CET); you can type another, e.g. `2026-11-28 01:00` or
+  `28.11.2026 01:00`. Until then the button is **yellow** and reads
+  `Statistics ▾ (reset Sat 28.11. 01:00)`, and the line at the bottom
+  counts down. At that moment the function key and activity statistics
+  are set to zero by themselves (logged as `statistics reset · planned
+  for …`). The plan is kept in `pingpong_overview.ini`, so it survives a
+  restart; if the Overview is not running at that time, it resets as soon
+  as it starts – but only statistics older than the planned time.
+- **Cancel planned reset**, **Contest report…** and **Save CSV…** are there
+  too.
 
 **Emergency ▾ – for emergencies only.** Two commands for every lamp:
 

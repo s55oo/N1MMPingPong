@@ -126,6 +126,33 @@ def tx_minutes(seconds):
     return max(0.1, round(seconds / 60.0, 1))
 
 
+def next_contest_start(now):
+    """Next Saturday 01:00 local time (CQ WW starts 00:00 UTC = 01:00 CET).
+    On a Saturday before 01:00 that is the same day."""
+    t = time.localtime(now)
+    days = (5 - t.tm_wday) % 7  # Monday = 0 ... Saturday = 5
+    start = time.mktime((t.tm_year, t.tm_mon, t.tm_mday + days, 1, 0, 0, 0, 0, -1))
+    if start <= now:
+        start = time.mktime((t.tm_year, t.tm_mon, t.tm_mday + days + 7, 1, 0, 0, 0, 0, -1))
+    return start
+
+
+def parse_when(text):
+    """'2026-11-28 01:00' or '28.11.2026 01:00' (local time) -> epoch, else None."""
+    text = " ".join((text or "").split())
+    for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y %H.%M", "%Y-%m-%d %H.%M"):
+        try:
+            return time.mktime(time.strptime(text, fmt))
+        except ValueError:
+            pass
+    return None
+
+
+def fmt_when(epoch):
+    """'Sat 28.11. 01:00'."""
+    return time.strftime("%a %d.%m. %H:%M", time.localtime(epoch))
+
+
 def fmt_ms(ms):
     """Round-trip time: one decimal below 10 ms (fast LAN), else whole ms."""
     return "{:.1f} ms".format(ms) if ms < 10 else "{:.0f} ms".format(ms)
@@ -234,6 +261,12 @@ class Overview:
             pass
         if not self.cfg.has_section("window"):
             self.cfg.add_section("window")
+        if not self.cfg.has_section("stats"):
+            self.cfg.add_section("stats")
+        try:
+            self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
+        except ValueError:
+            self.reset_at = 0.0
         self._build()
         threading.Thread(target=self._listen, daemon=True).start()
         if web_port:
@@ -1111,14 +1144,88 @@ class Overview:
 
     def _reset_stats(self):
         if not messagebox.askyesno(
-            TITLE, "Reset all statistics (function keys and activity) to zero?", parent=self.root
+            TITLE, "Reset all statistics (function keys and activity) to zero now?", parent=self.root
         ):
             return
+        self._do_reset("by hand")
+
+    def _do_reset(self, how):
         with self.lock:
             self.stats = {}
             self.stats_since = time.time()
         self._tables_cache = None  # show the empty tables at once
         self._save_stats()
+        self._event("-", "statistics reset", how)
+
+    # ----- planned reset (contest start)
+
+    def _fill_stats_menu(self):
+        m = self.stats_menu
+        m.delete(0, tk.END)
+        m.add_command(label="Reset statistics now…", command=self._reset_stats)
+        m.add_command(label="Reset at contest start…  (set date and time)", command=self._plan_reset)
+        if self.reset_at:
+            m.add_command(label="Cancel planned reset  ({})".format(fmt_when(self.reset_at)),
+                          command=lambda: self._set_reset_at(0.0))
+        m.add_separator()
+        m.add_command(label="Contest report…", command=self._contest_report)
+        m.add_command(label="Save CSV…", command=self._export_csv)
+
+    def _plan_reset(self):
+        """Ask when the statistics should be reset (default: next Saturday 01:00)."""
+        default = self.reset_at if self.reset_at > time.time() else next_contest_start(time.time())
+        while True:
+            text = simpledialog.askstring(
+                TITLE, "Reset the statistics automatically at (local time):\n"
+                "format 2026-11-28 01:00 or 28.11.2026 01:00\n\n"
+                "CQ WW starts Saturday 00:00 UTC = 01:00 local (CET).",
+                initialvalue=time.strftime("%Y-%m-%d %H:%M", time.localtime(default)),
+                parent=self.root)
+            if text is None:
+                return
+            when = parse_when(text)
+            if when is None:
+                messagebox.showwarning(TITLE, "Not a date and time: {}".format(text), parent=self.root)
+            elif when <= time.time():
+                messagebox.showwarning(TITLE, "That time is already past.", parent=self.root)
+            else:
+                break
+        self._set_reset_at(when)
+        messagebox.showinfo(TITLE, "Statistics will be reset at {} (in {}).\n\nThe Overview must be "
+                            "running then – if it starts later, it resets at once.".format(
+                                fmt_when(when), ago(when - time.time())), parent=self.root)
+
+    def _set_reset_at(self, when):
+        self.reset_at = float(when or 0)
+        self.cfg.set("stats", "reset_at", "{:.0f}".format(self.reset_at) if self.reset_at else "")
+        self._save()
+        self._event("-", "statistics reset planned" if when else "planned reset cancelled",
+                    fmt_when(when) if when else "")
+        self._show_reset_plan()
+
+    def _show_reset_plan(self):
+        if getattr(self, "stats_button", None) is None:
+            return
+        if self.reset_at:
+            text, bg = "Statistics ▾  (reset {})".format(fmt_when(self.reset_at)), "#ffe08a"
+        else:
+            text, bg = "Statistics ▾", self._stats_button_bg
+        if self.stats_button.cget("text") != text:
+            self.stats_button.configure(text=text, bg=bg, activebackground=bg)
+
+    def _check_planned_reset(self, now):
+        """Planned reset due? Also when the Overview was not running at that
+        moment: statistics older than the planned time are reset at start."""
+        if not self.reset_at or now < self.reset_at:
+            return False
+        when = self.reset_at
+        self.reset_at = 0.0
+        self.cfg.set("stats", "reset_at", "")
+        self._save()
+        if self.stats_since < when:
+            self._do_reset("planned for " + fmt_when(when))
+            return True
+        return False
 
     def _pp_limit(self):
         """Ping-pong release time the master reports (default 40 s)."""
@@ -1319,6 +1426,12 @@ class Overview:
         setup_menu.add_command(label="Restore setup…", command=self._restore_setup)
         setup.configure(menu=setup_menu)
         setup.pack(**pad)
+        # Statistics: reset now, or at the contest start (planned, shown on the button).
+        self.stats_button = tk.Menubutton(row2, text="Statistics ▾", relief=tk.RAISED)
+        self.stats_menu = tk.Menu(self.stats_button, tearoff=0, postcommand=self._fill_stats_menu)
+        self.stats_button.configure(menu=self.stats_menu)
+        self.stats_button.pack(**pad)
+        self._stats_button_bg = self.stats_button.cget("bg")
         # Shown only when a newer Overview is on GitHub (exe only).
         self.update_button = tk.Button(row2, text="Update Overview…", command=self._update_self,
                                        bg="#ffe08a")
@@ -1660,6 +1773,8 @@ class Overview:
         self.root.after(REFRESH_MS, self._refresh)
 
     def _refresh_body(self):
+        self._check_planned_reset(time.time())
+        self._show_reset_plan()
         if self.self_update is not None:
             if not self.update_button.winfo_ismapped():
                 self.update_button.configure(
@@ -1720,6 +1835,9 @@ class Overview:
         if time.time() - self._stats_saved > STATS_SAVE:
             self._save_stats()
         notes = list(snap["notes"])
+        if self.reset_at:
+            notes.insert(0, "statistics reset planned: {} (in {})".format(
+                fmt_when(self.reset_at), ago(max(0, self.reset_at - time.time()))))
         if self.web_port and not self.web_error:
             notes.append("web page: " + "  or  ".join(self.web_urls()[:3]))
         self.foot.configure(text="   ·   ".join(notes))
