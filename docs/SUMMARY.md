@@ -92,6 +92,9 @@ Full manual: [README](../README.md). How it talks on the network:
 
 ## 2. The Overview (on the master PC)
 
+Started from the **master's lamp** (**Options ▾ → Open PingPong Overview…**);
+the lamp downloads it if it is missing. One Overview per PC.
+
 ![PingPong Overview – ready check, all green](overview.png)
 
 - **One live table** of every station:
@@ -153,7 +156,9 @@ Full manual: [README](../README.md). How it talks on the network:
      (Run = RUN, S&P = INB).
    - Turn on **F12 call** and, where wanted, **Block my F-keys**.
 2. **Before the start, on the master PC:**
-   - Start the Overview.
+   - Start the Overview from the master's lamp: **Options ▾ → Open
+     PingPong Overview…** (only on the master; it downloads the Overview
+     if it is missing).
    - **Update all lamps…**.
    - Wait until every row is **green** (`✔ READY`).
    - **Reset** the function key statistics.
@@ -202,7 +207,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 96 tests) run on every push before
+- **Automated tests** (`tests/`, 98 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

@@ -1549,6 +1549,14 @@ def main():
     parser.add_argument("--web-port", type=int, default=WEB_PORT,
                         help="port of the web page (default 8046, 0 = no web page)")
     args = parser.parse_args()
+    after_update = os.environ.pop("PINGPONG_AFTER_UPDATE", "") == "1"
+    if not pp.claim_single_instance(15.0 if after_update else 3.0, pp.OVERVIEW_MUTEX):
+        hidden = tk.Tk()
+        hidden.withdraw()
+        messagebox.showinfo(TITLE, "PingPong Overview is already running on this PC.",
+                            parent=hidden)
+        hidden.destroy()
+        return
     root = tk.Tk()
     try:
         root.iconbitmap(default=resource("pingpong.ico"))

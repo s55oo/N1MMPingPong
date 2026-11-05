@@ -525,5 +525,35 @@ class RobustnessTest(unittest.TestCase):
         self.assertEqual(app.root.scheduled[-1][0], 120)
 
 
+class OpenOverviewTest(unittest.TestCase):
+    """Open PingPong Overview… works only on the master's lamp."""
+
+    def setUp(self):
+        self.started = []
+        self.saved = (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile, m.instance_running)
+        m.upd.is_frozen = lambda: True
+        m.upd.relaunch = lambda exe, args, after_update=True: self.started.append(
+            (exe, after_update))
+        m.os.path.isfile = lambda path: True
+        m.instance_running = lambda name: False
+
+    def tearDown(self):
+        (m.upd.is_frozen, m.upd.relaunch, m.os.path.isfile, m.instance_running) = self.saved
+
+    def test_not_master_does_nothing(self):
+        app = make_lamp(_i_am_master=False)
+        app._open_overview()
+        self.assertEqual(self.started, [])
+
+    def test_master_starts_overview_next_to_lamp(self):
+        app = make_lamp(_i_am_master=True)
+        app._open_overview()
+        self.assertEqual(len(self.started), 1)
+        exe, after_update = self.started[0]
+        self.assertTrue(exe.endswith(m.OVERVIEW_EXE))
+        self.assertFalse(after_update)
+        self.assertIn("Overview started", app.events)
+
+
 if __name__ == "__main__":
     unittest.main()

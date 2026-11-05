@@ -440,6 +440,19 @@ class DisplayApp(RulesMixin):
             state=tk.DISABLED,
         )
         menu.add_separator()
+        if self._i_am_master:
+            menu.add_command(
+                label="Open PingPong Overview…",
+                command=self._open_overview,
+                state=tk.DISABLED if self._busy else tk.NORMAL,
+            )
+        else:
+            master = self.peer_name(self._master_peer) if self._master_peer else "?"
+            menu.add_command(
+                label="Open PingPong Overview  (only on master {})".format(master),
+                state=tk.DISABLED,
+            )
+        menu.add_separator()
         frozen = upd.is_frozen()
         state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
         menu.add_command(
@@ -1803,6 +1816,84 @@ class DisplayApp(RulesMixin):
         self._key_event("ping-pong lock {} (for all PCs)".format("ON" if on else "OFF"))
         self.hello_now.set()  # tell all lamps right away
 
+    # ----- Overview (started from the master's lamp only) -----
+
+    def _open_overview(self):
+        """Start PingPong Overview on this (master) PC. Its exe sits next
+        to the lamp's; if it is missing, offer to download it."""
+        if not self._i_am_master or self._busy:
+            return
+        if instance_running(OVERVIEW_MUTEX):
+            messagebox.showinfo(
+                "PingPong", "PingPong Overview is already running on this PC.",
+                parent=self.root)
+            return
+        if not upd.is_frozen():  # from source: run the .py next to us
+            script = os.path.join(app_dir(), "pingpong_overview.py")
+            try:
+                import subprocess
+
+                subprocess.Popen([sys.executable, script], cwd=app_dir())
+                self._key_event("Overview started")
+            except OSError as exc:
+                messagebox.showerror("PingPong", "Could not start the Overview:\n{}".format(exc),
+                                     parent=self.root)
+            return
+        target = os.path.join(os.path.dirname(upd.exe_path()), OVERVIEW_EXE)
+        if os.path.isfile(target):
+            self._start_overview(target)
+            return
+        self._busy = True
+        self._status = "looking for PingPong Overview…"
+        self._run_bg(lambda: upd.fetch_releases(OVERVIEW_EXE),
+                     lambda rels, err: self._offer_overview(target, rels, err))
+
+    def _offer_overview(self, target, releases, error):
+        self._busy = False
+        self._status = ""
+        if error is not None or not releases:
+            messagebox.showerror(
+                "PingPong",
+                "{} is not next to the lamp and could not be downloaded:\n{}".format(
+                    OVERVIEW_EXE, error or "no release carries it"),
+                parent=self.root)
+            return
+        rel = releases[0]
+        if not messagebox.askyesno(
+            "PingPong",
+            "{} is not in\n{}\n\nDownload PingPong Overview v{} ({:.1f} MB) from GitHub "
+            "and start it?".format(OVERVIEW_EXE, os.path.dirname(target), rel["version"],
+                                   (rel["size"] or 0) / 1e6),
+            parent=self.root,
+        ):
+            return
+        self._busy = True
+        self._status = "downloading PingPong Overview v{}…".format(rel["version"])
+
+        def work():
+            part = upd.download(rel, target)
+            os.replace(part, target)
+            return target
+
+        self._run_bg(work, self._overview_downloaded)
+
+    def _overview_downloaded(self, target, error):
+        self._busy = False
+        self._status = ""
+        if error is not None:
+            messagebox.showerror("PingPong", "Download failed:\n{}".format(error),
+                                 parent=self.root)
+            return
+        self._start_overview(target)
+
+    def _start_overview(self, target):
+        try:
+            upd.relaunch(target, [], after_update=False)
+            self._key_event("Overview started")
+        except OSError as exc:
+            messagebox.showerror("PingPong", "Could not start the Overview:\n{}".format(exc),
+                                 parent=self.root)
+
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())
         self.settings.set("share_n1mm", self.relay_on)
@@ -1945,10 +2036,28 @@ def on_screen(x, y):
     except Exception:
         return True
 
-_instance_mutex = None  # Windows mutex: one lamp per PC
+_instance_mutex = None  # Windows mutex: one lamp (one Overview) per PC
+LAMP_MUTEX = "Local\\PingPongLamp"
+OVERVIEW_MUTEX = "Local\\PingPongOverview"
+OVERVIEW_EXE = "pingpong_overview.exe"
 
 
-def claim_single_instance(wait):
+def instance_running(name):
+    """True when a program holding mutex `name` runs on this PC."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenMutexW.restype = ctypes.c_void_p
+    handle = kernel32.OpenMutexW(0x00100000, False, name)  # SYNCHRONIZE
+    if handle:
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return True
+    return False
+
+
+def claim_single_instance(wait, name=LAMP_MUTEX):
     """Only one lamp per PC. Waits up to `wait` s for an old one to exit
     (after an update the old lamp closes a moment after starting us)."""
     global _instance_mutex
@@ -1960,7 +2069,7 @@ def claim_single_instance(wait):
     kernel32.CreateMutexW.restype = ctypes.c_void_p
     deadline = time.time() + wait
     while True:
-        handle = kernel32.CreateMutexW(None, False, "Local\\PingPongLamp")
+        handle = kernel32.CreateMutexW(None, False, name)
         if handle and ctypes.get_last_error() != 183:  # ERROR_ALREADY_EXISTS
             _instance_mutex = handle  # held until this process exits
             return True

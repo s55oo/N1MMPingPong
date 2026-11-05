@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.77 · Made by **S55OO** with AI assistance.
+> **Version:** 1.78 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -229,8 +229,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.77`
-  (the others just `PingPong v1.77`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.78`
+  (the others just `PingPong v1.78`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -531,10 +531,19 @@ PC, kept by updates.
 
 ## 3. Overview (pingpong_overview.exe)
 
-A separate program for the **master PC** (or the captain's PC): one live
-table of every PingPong station. Download `pingpong_overview.exe` from
-the [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest),
-put it anywhere and start it – no setup.
+A separate program for the **master PC**: one live table of every
+PingPong station.
+
+**Start it from the master's lamp:** **Options ▾ → Open PingPong
+Overview…**. The item is active only on the master's lamp; on other PCs
+it is greyed out and names the master. The lamp starts
+`pingpong_overview.exe` from its own folder. If the exe is not there, the
+lamp offers to download it from the
+[latest release](https://github.com/s55oo/N1MMPingPong/releases/latest)
+(checked by size and SHA-256), saves it next to `n1mm_lamps.exe` and
+starts it. Only one Overview runs per PC; a second start says it is
+already running. (Lamps accept the Overview's commands only from the
+master PC anyway.)
 
 ![PingPong Overview](docs/overview.png)
 
@@ -567,7 +576,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.77 ✔`), the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.78 ✔`), the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…**, **Always on top**.
 
 **Ready check.** When the Overview starts, every station's row is
@@ -596,7 +605,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.77 ✔** when every lamp is current – then a
+lists them), **All lamps v1.78 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
