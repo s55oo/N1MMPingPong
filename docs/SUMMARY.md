@@ -105,6 +105,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - keyboard watcher not running.
 
   Each row switches to normal colors when that station starts operating.
+- **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
 - **Update all lamps:** one button. Every lamp downloads the newest
   release and restarts, and no one has to touch the other PCs. Lamps
   accept this only from the master PC.

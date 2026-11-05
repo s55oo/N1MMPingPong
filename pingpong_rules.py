@@ -36,6 +36,8 @@ class RulesMixin:
 
         Accepted only from the master PC (the Overview runs there), never
         twice (it arrives on every network), only if meant for this lamp.
+        "pingpong" (lock on/off) is applied by the master lamp, which then
+        passes the setting on to every lamp.
         """
         seen = self.__dict__.setdefault("_commands_seen", [])
         if command["id"] in seen:
@@ -56,6 +58,10 @@ class RulesMixin:
         self._key_event("command '{}' from the master PC".format(command["cmd"]))
         if command["cmd"] == "update":
             self._ui_calls.append(self._remote_update)
+        elif command["cmd"] == "pingpong" and command.get("value") in ("1", "0"):
+            if self._i_am_master:
+                on = command["value"] == "1"
+                self._ui_calls.append(lambda: self._set_pingpong(on))
 
     @locked
     def on_relay(self, src, node_id, data):

@@ -264,7 +264,7 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(app._ui_calls, [])  # not from the master PC
         cmd = m.parse_command(m.make_command("update"))
         app.on_command("10.0.0.9", cmd)
-        app.on_command("10.0.0.9", cmd)
+        app.on_command("10.0.0.9", cmd)  # same command on another network: once
         self.assertEqual(len(app._ui_calls), 1)
 
     def test_master_lamp_takes_command_from_own_pc(self):
@@ -273,6 +273,26 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(len(app._ui_calls), 1)
         app.on_command(MY_IP, m.parse_command(m.make_command("update", to="SOMEONE")))
         self.assertEqual(len(app._ui_calls), 1)
+
+    def test_pingpong_command_only_master_applies(self):
+        other = make_lamp(_i_am_master=False)
+        other._master_peer = peer(other, "M", ["10.0.0.9"], alias="MASTER")
+        other.on_command("10.0.0.9", m.parse_command(m.make_command("pingpong", value="0")))
+        self.assertEqual(other._ui_calls, [])  # only the master lamp applies it
+        master = make_lamp(_i_am_master=True, settings=FakeSettings())
+        master.on_command(MY_IP, m.parse_command(m.make_command("pingpong", value="0")))
+        self.assertEqual(len(master._ui_calls), 1)
+        master._ui_calls[0]()
+        self.assertFalse(master.pp_enabled)
+        self.assertGreater(master.hello_now.count, 0)  # passed on to all lamps at once
+
+
+class FakeSettings:
+    def __init__(self):
+        self.values = {}
+
+    def set_text(self, section, key, value):
+        self.values[(section, key)] = value
 
 
 class LockTest(unittest.TestCase):

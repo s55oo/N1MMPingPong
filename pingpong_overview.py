@@ -418,6 +418,27 @@ class Overview:
                 sock.close()
         return sent
 
+    def _toggle_pingpong(self):
+        """Ping-pong lock ON <-> OFF: asks the master lamp, which passes the
+        setting on to every lamp (the button follows the master's hello)."""
+        current = self.snapshot.get("pingpong", "")
+        if not self._on_master_pc(time.time()):
+            messagebox.showwarning(TITLE, "This PC is not the master PC – the lamps take this "
+                                   "only from the master PC. Run the Overview there.",
+                                   parent=self.root)
+            return
+        if current not in ("1", "0"):
+            messagebox.showinfo(TITLE, "No master heard yet (or the master is older than "
+                                "v1.67) - set it on the master's lamp under Options.",
+                                parent=self.root)
+            return
+        value = "0" if current == "1" else "1"
+        if not self._send_command(pp.make_command("pingpong", value=value)):
+            messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
+            return
+        self.pp_button.configure(text="Ping-pong lock: …")
+        self._pp_sent = time.time()
+
     def _on_master_pc(self, now):
         """Is the master lamp on this PC? Lamps take commands only from it."""
         try:
@@ -695,6 +716,10 @@ class Overview:
         self.update_button = tk.Button(top, text="Update Overview…", command=self._update_self,
                                        bg="#ffe08a")
         tk.Button(top, text="Ready check", command=self._ready_check).pack(side=tk.RIGHT, padx=8)
+        self.pp_button = tk.Button(top, text="Ping-pong lock: ?", width=20,
+                                   command=self._toggle_pingpong)
+        self.pp_button.pack(side=tk.RIGHT)
+        self._pp_sent = 0.0
         self._on_top(save=False)
 
         style = ttk.Style(self.root)
@@ -853,12 +878,14 @@ class Overview:
         rows.sort(key=lambda r: r["sort"])
         live = [l for l in lamps if now - l.hello_seen <= GONE_AFTER]
         warn = False
+        pp_state = ""  # ping-pong lock as the master reports it ("1", "0", "")
         if len(masters) == 1:
             m = masters[0]
             head = "{} lamps  ·  master: {}  ·  F12 block time: S&P call {:g} s, Run call {:g} s".format(
                 len(live), m.name(), m.hello.get("block_time", 0) or 30,
                 m.hello.get("block_time_run", 0) or 5)
             pp_set = m.hello.get("pingpong", "")
+            pp_state = pp_set
             if pp_set:
                 head += "  ·  ping-pong lock: " + ("ON" if pp_set == "1" else "OFF")
         elif masters:
@@ -902,6 +929,7 @@ class Overview:
             },
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
+            "pingpong": pp_state,
             "columns": [[cid, dict((c[0], c[1]) for c in COLUMNS)[cid]] for cid in WEB_ORDER],
             "time": time.strftime("%H:%M:%S"),
         }
@@ -941,6 +969,12 @@ class Overview:
                     self.tree.move(row["id"], "", index)
             else:
                 self.tree.insert("", index, iid=row["id"], values=vals, tags=tags)
+        pp_state = snap.get("pingpong", "")
+        if time.time() - self._pp_sent > 3:  # after a click, wait for the master's answer
+            text, bg = {"1": ("Ping-pong lock: ON", "#3fb950"),
+                        "0": ("Ping-pong lock: OFF", "#d0d0d0")}.get(pp_state, ("Ping-pong lock: ?", "#d0d0d0"))
+            if self.pp_button.cget("text") != text:
+                self.pp_button.configure(text=text, bg=bg, activebackground=bg)
         self.head.configure(text=snap["head"], fg=(
             "#c00000" if snap["warn"] or snap["ready"] == "bad"
             else "#1f8a3b" if snap["ready"] == "ok" else "black"))

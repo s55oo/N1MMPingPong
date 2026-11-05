@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.66 · Made by **S55OO** with AI assistance.
+> **Version:** 1.67 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -318,8 +318,10 @@ Nothing to set; **Options ▾** only shows the current role.
 Untick it on the master and **nobody is locked** – every station may
 transmit without priority; the value reaches all lamps at once. Other
 PCs show it greyed out (`Ping-pong lock: OFF – everybody may transmit
-(set on master RUN1)`), the Overview shows it in its top line. A new
-master keeps the current setting.
+(set on master RUN1)`). The same switch is in the **Overview** on the
+master PC: the button **Ping-pong lock: ON** (green) / **OFF** – one click
+switches it, the master's lamp passes it on to every lamp. A new master
+keeps the current setting.
 
 | Role | Behavior |
 |---|---|
@@ -514,6 +516,10 @@ day two). Checked for each lamp:
 - N1MM data arrives and its band/mode is supported (`no N1MM data`);
 - exactly one master (`no master`, `two masters`);
 - keyboard watcher running where F12 call, F-key block or INB needs it.
+
+**Ping-pong lock: ON / OFF** (button, green when on) switches the
+ping-pong lock for all PCs with one click – the same as the switch in the
+master lamp's Options.
 
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The dialog first lists
