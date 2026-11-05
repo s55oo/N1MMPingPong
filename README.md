@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.60 · Made by **S55OO** with AI assistance.
+> **Version:** 1.61 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -538,6 +538,11 @@ administrator rights; rule `PingPong Overview web page`, TCP 8046).
 - `pingpong_overview.exe [--discovery-port 46070] [--web-port 8046]`
   (`--web-port 0` = no web page). Window place and **Always on top** are
   kept in `pingpong_overview.ini` next to the exe.
+- **Updates itself:** at start (and every 30 min) it looks for a newer
+  release. If there is one, it asks once, and the yellow **Update
+  Overview to vX…** button stays visible – it downloads the new
+  `pingpong_overview.exe`, checks it (size, SHA-256) and restarts; the
+  statistics and window settings are kept.
 
 ---
 
@@ -583,14 +588,15 @@ right, details of the selected packet at the bottom. Needs Python.
 
 Normally you don't need to: every release is built automatically (see
 below). To build locally, with Python installed, double-click
-**`build_exe.bat`**, or run:
+**`build_exe.bat`** – it runs the tests first, then builds both exes.
+By hand:
 
 ```bat
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
-copy /Y dist\n1mm_lamps.exe n1mm_lamps.exe
-python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
-copy /Y dist\pingpong_overview.exe pingpong_overview.exe
+python -m unittest discover -s tests -t tests
+python tools\make_version_info.py
+python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico --version-file build\version_n1mm_lamps.txt n1mm_lamps.py
+python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --version-file build\version_pingpong_overview.txt --add-data "pingpong.ico;." pingpong_overview.py
 ```
 
 **Antivirus false positives:** a locally built EXE can be flagged by
@@ -598,16 +604,26 @@ Windows Defender or other AV engines – PyInstaller's prebuilt bootloader
 is a common heuristic trigger. The released EXE is built by the
 [**Build n1mm_lamps.exe**](.github/workflows/build-exe.yml) GitHub Actions
 workflow, which compiles the PyInstaller bootloader **from source** on a
-clean Windows runner, uses no UPX, and runs a Defender scan on the result.
-Prefer the release download if AV flags a local build.
+clean Windows runner, uses no UPX, gives both exes proper Windows version
+information (product, company, description – unsigned exes without it
+look suspicious to AV heuristics) and scans them with **Windows
+Defender**: a build Defender flags is **never released**. Prefer the
+release download if AV flags a local build.
+
+**Tests first.** Every push runs the automated tests in `tests/` (F12
+calls, Run/S&P, urgent calls, the ping-pong lock, master, commands,
+keyboard decisions, Overview statistics and ready check – Python's
+`unittest`, nothing to install). If one fails, nothing is built or
+released.
 
 **Releases are automatic.** On every push to `main` the workflow reads
-`__version__` from `n1mm_lamps.py`. If release `v<version>` doesn't exist
+`__version__` from `pingpong_version.py`. If release `v<version>` doesn't exist
 yet, it creates the tag and the release, with notes from
 `releases/v<version>.md`, and attaches both freshly built EXEs
 (`n1mm_lamps.exe`, `pingpong_overview.exe`; the lamp's updater only
-uses `n1mm_lamps.exe`). To publish a
-new version: bump `__version__`, add `releases/vX.Y.md`, push to `main`.
+uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`). To publish a
+new version: bump `__version__` in `pingpong_version.py`, add
+`releases/vX.Y.md`, push to `main`.
 Existing releases are never overwritten.
 
 ---
@@ -615,10 +631,16 @@ Existing releases are never overwritten.
 ## 7. Files
 
 ```
-n1mm_lamps.py       – lamp (source)
-pingpong_update.py  – self-update / switch-version logic (built into the exe)
-pingpong_keys.py    – F12 key watcher and F-key block (built into the exe)
-pingpong_overview.py – overview window + web page (source)
+n1mm_lamps.py       – lamp: window, Options menu, updates (start here)
+pingpong_rules.py   – lamp rules: calls, urgent calls, ping-pong lock, master
+pingpong_net.py     – messages and UDP loops (N1MM 12060, lamps 46070)
+pingpong_common.py  – constants, N1MM packet parsing, station records
+pingpong_keys.py    – keyboard watcher: F12, F-key block, Shift+F2/F4
+pingpong_update.py  – self-update / switch-version logic (lamp and Overview)
+pingpong_version.py – the version number (one place)
+pingpong_overview.py – Overview: window + web page
+tests/              – automated tests (run on every push)
+tools/make_version_info.py – Windows version info for the exes
 n1mm_watch.py       – traffic watcher (source)
 PingPong.bat        – watcher launcher
 build_exe.bat       – local one-click EXE build

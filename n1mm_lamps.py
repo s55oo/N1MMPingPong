@@ -20,16 +20,22 @@ Stations are detected automatically; optional lamps.cfg
 ("IP,label,color" per line) gives fixed labels/colors. Per-PC settings
 are kept in pingpong.ini next to the exe.
 
-Made by S55OO with AI assistance.
+The program is split into parts:
 
-Version: 1.60
+- n1mm_lamps.py      - this file: the window, Options menu, updates
+- pingpong_rules.py  - what the lamp decides (calls, lock, master, ...)
+- pingpong_net.py    - messages and UDP loops (N1MM 12060, lamps 46070)
+- pingpong_common.py - constants, N1MM packet parsing, station records
+- pingpong_keys.py   - keyboard watcher (F12, F-key block, Shift+F2/F4)
+- pingpong_update.py - self-update from GitHub releases
+- pingpong_version.py - the version number
+
+Made by S55OO with AI assistance.
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
-
-__version__ = "1.60"
 
 import argparse
 import base64
@@ -42,78 +48,23 @@ import threading
 import time
 import tkinter as tk
 import webbrowser
-import xml.etree.ElementTree as ET
 from tkinter import colorchooser, messagebox, simpledialog
 
 import pingpong_keys as keys
 import pingpong_update as upd
+from pingpong_common import *  # noqa: F401,F403
+from pingpong_common import _float, guarded, log_error  # noqa: F401
+from pingpong_net import *  # noqa: F401,F403
+from pingpong_net import _sender_socket  # noqa: F401
+from pingpong_rules import RulesMixin
+from pingpong_version import __version__
 
-DEFAULT_PORT = 12060
-DEFAULT_STALE = 5.0
-# Keep well away from N1MM's own ports (12060 external broadcast and
-# multi-computer networking, 12070 multi-computer UDP): N1MM tries to
-# parse anything arriving there and throws IndexOutOfRangeException.
-DEFAULT_DISCOVERY_PORT = 46070
-HELLO_INTERVAL = 3.0  # s: lamp-to-lamp hello (sent at once on F12 / name change)
-PEER_TIMEOUT = 12.0  # s: a lamp not heard this long is gone
-NETWORK_REFRESH = 30.0  # s: re-read this PC's network adapters
-LOCAL_N1MM_RECENT = 10.0  # s: own N1MM counts as running if heard this recently
-TEST_LOG = "pingpong_test.log"
-ERROR_LOG = "pingpong_error.log"
-
-
-def log_error(where):
-    """Write the current exception to pingpong_error.log (next to the exe)
-    instead of letting a network thread die silently."""
-    import traceback
-
-    try:
-        path = os.path.join(app_dir(), ERROR_LOG)
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write("{}  v{}  {}\n{}\n".format(
-                time.strftime("%Y-%m-%d %H:%M:%S"), __version__, where,
-                traceback.format_exc(),
-            ))
-    except Exception:
-        pass
-
-
-def guarded(where, func):
-    """Call func(*args); on any error log it and keep the thread alive."""
-    def call(*args):
-        try:
-            return func(*args)
-        except Exception:
-            log_error(where)
-    return call
-BLINK_HALF = 0.4  # s: on / off time when a call (F12) blinks the lamp
-MAX_ALIAS = 12  # characters for "My name"
-SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
-CALL_BORDER = 13  # px: width of the F12 call border around the lamp
-URGENT_WAIT = 3.0  # s: urgent call ends if N1MM starts no transmission by then
-URGENT_HALF = 0.15  # s: fast flash of an urgent call
-STATION_FORGET = 60.0  # s: stations not heard this long leave the footer
-# N1MM may also send its broadcasts to 127.0.0.1; such packets are
-# always from this PC's own N1MM.
-LOOPBACK = {"127.0.0.1"}
-BLOCK_LIMIT = 30.0  # s: default time of an S&P station's F12 call (master can change)
-BLOCK_LIMIT_RUN = 5.0  # s: default time of a Run station's F12 call (master can change)
-BLOCK_RANGE = (1, 30)  # s: allowed F12 call / block times
-
-
-def clamp_block(value, default=BLOCK_LIMIT):
-    """F12 call/block time within BLOCK_RANGE (0 or missing = default)."""
-    if not value:
-        return default
-    return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
-PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
-NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
-FIREWALL_RULE = "PingPong lamps UDP"
-ROLES = ("off", "RUN", "INB")
 HELP_URL = "https://github.com/s55oo/N1MMPingPong"
+
 HELP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABY0lEQVR4nGNgoDJgxCcplb/1PzbxZxO9cepjJMUgYgxmxGcYIyMDQ4ajEkOCjTyDBD8Hw6N33xhm7r/PsOTYI5yGMuFzWaKtAkOJpypD08brDDrVuxmm7rnL0BqizRBpIYtTDxNOCUZGhmIPVYaFRx4xbL34guHzjz8MK04+YVhx4jFYHJdDmHAED4OGFC+DABcrw77rr1DELz76yCApwMHAw86CVR8TNteBwLWnnxikC7YxHLn1FkVcS5qP4dP33wzffv3F6komBhKArZoIQ6yVHMPsgw8Y/v3HnhCYiDXMWEGQYX6KMcP+G68ZJu66g1MdEzGGMTMxMvRF6jJcefqJIX3BOYa///5TZqCONB+DijgPQ+umGww/f//Dq5aJGAPF+NjB9K2XXwiqZSQ1u+ECz6A5higXRlnIMjyd4MWgL8tPvAspceUzpPzMRGyxRIxhDNi8TIqhRBVfyICcApbqAAC2c3+GEqNjHgAAAABJRU5ErkJggg=="
 )
+
 APP_ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAS/0lEQVR4nN2ba4xdV3XHf2ufc+5r"
     "xuOxxxPi4OBgk9jYsZ1nQ0hgpBDCowm0pUNVQFCqQqEUUakSog9UQYUEX/qhH1paEKpKKx4DFa+q"
@@ -203,707 +154,11 @@ APP_ICON_B64 = (
     "s3KSO0bwT2NPTuqmTHSLEVmtqkMvOAO/HM0gHBIxuzpnmrsPHPjfLvTz8IuS+TV+fP6cPuv/AYYg"
     "73G7MD/GAAAAAElFTkSuQmCC"
 )
-COLOR_IDLE = "#3a3a3a"
-COLOR_PALETTE = [
-    "red",
-    "orange",
-    "light blue",
-    "light green",
-    "purple",
-    "cyan",
-    "gold",
-    "pink",
-    "brown",
-    "lime green",
-]
-
-BANDS = [
-    (1.8, 2.0, "1.8"),
-    (3.5, 4.0, "3.5"),
-    (7.0, 7.3, "7"),
-    (14.0, 14.35, "14"),
-    (21.0, 21.45, "21"),
-    (28.0, 29.7, "28"),
-]
-MODES_ALLOWED = {"CW", "RTTY", "SSB"}
-# N1MM reports phone as "SSB" (seen in RadioInfo) or USB/LSB depending on
-# radio/setup; all of them are one group so stations always match.
-MODE_ALIASES = {"USB": "SSB", "LSB": "SSB"}
 
 FONT_SIZES = [(4, 34), (8, 29), (12, 23), (9999, 21)]  # +30 % (v1.30)
 
 
-def band_of(freq_str):
-    try:
-        mhz = float(freq_str) / 100000.0
-    except (TypeError, ValueError):
-        return None
-    for lo, hi, name in BANDS:
-        if lo <= mhz < hi:
-            return name
-    return None
-
-
-def freq_khz(freq):
-    """N1MM Freq (10 Hz units) as kHz text: '1402500' -> '14025.00 kHz'."""
-    try:
-        return "{:.2f} kHz".format(float(freq) / 100.0)
-    except (TypeError, ValueError):
-        return ""
-
-
-def group_of(freq, mode):
-    band = band_of(freq)
-    mode = MODE_ALIASES.get(mode, mode)
-    if not band or mode not in MODES_ALLOWED:
-        return None
-    return band, mode
-
-
-def group_label(key):
-    if not key:
-        return ""
-    return "{} {}".format(key[0], key[1])
-
-
-def clean_caption(caption):
-    caption = caption.strip()
-    cleaned = re.sub(r"^\s*F\d+\s*", "", caption).strip()
-    return cleaned or caption
-
-
-def radio_running(data):
-    """IsRunning from a RadioInfo packet: True = Run, False = S&P, None = n/a."""
-    m = re.search(rb"<IsRunning>\s*(\w+)\s*</IsRunning>", data)
-    if not m:
-        return None
-    return m.group(1).lower() == b"true"
-
-
-def packet_info(data):
-    raw = data.decode("utf-8", errors="replace")
-    start = raw.find("<")
-    if start < 0:
-        return False, "", "", False, "", ""
-    try:
-        root = ET.fromstring(raw[start:])
-    except ET.ParseError:
-        return False, "", "", False, "", ""
-    if root.tag != "RadioInfo":
-        return False, "", "", False, "", ""
-    caption = ""
-    station = ""
-    freq = ""
-    mode = ""
-    is_tx = False
-    for el in root.iter():
-        if el.tag == "FunctionKeyCaption":
-            caption = clean_caption(el.text or "")
-        elif el.tag == "StationName" and el.text and el.text.strip():
-            station = el.text.strip()
-        elif el.tag == "Freq" and el.text and el.text.strip():
-            freq = el.text.strip()
-        elif el.tag == "Mode" and el.text and el.text.strip():
-            mode = el.text.strip().upper()
-        elif el.tag == "IsTransmitting":
-            is_tx = (el.text or "").strip().lower() == "true"
-    return True, caption, station, is_tx, freq, mode
-
-
-def _usable_ip(ip):
-    return bool(ip) and not ip.startswith("127.") and not ip.startswith("169.254.") \
-        and ip != "0.0.0.0"
-
-
-def _broadcast_of(ip, mask):
-    ip_n = struct.unpack("!I", socket.inet_aton(ip))[0]
-    mask_n = struct.unpack("!I", socket.inet_aton(mask))[0]
-    return socket.inet_ntoa(struct.pack("!I", (ip_n | (~mask_n & 0xFFFFFFFF))))
-
-
-def _windows_ipv4_table():
-    """All IPv4 addresses of all adapters (LAN, Wi-Fi, VPN) via iphlpapi.
-
-    Returns [(ip, netmask), ...]. Works regardless of Windows language and
-    of how the host name resolves, unlike gethostbyname_ex().
-    """
-    import ctypes
-    from ctypes import wintypes
-
-    class MIB_IPADDRROW(ctypes.Structure):
-        _fields_ = [
-            ("dwAddr", wintypes.DWORD),
-            ("dwIndex", wintypes.DWORD),
-            ("dwMask", wintypes.DWORD),
-            ("dwBCastAddr", wintypes.DWORD),
-            ("dwReasmSize", wintypes.DWORD),
-            ("unused1", ctypes.c_ushort),
-            ("wType", ctypes.c_ushort),
-        ]
-
-    MIB_IPADDR_DISCONNECTED = 0x0008
-    MIB_IPADDR_DELETED = 0x0040
-    iphlpapi = ctypes.windll.iphlpapi
-    size = wintypes.ULONG(0)
-    iphlpapi.GetIpAddrTable(None, ctypes.byref(size), False)
-    if not size.value:
-        return []
-    buf = ctypes.create_string_buffer(size.value)
-    if iphlpapi.GetIpAddrTable(buf, ctypes.byref(size), False) != 0:
-        return []
-    count = ctypes.cast(buf, ctypes.POINTER(wintypes.DWORD))[0]
-    rows = ctypes.cast(
-        ctypes.addressof(buf) + ctypes.sizeof(wintypes.DWORD),
-        ctypes.POINTER(MIB_IPADDRROW),
-    )
-    result = []
-    for i in range(count):
-        row = rows[i]
-        if row.wType & (MIB_IPADDR_DISCONNECTED | MIB_IPADDR_DELETED):
-            continue
-        ip = socket.inet_ntoa(struct.pack("<I", row.dwAddr))
-        mask = socket.inet_ntoa(struct.pack("<I", row.dwMask))
-        result.append((ip, mask))
-    return result
-
-
-def _route_ip():
-    """IP of the adapter holding the default route (no packet is sent)."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(("10.255.255.255", 1))
-        return sock.getsockname()[0]
-    except OSError:
-        return ""
-    finally:
-        sock.close()
-
-
-def local_networks():
-    """[(ip, broadcast), ...] for every active IPv4 adapter on this PC."""
-    nets = []
-    seen = set()
-
-    def add(ip, mask):
-        if _usable_ip(ip) and ip not in seen:
-            seen.add(ip)
-            try:
-                nets.append((ip, _broadcast_of(ip, mask)))
-            except OSError:
-                pass
-
-    if sys.platform == "win32":
-        try:
-            for ip, mask in _windows_ipv4_table():
-                add(ip, mask)
-        except Exception:
-            pass
-    # Fallbacks (non-Windows, or if the API call failed). Netmask unknown
-    # here, so assume /24, which matches typical home/club networks.
-    candidates = []
-    try:
-        candidates.extend(socket.gethostbyname_ex(socket.gethostname())[2])
-    except OSError:
-        pass
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            candidates.append(info[4][0])
-    except OSError:
-        pass
-    candidates.append(_route_ip())
-    for ip in candidates:
-        add(ip, "255.255.255.0")
-    return nets
-
-
-def local_interfaces():
-    return [ip for ip, _ in local_networks()]
-
-
-def parse_spec(spec):
-    spec = spec.strip()
-    if "," in spec:
-        parts = [p.strip() for p in spec.split(",")]
-    elif ":" in spec:
-        parts = [p.strip() for p in spec.split(":")]
-    else:
-        parts = [spec]
-    ip = parts[0]
-    label = parts[1] if len(parts) > 1 else ""
-    color = parts[2] if len(parts) > 2 else ""
-    return ip, label, color
-
-
-def read_config(config_path):
-    hints = {}
-    if config_path and os.path.exists(config_path):
-        with open(config_path, encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                ip, label, color = parse_spec(line)
-                hints[ip] = (label, color)
-    return hints
-
-
-def write_config(config_path, ip, label, color):
-    if not config_path:
-        return
-    line = ",".join([ip, label or "", color])
-    try:
-        with open(config_path, "a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-    except OSError:
-        pass
-
-
-def open_socket(bind_ip, port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.bind((bind_ip, port))
-    sock.settimeout(0.3)
-    return sock
-
-
-def listener_loop(bind_ip, port, on_packet, stop):
-    try:
-        sock = open_socket(bind_ip, port)
-    except OSError:
-        for ip in local_interfaces():
-            try:
-                sock = open_socket(ip, port)
-                break
-            except OSError:
-                continue
-        else:
-            return
-    while not stop.is_set():
-        try:
-            data, addr = sock.recvfrom(65535)
-        except socket.timeout:
-            continue
-        except OSError:
-            break
-        guarded("N1MM packet", on_packet)(addr[0], data)
-    try:
-        sock.close()
-    except OSError:
-        pass
-
-
-def make_hello(
-    node_id, host, ips, local_n1mm, color="", color_time=0.0,
-    alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
-    n1mm_master="", started=0.0, colors="", block_time=0.0,
-    alert_run=False, block_time_run=0.0,
-    urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0,
-):
-    root = ET.Element("PingPongHello")
-    for tag, value in (
-        ("Id", node_id),
-        ("Host", host),
-        ("Version", __version__),
-        ("Ips", ",".join(ips)),
-        ("LocalN1MM", "true" if local_n1mm else "false"),
-        ("Color", color or ""),
-        ("ColorTime", "{:.3f}".format(color_time or 0.0)),
-        ("Alert", "1" if alert else "0"),
-        ("AlertBand", alert_band or ""),
-        ("AlertTime", "{:.3f}".format(alert_time or 0.0)),
-        ("Status", status or ""),
-        ("Alias", alias or ""),
-        ("Role", role or ""),
-        ("N1MMMaster", n1mm_master or ""),
-        ("Started", "{:.3f}".format(started or 0.0)),
-        ("Colors", colors or ""),
-        ("BlockTime", "{:g}".format(block_time) if block_time else ""),
-        ("AlertRun", "1" if alert_run else "0"),
-        ("BlockTimeRun", "{:g}".format(block_time_run) if block_time_run else ""),
-        ("Urgent", "1" if urgent else "0"),
-        ("UrgentBand", urgent_band or ""),
-        ("UrgentMode", urgent_mode or ""),
-        ("UrgentTime", "{:.3f}".format(urgent_time or 0.0)),
-    ):
-        ET.SubElement(root, tag).text = value
-    return ET.tostring(root, encoding="utf-8")
-
-
-def parse_hello(data):
-    try:
-        root = ET.fromstring(data.decode("utf-8", errors="replace"))
-    except ET.ParseError:
-        return None
-    if root.tag != "PingPongHello":
-        return None
-
-    def get(tag):
-        return (root.findtext(tag) or "").strip()
-
-    node_id = get("Id")
-    if not node_id:
-        return None
-    return {
-        "id": node_id,
-        "host": get("Host"),
-        "version": get("Version"),
-        "ips": [ip.strip() for ip in get("Ips").split(",") if ip.strip()],
-        "local_n1mm": get("LocalN1MM").lower() == "true",
-        "color": get("Color"),
-        "color_time": _float(get("ColorTime")),
-        "alert": get("Alert") == "1",
-        "alert_band": get("AlertBand"),
-        "alert_time": _float(get("AlertTime")),
-        "status": get("Status"),
-        "alias": get("Alias"),
-        "role": get("Role"),
-        "n1mm_master": get("N1MMMaster"),
-        "started": _float(get("Started")),
-        "colors": parse_colors(get("Colors")),
-        "block_time": _float(get("BlockTime")),
-        "alert_run": get("AlertRun") == "1",
-        "block_time_run": _float(get("BlockTimeRun")),
-        "urgent": get("Urgent") == "1",
-        "urgent_band": get("UrgentBand"),
-        "urgent_mode": get("UrgentMode"),
-        "urgent_time": _float(get("UrgentTime")),
-    }
-
-
-def format_colors(mapping):
-    """{'pc:oo840g4': 'red', ...} -> 'pc:oo840g4=red;...' for the hello."""
-    return ";".join("{}={}".format(k, v) for k, v in sorted(mapping.items()))
-
-
-def parse_colors(text):
-    result = {}
-    for part in (text or "").split(";"):
-        key, sep, value = part.partition("=")
-        if sep and key.strip() and value.strip():
-            result[key.strip()] = value.strip()
-    return result
-
-
-def n1mm_ini_path():
-    """N1MM Logger+ settings file: Documents\\N1MM Logger+\\N1MM Logger.ini."""
-    docs = ""
-    if sys.platform == "win32":
-        try:
-            import ctypes
-
-            buf = ctypes.create_unicode_buffer(1024)
-            # CSIDL_PERSONAL = 5: the real Documents folder (also if moved).
-            if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0:
-                docs = buf.value
-        except Exception:
-            docs = ""
-    if not docs:
-        docs = os.path.join(os.path.expanduser("~"), "Documents")
-    return os.path.join(docs, "N1MM Logger+", "N1MM Logger.ini")
-
-
-def read_n1mm_master(path):
-    """True/False from [NetworkStatus] IsNetworkMaster; None if no file."""
-    try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            section = ""
-            for line in fh:
-                line = line.strip()
-                if line.startswith("[") and line.endswith("]"):
-                    section = line[1:-1].strip().lower()
-                elif section == "networkstatus" and "=" in line:
-                    key, _, value = line.partition("=")
-                    if key.strip().lower() == "isnetworkmaster":
-                        return value.strip().lower() == "true"
-    except OSError:
-        return None
-    return False
-
-
-def _float(text):
-    try:
-        return float(text)
-    except ValueError:
-        return 0.0
-
-
-def _sender_socket(ip):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.bind((ip, 0))
-    return sock
-
-
-RELAY_MAGIC = b"PPR1"  # lamp-to-lamp copy of this PC's N1MM RadioInfo
-DIRECT_RECENT = 15.0  # s: prefer N1MM's own broadcast over a relayed copy
-
-
-def make_relay(node_id, data):
-    return RELAY_MAGIC + node_id.encode("ascii") + b"\n" + data
-
-
-COMMAND_MAGIC = b"PPC1"  # command from PingPong Overview on the master PC
-
-
-def make_command(cmd, to="*", **args):
-    """Overview -> lamps: e.g. make_command("update")."""
-    import json
-    import uuid
-
-    body = {"id": uuid.uuid4().hex, "cmd": cmd, "to": to}
-    body.update(args)
-    return COMMAND_MAGIC + json.dumps(body).encode("utf-8")
-
-
-def parse_command(data):
-    """dict of a command message, or None."""
-    if not data.startswith(COMMAND_MAGIC):
-        return None
-    import json
-
-    try:
-        body = json.loads(data[len(COMMAND_MAGIC):].decode("utf-8"))
-    except ValueError:
-        return None
-    if not isinstance(body, dict) or not body.get("id") or not body.get("cmd"):
-        return None
-    return body
-
-
-def parse_relay(data):
-    """(node_id, N1MM packet) of a relay message, or None."""
-    if not data.startswith(RELAY_MAGIC):
-        return None
-    head, sep, payload = data[len(RELAY_MAGIC):].partition(b"\n")
-    if not sep or not head:
-        return None
-    return head.decode("ascii", errors="replace"), payload
-
-
-def send_relay(share, payload):
-    """Broadcast a relay message on every network (any thread)."""
-    for sock, bcast in list(share.get("targets", ())):
-        try:
-            sock.sendto(payload, (bcast, share["port"]))
-        except OSError:
-            pass
-
-
-def discovery_loop(
-    port, node_id, get_state, on_networks, on_hello, stop, hello_now=None,
-    share=None, on_relay=None, on_command=None,
-):
-    """Active discovery between PCs running PingPong.
-
-    Every HELLO_INTERVAL seconds a small PingPongHello packet is broadcast
-    on every active adapter (LAN, Wi-Fi, VPN) on the discovery port, which
-    is separate from N1MM's 12060 so N1MM and other loggers never see it.
-    Hellos from other PCs make them known even if their N1MM sends nothing;
-    our own hello coming back tells us which of our addresses are live.
-    """
-    try:
-        recv = open_socket("0.0.0.0", port)
-    except OSError:
-        recv = None
-    host = socket.gethostname()
-    senders = {}
-    nets = []
-    next_refresh = 0.0
-    next_hello = 0.0
-    while not stop.is_set():
-        try:
-            now = time.time()
-            if now >= next_refresh:
-                nets = local_networks()
-                wanted = set(ip for ip, _ in nets)
-                for ip in list(senders):
-                    if ip not in wanted:
-                        try:
-                            senders.pop(ip).close()
-                        except OSError:
-                            pass
-                for ip in wanted:
-                    if ip not in senders:
-                        try:
-                            senders[ip] = _sender_socket(ip)
-                        except OSError:
-                            pass
-                on_networks(nets)
-                if share is not None:
-                    share["port"] = port
-                    share["targets"] = [
-                        (senders[ip], bcast) for ip, bcast in nets if ip in senders
-                    ]
-                next_refresh = now + NETWORK_REFRESH
-            if hello_now is not None and hello_now.is_set():
-                hello_now.clear()  # e.g. F12 pressed: announce right away
-                next_hello = 0.0
-            if now >= next_hello:
-                payload = make_hello(
-                    node_id, host, [ip for ip, _ in nets], **get_state()
-                )
-                for ip, bcast in nets:
-                    sock = senders.get(ip)
-                    if sock is None:
-                        continue
-                    for target in (bcast, "255.255.255.255"):
-                        try:
-                            sock.sendto(payload, (target, port))
-                        except OSError:
-                            pass
-                next_hello = now + HELLO_INTERVAL
-        except Exception:
-            # Never let one error stop all lamp-to-lamp messages.
-            log_error("discovery send")
-            next_hello = time.time() + HELLO_INTERVAL
-            stop.wait(1.0)
-        if recv is None:
-            stop.wait(0.3)
-            continue
-        try:
-            data, addr = recv.recvfrom(65535)
-        except socket.timeout:
-            continue
-        except OSError:
-            stop.wait(0.3)
-            continue
-        command = parse_command(data)
-        if command is not None:
-            if on_command is not None:
-                guarded("command", on_command)(addr[0], command)
-            continue
-        relay = parse_relay(data)
-        if relay is not None:
-            if on_relay is not None:
-                guarded("relay", on_relay)(addr[0], relay[0], relay[1])
-            continue
-        info = parse_hello(data)
-        if info:
-            guarded("hello", on_hello)(addr[0], info)
-    for sock in list(senders.values()) + ([recv] if recv else []):
-        try:
-            sock.close()
-        except OSError:
-            pass
-
-
-PORT_CHECK = 30.0  # s: how often to look for other programs on N1MM's port
-
-
-def port_users(port):
-    """Names of other programs (not this one) listening on UDP port.
-
-    Windows only (GetExtendedUdpTable); [] elsewhere or on any error.
-    Two programs on N1MM's port means Windows gives each packet sent to
-    127.0.0.1 to only one of them - the lamp then misses N1MM data.
-    """
-    if sys.platform != "win32":
-        return []
-    import ctypes
-    from ctypes import wintypes
-
-    iphlp = ctypes.WinDLL("iphlpapi")
-    size = wintypes.DWORD(0)
-    AF_INET, UDP_TABLE_OWNER_PID = 2, 1
-    iphlp.GetExtendedUdpTable(None, ctypes.byref(size), False, AF_INET, UDP_TABLE_OWNER_PID, 0)
-    buf = ctypes.create_string_buffer(size.value + 1024)
-    size = wintypes.DWORD(len(buf))
-    if iphlp.GetExtendedUdpTable(buf, ctypes.byref(size), False, AF_INET, UDP_TABLE_OWNER_PID, 0):
-        return []
-    count = struct.unpack_from("<I", buf, 0)[0]
-    me = os.getpid()
-    pids = set()
-    for i in range(count):
-        _addr, rport, pid = struct.unpack_from("<III", buf, 4 + 12 * i)
-        if socket.ntohs(rport & 0xFFFF) == port and pid not in (me, 0):
-            pids.add(pid)
-    names = []
-    for pid in sorted(pids):
-        names.append(_process_name(pid) or "PID {}".format(pid))
-    # PyInstaller onefile: our own launcher process has the same exe name
-    # but owns no socket, so it never shows up here.
-    return sorted(set(names))
-
-
-def _process_name(pid):
-    try:
-        import ctypes
-        from ctypes import wintypes
-
-        kernel32 = ctypes.WinDLL("kernel32")
-        kernel32.OpenProcess.restype = wintypes.HANDLE
-        handle = kernel32.OpenProcess(0x1000, False, pid)
-        if not handle:
-            return ""
-        try:
-            buf = ctypes.create_unicode_buffer(1024)
-            size = wintypes.DWORD(len(buf))
-            if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-                return os.path.basename(buf.value)
-            return ""
-        finally:
-            kernel32.CloseHandle(handle)
-    except Exception:
-        return ""
-
-
-def port_watch_loop(port, out, stop):
-    """Background: out[port] = other programs on the port, every 30 s."""
-    stop.wait(3.0)
-    while not stop.is_set():
-        try:
-            out[port] = port_users(port)
-        except Exception:
-            out[port] = []
-        stop.wait(PORT_CHECK)
-
-
-class Peer:
-    def __init__(self, node_id):
-        self.id = node_id
-        self.host = ""
-        self.version = ""
-        self.ips = set()
-        self.local_n1mm = False
-        self.alias = ""
-        self.role = ""
-        self.n1mm_master = None
-        self.started = 0.0
-        self.colors = {}
-        self.block_time = 0.0
-        self.block_time_run = 0.0
-        self.alert_run = False
-        self.urgent = False
-        self.urgent_band = ""
-        self.urgent_mode = ""
-        self.urgent_time = 0.0
-        self.color = ""
-        self.color_time = 0.0
-        self.alert = False
-        self.alert_band = ""
-        self.alert_time = 0.0
-        self.last_seen = 0.0
-
-
-class Station:
-    def __init__(self, ip, label, color):
-        self.ip = ip
-        self.label = label or ip
-        self.color = color
-        self.count = 0
-        self.msg = ""
-        self.msg_time = 0.0
-        self.tx = False
-        self.last_seen = 0.0
-        self.freq = ""
-        self.mode = ""
-        self.key = None
-        self.running = None  # True = Run, False = S&P, None = unknown
-        self.direct_seen = 0.0  # last packet straight from N1MM (not relayed)
-
-
-class DisplayApp:
+class DisplayApp(RulesMixin):
     def __init__(self, root, config_path, port, stale, discovery_port=None):
         self.root = root
         self.port = port
@@ -915,6 +170,8 @@ class DisplayApp:
         self.local = set(self.local_nets) | LOOPBACK
         self.stations = {}
         self.peers = {}
+        # One lock for the station / lamp lists (UDP, discovery, window).
+        self.lock = threading.RLock()
         self.node_id = base64.b16encode(os.urandom(6)).decode("ascii")
         self.used_colors = set(color for _, color in self.hints.values() if color)
         self.tracked = None
@@ -1035,34 +292,6 @@ class DisplayApp:
             upd.cleanup_leftovers(upd.exe_path())
             if self.var_check.get():
                 self.root.after(3000, lambda: self._check_updates(manual=False))
-
-    # ---------------------------------------------------------- updates
-
-    def on_command(self, src, command):
-        """Discovery thread: a command from PingPong Overview.
-
-        Accepted only from the master PC (the Overview runs there), never
-        twice (it arrives on every network), only if meant for this lamp.
-        """
-        seen = self.__dict__.setdefault("_commands_seen", [])
-        if command["id"] in seen:
-            return
-        seen.append(command["id"])
-        del seen[:-50]
-        if command.get("to") not in ("*", self.node_id):
-            return
-        master = self._master_peer
-        from_master = (
-            (self._i_am_master and src in self.local)
-            or (master is not None and src in master.ips)
-        )
-        if not from_master:
-            self._key_event("command '{}' from {} ignored - not the master PC".format(
-                command["cmd"], src))
-            return
-        self._key_event("command '{}' from the master PC".format(command["cmd"]))
-        if command["cmd"] == "update":
-            self._ui_calls.append(self._remote_update)
 
     def _remote_update(self):
         """'Update all lamps' from the Overview: install the newest release
@@ -1425,8 +654,6 @@ class DisplayApp:
             )
         self.on_close()
 
-    # ---------------------------------------------------------- stations
-
     def _station(self, src, station_name):
         ip = src
         if ip in self.stations:
@@ -1442,33 +669,7 @@ class DisplayApp:
         self.stations[ip] = station
         return station
 
-    def on_relay(self, src, node_id, data):
-        """Discovery thread: another lamp passed on its own N1MM's packet."""
-        if node_id == self.node_id:
-            return  # our own relay came back
-        peer = self.peers.get(node_id)
-        if peer is not None and getattr(peer, "same_pc", False):
-            return
-        if src in self.local:
-            return
-        ip = self._canon_ip(src)
-        station = self.stations.get(ip)
-        if station is not None and time.time() - station.direct_seen < DIRECT_RECENT:
-            return  # N1MM's own broadcast reaches us: use that
-        self.on_packet(ip, data, relayed=True)
-
-    def _canon_ip(self, src):
-        """One station per PC: map any address of a PingPong PC to the
-        address its station is already known under."""
-        if src in self.local:
-            return src
-        for peer in self._fresh_peers(time.time()):
-            if src in peer.ips:
-                for ip in sorted(peer.ips - self.local):
-                    if ip in self.stations:
-                        return ip
-        return src
-
+    @locked
     def on_packet(self, src, data, relayed=False):
         is_radio, caption, station_name, is_tx, freq, mode = packet_info(data)
         if self.test_on:
@@ -1509,214 +710,6 @@ class DisplayApp:
             if started:
                 self._pingpong_tx(station)
 
-    def on_networks(self, nets):
-        self.local_nets = set(ip for ip, _ in nets)
-        self.local = self.local_nets | self.self_seen | LOOPBACK
-
-    def on_hello(self, src, info):
-        if info["id"] == self.node_id:
-            # Our own broadcast came back: src is certainly one of our IPs.
-            if src not in self.local:
-                self.self_seen.add(src)
-                self.local = self.local_nets | self.self_seen | LOOPBACK
-            return
-        peer = self.peers.get(info["id"])
-        if peer is None:
-            peer = Peer(info["id"])
-            self.peers[info["id"]] = peer
-        peer.host = info["host"] or src
-        peer.alias = (info.get("alias") or "")[:MAX_ALIAS]
-        peer.role = info.get("role", "") if info.get("role") in ROLES else ""
-        nm = info.get("n1mm_master", "")
-        peer.n1mm_master = True if nm == "1" else (False if nm == "0" else None)
-        peer.started = info.get("started", 0.0) or 0.0
-        peer.colors = info.get("colors", {}) or {}
-        peer.block_time = info.get("block_time", 0.0) or 0.0
-        peer.block_time_run = info.get("block_time_run", 0.0) or 0.0
-        peer.alert_run = info.get("alert_run", False)
-        peer.urgent = info.get("urgent", False)
-        peer.urgent_band = info.get("urgent_band", "")
-        peer.urgent_mode = info.get("urgent_mode", "")
-        peer.urgent_time = info.get("urgent_time", 0.0)
-        peer.version = info["version"]
-        peer.ips = set(info["ips"]) | {src}
-        # Same PC only if the hello came from one of our own addresses or
-        # carries our PC name. Comparing all addresses is wrong: virtual
-        # adapters (VirtualBox 192.168.56.1, VPNs) repeat on every PC.
-        peer.same_pc = src in self.local or (
-            (info["host"] or "").lower() == socket.gethostname().lower()
-        )
-        peer.local_n1mm = info["local_n1mm"]
-        peer.color = info.get("color", "")
-        peer.color_time = info.get("color_time", 0.0)
-        peer.alert = info.get("alert", False)
-        peer.alert_band = info.get("alert_band", "")
-        peer.alert_time = info.get("alert_time", 0.0)
-        status = info.get("status", "")
-        if status != getattr(peer, "status", None):
-            peer.status = status
-            if self.test_on:
-                self._test_write(
-                    "{}  peer {} ({} v{}): {}".format(
-                        time.strftime("%H:%M:%S"), peer.host, src,
-                        peer.version or "?", status or "no status (older than v1.18)",
-                    )
-                )
-        peer.last_seen = time.time()
-
-    def _status_text(self):
-        """Short state report sent to the other lamps (for diagnosis)."""
-        mine = self._local_station()
-        if mine is None:
-            n1mm = "N1MM: not heard"
-        else:
-            n1mm = "N1MM {} from {}, {}".format(
-                group_label(mine.key) or "no band/mode",
-                mine.ip,
-                {True: "Run", False: "S&P", None: "Run/S&P unknown"}[mine.running],
-            )
-        calls = [p.host for p in self._incoming_calls(time.time())]
-        return "; ".join([
-            n1mm,
-            "F12 call option " + ("on" if self.f12_on else "off"),
-            "call " + ("ON" if self.alert_on else "off"),
-            "block option " + ("on" if self.block_on else "off"),
-            "keyboard watcher " + ("running" if self.key_watcher is not None else "off"),
-            "calls seen: " + (", ".join(calls) or "none"),
-            "F-keys " + ("BLOCKED" if self._block_active else "free"),
-            "sees: " + (", ".join(
-                "{} {}".format(st.label, group_label(st.key) or "?")
-                for st in list(self.stations.values())
-                if st.ip not in self.local and time.time() - st.last_seen < 30
-            ) or "no other station"),
-            "share N1MM " + ("on" if self.relay_on else "off"),
-            "N1MM master here: {}".format(
-                {True: "yes", False: "no", None: "unknown (no N1MM settings file)"}[self.n1mm_master]
-            ),
-            "PingPong master: " + ("this PC" if self._i_am_master else (
-                self.peer_name(self._master_peer) if self._master_peer else "?"
-            )),
-            "ping-pong role " + self.my_role
-            + (" (LOCKED)" if self._pp_locked else ""),
-        ])
-
-    def _hello_state(self):
-        return {
-            "local_n1mm": self._local_n1mm_active(),
-            "color": self.my_color,
-            "color_time": self.my_color_time,
-            "alert": self.alert_on,
-            "alert_band": self._my_band(),
-            "alert_time": self.alert_time,
-            "status": self._status_text(),
-            "alias": self.my_alias,
-            "role": self.my_role if self.my_role != "off" else "",
-            "n1mm_master": {True: "1", False: "0"}.get(self.n1mm_master, ""),
-            "started": self.started,
-            "colors": format_colors(self.color_map) if self._i_am_master else "",
-            "block_time": self.block_limit if self._i_am_master else 0.0,
-            "alert_run": self.alert_on and self.alert_run,
-            "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
-            "urgent": self.urgent_on,
-            "urgent_band": self.urgent_key[0],
-            "urgent_mode": self.urgent_key[1],
-            "urgent_time": self.urgent_time,
-        }
-
-    # ---------------------------------------------------------- colors
-
-    def _fresh_peers(self, now):
-        return [
-            p for p in list(self.peers.values())
-            if (now - p.last_seen) <= PEER_TIMEOUT
-        ]
-
-    def _color_owners(self, now):
-        """{color: owner} for chosen colors; owner is "me" or a Peer.
-
-        If two PCs chose the same color, the one that chose it first keeps
-        it (ties: host name), so every lamp reaches the same decision.
-        """
-        claims = []
-        if self.my_color:
-            claims.append((self.my_color_time, socket.gethostname(), "me", self.my_color))
-        for peer in self._fresh_peers(now):
-            if peer.color:
-                claims.append((peer.color_time, peer.host, peer, peer.color))
-        owners = {}
-        for _, _, owner, color in sorted(claims, key=lambda c: (c[0], c[1])):
-            owners.setdefault(color.lower(), owner)
-        return owners
-
-    # ---------------------------------------------------------- master
-
-    def _check_n1mm_master(self, now):
-        """Re-read IsNetworkMaster from this PC's N1MM settings (cheap: only
-        when the file changed, at most every 2 s)."""
-        if now - self._ini_checked < 2.0:
-            return
-        self._ini_checked = now
-        try:
-            mtime = os.path.getmtime(self.n1mm_ini)
-        except OSError:
-            if self.n1mm_master is not None:
-                self.n1mm_master = None
-                self.hello_now.set()
-            return
-        if mtime != self._ini_mtime:
-            self._ini_mtime = mtime
-            value = read_n1mm_master(self.n1mm_ini)
-            if value != self.n1mm_master:
-                self.n1mm_master = value
-                self._key_event("N1MM network master on this PC: {}".format(value))
-                self.hello_now.set()
-
-    def _pick_master(self, now):
-        """'me' or a Peer: the PC whose N1MM is network master; if none
-        says so, the lamp that started first (ties: PC name)."""
-        me = ("me", self.n1mm_master, self.started, socket.gethostname().lower())
-        cands = [me] + [
-            (p, p.n1mm_master, p.started or now, (p.host or "").lower())
-            for p in self._fresh_peers(now)
-            if not getattr(p, "same_pc", False)
-        ]
-        masters = [c for c in cands if c[1] is True]
-        pool = masters or cands
-        return min(pool, key=lambda c: (c[2], c[3]))[0]
-
-    def color_key(self, station, now):
-        """'pc:<windows name>' for a PC running a lamp, else 'n1mm:<name>'."""
-        if station.ip in self.local:
-            return "pc:" + socket.gethostname().lower()
-        for peer in self._fresh_peers(now):
-            if station.ip in peer.ips and not getattr(peer, "same_pc", False):
-                return "pc:" + (peer.host or "").lower()
-        return "n1mm:" + (station.label or station.ip).lower()
-
-    def _assign_colors(self, owners, now):
-        """Master: keep every color already given, give new stations the
-        next free palette color (never one a PC has chosen itself)."""
-        keys = {"pc:" + socket.gethostname().lower()}
-        for peer in self._fresh_peers(now):
-            if not getattr(peer, "same_pc", False):
-                keys.add("pc:" + (peer.host or "").lower())
-        for st in list(self.stations.values()):
-            if now - st.last_seen <= STATION_FORGET:
-                keys.add(self.color_key(st, now))
-        # Keep colors of stations still here (sticky); drop names that no
-        # longer exist, e.g. a station first seen before its lamp was heard.
-        result = {
-            k: v for k, v in self.color_map.items()
-            if k in keys and v.lower() not in owners
-        }
-        used = set(owners) | {v.lower() for v in result.values()}
-        for key in sorted(keys - set(result)):
-            free = [c for c in COLOR_PALETTE if c.lower() not in used]
-            color = free[0] if free else COLOR_PALETTE[len(result) % len(COLOR_PALETTE)]
-            result[key] = color
-            used.add(color.lower())
-        return result
-
     def _set_title(self, master):
         """Title bar: 'MASTER' on the master PC only."""
         title = (
@@ -1755,39 +748,6 @@ class DisplayApp:
             self._key_event("PingPong master: {}".format(
                 "this PC" if self._i_am_master else self.peer_name(master)
             ))
-
-    def _port_warning(self):
-        """Text when another program listens on N1MM's port, else ""."""
-        names = self._port_users.get(self.port) or []
-        if not names:
-            return ""
-        return "UDP {} also used by {} – N1MM data may be missing here " \
-            "(see README: Another program on 12060)".format(self.port, ", ".join(names))
-
-    def _master_warning(self, now):
-        """Text when more than one PC acts or claims to be master, else "".
-
-        Only the master sends <BlockTime>, so two lamps sending it (or one
-        besides this master) means lamps that don't hear each other. Two
-        N1MMs saying IsNetworkMaster=True is a N1MM setup problem.
-        """
-        me = self.my_alias or socket.gethostname()
-        peers = [
-            p for p in self._fresh_peers(now) if not getattr(p, "same_pc", False)
-        ]
-        acting = ([me] if self._i_am_master else []) + [
-            self.peer_name(p) for p in peers if p.block_time
-        ]
-        if len(acting) > 1:
-            return "TWO MASTERS: {} – the lamps don't hear each other (firewall?) " \
-                "or run different versions".format(", ".join(sorted(acting)))
-        n1mm = ([me] if self.n1mm_master is True else []) + [
-            self.peer_name(p) for p in peers if p.n1mm_master is True
-        ]
-        if len(n1mm) > 1:
-            return "N1MM master on {} – check N1MM's Network Status".format(
-                " and ".join(sorted(n1mm)))
-        return ""
 
     def _color_for(self, station, owners, now):
         if station.ip in self.local:
@@ -1927,13 +887,6 @@ class DisplayApp:
             side=tk.LEFT, padx=4
         )
 
-    def _local_n1mm_active(self):
-        now = time.time()
-        return any(
-            st.ip in self.local and (now - st.last_seen) <= LOCAL_N1MM_RECENT
-            for st in list(self.stations.values())
-        )
-
     def _peer_rows(self, now):
         """Footer notes for PingPong PCs whose N1MM traffic we do not get."""
         station_ips = set(self.stations)
@@ -1951,49 +904,6 @@ class DisplayApp:
                 rows.append("{}: no N1MM".format(self.peer_name(peer)))
         rows.extend(self._version_rows(now))
         rows.extend(self._no_lamp_rows(now))
-        return rows
-
-    def _version_rows(self, now):
-        """Footer notes for lamps running another PingPong version."""
-        mine = upd.parse_version(__version__)
-        rows = []
-        for peer in self._fresh_peers(now):
-            if getattr(peer, "same_pc", False) or not peer.version:
-                continue
-            theirs = upd.parse_version(peer.version)
-            if theirs and theirs < mine:
-                rows.append("{}: v{} – update it".format(self.peer_name(peer), peer.version))
-            elif theirs > mine:
-                rows.append("{}: v{} – update this PC".format(self.peer_name(peer), peer.version))
-        return rows
-
-    def _no_lamp_rows(self, now):
-        """Footer notes for N1MM PCs heard directly but without a lamp.
-
-        If other lamps are heard, that PC simply runs no PingPong. If no
-        lamp at all is heard, this PC's firewall probably drops port 46070.
-        """
-        if not self._share["port"] or now - self.started < NO_LAMP_AFTER:
-            return []
-        peers = self._fresh_peers(now)
-        lamp_ips = set()
-        for peer in peers:
-            lamp_ips |= peer.ips
-        rows = []
-        for st in list(self.stations.values()):
-            if (
-                st.ip in self.local
-                or st.ip in lamp_ips
-                or now - st.direct_seen > NO_LAMP_AFTER
-            ):
-                continue
-            if any(not getattr(p, "same_pc", False) for p in peers):
-                rows.append("{}: no PingPong lamp there".format(st.label))
-            else:
-                rows.append(
-                    "{}: no PingPong heard – firewall? Options ▾ → Allow PingPong in "
-                    "Windows Firewall".format(st.label)
-                )
         return rows
 
     def _allow_firewall(self):
@@ -2036,21 +946,6 @@ class DisplayApp:
                 parent=self.root,
             )
 
-    def peer_name(self, peer):
-        """Name to show for a PingPong PC: its alias, else its PC name."""
-        return peer.alias or peer.host
-
-    def station_name(self, st):
-        """Name to show for an N1MM station: the alias its PC announced
-        (or this PC's own alias), else N1MM's StationName."""
-        if st.ip in self.local:
-            return self.my_alias or st.label
-        now = time.time()
-        for peer in self._fresh_peers(now):
-            if st.ip in peer.ips and peer.alias:
-                return peer.alias
-        return st.label
-
     def _choose_block_time(self, run=False):
         """Master only: how long an F12 call blocks the other PCs.
 
@@ -2086,73 +981,6 @@ class DisplayApp:
             "Run" if run else "S&P", value))
         self.hello_now.set()  # tell all lamps right away
 
-    def _urgent_pressed(self, fkey="F4"):
-        """Keyboard thread: Shift+F2 / Shift+F4 in N1MM start an urgent call.
-
-        It lasts while N1MM transmits the F2/F4 message N1MM fires at the same
-        time; it ends when that transmission ends (see _urgent_check).
-        """
-        if not self.f12_on:
-            return
-        mine = self._local_station()
-        if mine is None or not mine.key:
-            self._key_event("Shift+{} ignored - this PC's band/mode unknown".format(fkey))
-            return
-        self.urgent_on = True
-        self.urgent_fkey = fkey
-        self.urgent_key = (mine.key[0], mine.key[1])
-        self._urgent_tx_seen = False
-        self.urgent_time = time.time()
-        self.hello_now.set()
-        if self.test_on:
-            self._test_write("{}  Shift+{}  urgent call {}".format(
-                time.strftime("%H:%M:%S"), fkey,
-                "ON ({} {})".format(*self.urgent_key) if self.urgent_on else "OFF",
-            ))
-
-    def _urgent_check(self, now):
-        """End my urgent call when my F2/F4 transmission ends."""
-        if not self.urgent_on:
-            return
-        mine = self._local_station()
-        tx = mine is not None and mine.tx
-        if tx:
-            self._urgent_tx_seen = True
-            return
-        if self._urgent_tx_seen:
-            why = "transmission ended"
-        elif now - self.urgent_time > URGENT_WAIT:
-            why = "no transmission started ({} has no message?)".format(self.urgent_fkey)
-        else:
-            return
-        self.urgent_on = False
-        self.urgent_time = now
-        self._key_event("urgent call ended: " + why)
-        self.hello_now.set()  # receivers stop flashing right away
-
-    def _urgent_seen(self, peer, now):
-        """Remember when this urgent call was first seen here (local clock)."""
-        self._call_seen.setdefault(("urgent", peer.id, peer.urgent_time), now)
-        return True
-
-    def _incoming_urgent(self, now):
-        """Urgent calls (Shift+F2/F4) from other PCs on this PC's band and
-        mode - Run or S&P, every station is called."""
-        mine = self._local_station()
-        if mine is None or not mine.key:
-            return []
-        band, mode = mine.key[0], mine.key[1]
-        calls = [
-            p for p in self._fresh_peers(now)
-            if getattr(p, "urgent", False)
-            and p.urgent_band == band
-            and p.urgent_mode == mode
-            and not getattr(p, "same_pc", False)
-            and ("urgent", p.id, p.urgent_time) not in self.silenced
-            and self._urgent_seen(p, now)
-        ]
-        return sorted(calls, key=lambda p: p.urgent_time)
-
     def _show_urgent(self, peer, owners, now):
         """Intense flash: lamp and border swap caller color / white fast."""
         self._shown_urgent = peer
@@ -2183,12 +1011,6 @@ class DisplayApp:
                 self.peer_name(peer), peer.urgent_band, peer.urgent_mode,
             )
         )
-
-    def _my_limit(self):
-        return self.block_limit_run if self.alert_run else self.block_limit
-
-    def _call_limit(self, peer):
-        return self.block_limit_run if getattr(peer, "alert_run", False) else self.block_limit
 
     def _choose_alias(self):
         current = self.my_alias
@@ -2406,8 +1228,6 @@ class DisplayApp:
         self.canvas.coords(self.c_info, w / 2.0, h - inset - 2)
         self.canvas.itemconfigure(self.c_info, width=max(50, w - 2 * inset - 12))
 
-    # ---------------------------------------------------------- compact mode
-
     def _toggle_compact(self, event=None):
         """Shift+F: lamp only, no title bar or margins, info drawn on the
         lamp; Shift+F again: normal window. Same size and place."""
@@ -2439,8 +1259,6 @@ class DisplayApp:
         self._recenter_text()
         self._sync_compact()
         self.root.after(300, self._save_window)
-
-    # ---------------------------------------------------------- window place
 
     def _window_pos(self):
         """(x, y) of the window as used by geometry('+x+y')."""
@@ -2540,7 +1358,8 @@ class DisplayApp:
     def _update(self):
         """Display loop: one error is logged, the loop always goes on."""
         try:
-            self._update_body()
+            with self.lock:
+                self._update_body()
         except Exception:
             now = time.time()
             if now - self._last_ui_error > 60:  # don't flood the log
@@ -2706,13 +1525,6 @@ class DisplayApp:
             self.info.configure(fg=self._info_fg)
         self._sync_compact()
 
-    def _local_station(self):
-        """This PC's own N1MM station (most recently heard), or None."""
-        mine = [st for st in list(self.stations.values()) if st.ip in self.local]
-        if not mine:
-            return None
-        return max(mine, key=lambda st: st.last_seen)
-
     def _test_toggled(self):
         self.test_on = bool(self.var_test.get())
         self._test_write(
@@ -2767,8 +1579,6 @@ class DisplayApp:
             self._last_radio_xml = stable
         self._test_write("      XML: " + flat)
 
-    # ---------------------------------------------------------- F12 call
-
     def _start_keys(self):
         if self.key_watcher is not None:
             return True
@@ -2814,8 +1624,6 @@ class DisplayApp:
         self.settings.set("f12_call", call)
         self.settings.set("block_keys", block)
 
-    # ---------------------------------------------------------- ping-pong
-
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())
         self.settings.set("share_n1mm", self.relay_on)
@@ -2828,179 +1636,9 @@ class DisplayApp:
         self.hello_now.set()
         self._keys_toggled()
 
-    def role_of(self, st):
-        """Ping-pong role of an N1MM station: "RUN", "INB" or ""."""
-        if st.ip in self.local:
-            return self.my_role if self.my_role != "off" else ""
-        for peer in self._fresh_peers(time.time()):
-            if st.ip in peer.ips and not getattr(peer, "same_pc", False):
-                return peer.role
-        return ""
-
-    def _pingpong_tx(self, st):
-        """UDP thread: a station started transmitting.
-
-        RUN transmitting opens a new period (slot free). The first INB that
-        transmits after that holds the slot until RUN transmits again.
-        """
-        if not st.key:
-            return
-        band = st.key[0]
-        role = self.role_of(st)
-        now = time.time()
-        if role == "RUN":
-            if self._slots.pop(band, None) is not None:
-                self._key_event("ping-pong {} MHz: RUN transmits - slot free".format(band))
-        elif role == "INB":
-            slot = self._slots.get(band)
-            if slot is None or now - slot[1] > PP_LIMIT:
-                self._slots[band] = [st.ip, now]
-                self._key_event(
-                    "ping-pong {} MHz: slot taken by {}".format(band, self.station_name(st))
-                )
-            elif slot[0] == st.ip:
-                slot[1] = now  # holder keeps transmitting in its slot
-
-    def _run_on_band(self, band, now):
-        for st in list(self.stations.values()):
-            if (
-                st.key and st.key[0] == band
-                and now - st.last_seen <= STATION_FORGET
-                and self.role_of(st) == "RUN"
-            ):
-                return st
-        return None
-
-    def _pingpong_state(self, now):
-        """(locked, holder station) for this PC as an INB."""
-        if self.my_role != "INB":
-            return False, None
-        mine = self._local_station()
-        if mine is None or not mine.key:
-            return False, None
-        band = mine.key[0]
-        slot = self._slots.get(band)
-        if slot is None or now - slot[1] > PP_LIMIT:
-            return False, None
-        if slot[0] in self.local:
-            return False, None  # this PC holds the slot
-        if self._run_on_band(band, now) is None:
-            return False, None  # no RUN known on this band: no lock
-        holder = self.stations.get(slot[0])
-        self._pp_left = max(0, int(PP_LIMIT - (now - slot[1]) + 0.999))
-        return True, holder
-
-    def _keys_to_block(self):
-        """Keyboard thread: which keys to swallow right now."""
-        if self._pp_locked:
-            return keys.PINGPONG_KEYS
-        if self._block_active:
-            return True
-        return None
-
     def _key_event(self, text):
         if self.test_on:
             self._test_write("{}  keys: {}".format(time.strftime("%H:%M:%S"), text))
-
-    def _key_blocked(self, name):
-        """Keyboard thread: a send key was swallowed during a call."""
-        self._blocked_key = (name, time.time())
-        if self.test_on:
-            self._test_write(
-                "{}  {} key  BLOCKED (call active)".format(time.strftime("%H:%M:%S"), name)
-            )
-
-    def _band_call(self, now):
-        """Another PC's F12 call still running on this PC's band, or None.
-
-        Only for S&P (the stations a call is aimed at), silenced or not:
-        an S&P station cannot start a call while one runs on its band.
-        A Run station is never stopped.
-        """
-        mine = self._local_station()
-        if mine is None or not mine.key or mine.running is True:
-            return None
-        band = mine.key[0]
-        busy = [
-            p for p in self._fresh_peers(now)
-            if p.alert
-            and p.alert_band == band
-            and not getattr(p, "same_pc", False)
-            and self._block_left(p, now) > 0
-        ]
-        return min(busy, key=lambda p: p.alert_time) if busy else None
-
-    def _f12_pressed(self):
-        """Keyboard thread: F12 in N1MM toggles this PC's call."""
-        if not self.f12_on:
-            return
-        busy = self._band_busy
-        if not self.alert_on and busy is not None:
-            # Another station's call runs on this band: F12 is not a call.
-            self._f12_refused = time.time()
-            if self.test_on:
-                self._test_write(
-                    "{}  F12 key  ignored - {} is calling on this band".format(
-                        time.strftime("%H:%M:%S"), self.peer_name(busy)
-                    )
-                )
-            return
-        self.alert_on = not self.alert_on
-        if self.alert_on:
-            mine = self._local_station()
-            # A Run station's call blocks every station on the band.
-            self.alert_run = mine is not None and mine.running is True
-        self.alert_time = time.time()
-        self.hello_now.set()
-        if self.test_on:
-            self._test_write(
-                "{}  F12 key  call {}".format(
-                    time.strftime("%H:%M:%S"),
-                    ("ON (Run call - all stations)" if self.alert_run else "ON (S&P call)")
-                    if self.alert_on else "OFF",
-                )
-            )
-
-    def _my_band(self):
-        mine = self._local_station()
-        return mine.key[0] if mine is not None and mine.key else ""
-
-    def _incoming_calls(self, now):
-        """Peers calling (F12) on this PC's band.
-
-        A call from an S&P station reaches only S&P stations; a call from a
-        Run station reaches every station on the band (Run and S&P).
-        """
-        mine = self._local_station()
-        if mine is None or not mine.key:
-            return []
-        band = mine.key[0]
-        in_run = mine.running is True
-        calls = [
-            p for p in self._fresh_peers(now)
-            if p.alert
-            and p.alert_band == band
-            and (getattr(p, "alert_run", False) or not in_run)
-            and not getattr(p, "same_pc", False)  # never "call" ourselves
-            and (p.id, p.alert_time) not in self.silenced
-            and self._block_left(p, now) > 0  # call time over: stop blinking
-        ]
-        return sorted(calls, key=lambda p: p.alert_time)
-
-    def _block_left(self, peer, now):
-        """Seconds of F-key blocking left for this call (local clock)."""
-        key = (peer.id, peer.alert_time)
-        start = self._call_seen.setdefault(key, now)
-        if len(self._call_seen) > 50:  # forget old calls
-            for old in sorted(self._call_seen, key=self._call_seen.get)[:-20]:
-                self._call_seen.pop(old, None)
-        return self._call_limit(peer) - (now - start)
-
-    def _peer_station(self, peer):
-        for st in list(self.stations.values()):
-            if st.ip in peer.ips:
-                return st
-        return None
 
     def _silence_call(self, event=None):
         """Click on a blinking lamp: stop blinking for this call here."""
@@ -3064,10 +1702,6 @@ class DisplayApp:
                 self._block_note(peer, now),
             )
         )
-
-    def _my_call_left(self, now):
-        """Whole seconds my own F12 call still runs."""
-        return max(0, int(self._my_limit() - (now - self.alert_time) + 0.999))
 
     def _block_note(self, peer, now):
         if not self.block_on:
@@ -3141,14 +1775,7 @@ def on_screen(x, y):
     except Exception:
         return True
 
-
-def app_dir():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
-
-
-_instance_mutex = None
+_instance_mutex = None  # Windows mutex: one lamp per PC
 
 
 def claim_single_instance(wait):
@@ -3172,7 +1799,6 @@ def claim_single_instance(wait):
         if time.time() >= deadline:
             return False
         time.sleep(0.25)
-
 
 def main():
     parser = argparse.ArgumentParser(description="N1MM UDP 12060 display")
@@ -3207,7 +1833,6 @@ def main():
     discovery_port = 0 if args.no_discovery else args.discovery_port
     DisplayApp(root, args.config, args.port, args.stale, discovery_port)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

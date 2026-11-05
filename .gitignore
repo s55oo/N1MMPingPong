@@ -1,7 +1,7 @@
 # Build artifacts
 dist/
 build/
-n1mm_lamps.spec
+*.spec
 *.exe
 
 # Logs & cache
@@ -18,3 +18,7 @@ pingpong_test.log
 # Per-PC station file (see lamps.example.cfg)
 lamps.cfg
 pingpong_error.log
+
+# PingPong Overview (per-PC)
+pingpong_overview.ini
+pingpong_stats.json

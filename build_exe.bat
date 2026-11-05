@@ -10,12 +10,19 @@ if errorlevel 1 (
     if errorlevel 1 goto :error
 )
 
+echo Running tests...
+python -m unittest discover -s tests -t tests
+if errorlevel 1 goto :error
+
+python tools\make_version_info.py
+if errorlevel 1 goto :error
+
 echo Building n1mm_lamps.exe ...
-python -m PyInstaller --noconfirm --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
+python -m PyInstaller --noconfirm --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico --version-file build\version_n1mm_lamps.txt n1mm_lamps.py
 if errorlevel 1 goto :error
 
 echo Building pingpong_overview.exe ...
-python -m PyInstaller --noconfirm --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
+python -m PyInstaller --noconfirm --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --version-file build\version_pingpong_overview.txt --add-data "pingpong.ico;." pingpong_overview.py
 if errorlevel 1 goto :error
 copy /Y dist\pingpong_overview.exe pingpong_overview.exe >nul
 

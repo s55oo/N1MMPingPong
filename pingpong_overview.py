@@ -77,6 +77,7 @@ ROW_STYLE = {  # tag -> (background, text); "tx" uses the station color
     "ready_ok": ("#3fb950", "#ffffff"),   # before the station starts operating
     "ready_bad": ("#8b1a1a", "#ffffff"),  # darker than the "red" station color
 }
+OVERVIEW_ASSET = "pingpong_overview.exe"
 REMOTE_UPDATE_FROM = (1, 60)  # lamps from this version accept "update"
 RELEASE_CHECK = 1800.0  # s: how often to look for the newest release
 
@@ -178,6 +179,9 @@ class Overview:
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
         self.operating = set()  # stats keys of PCs that transmitted since the ready check
         self.newest = ""  # newest release on GitHub ("" = unknown)
+        self.self_update = None  # newer pingpong_overview.exe release, if any
+        self._asked_update = False
+        self._offer_scheduled = False
         self.stats_path = os.path.join(app_dir(), STATS_FILE)
         self.stats = {}  # stats key -> {"name", "keys": {F1: n}, "other", "tx_time"}
         self.stats_since = time.time()
@@ -273,14 +277,69 @@ class Overview:
     # ------------------------------------------------------------ ready check / update
 
     def _release_loop(self):
+        self.stop.wait(3.0)
         while not self.stop.is_set():
             try:
                 releases = upd.fetch_releases()
                 if releases:
                     self.newest = releases[0]["version"]
+                if upd.is_frozen():
+                    mine = upd.fetch_releases(OVERVIEW_ASSET)
+                    self.self_update = upd.newer_release(mine, pp.__version__)
             except Exception:
                 pass  # no internet: compare the lamps with each other only
             self.stop.wait(RELEASE_CHECK)
+
+    # ------------------------------------------------------------ self-update
+
+    def _offer_self_update(self):
+        """UI thread: once per start, offer a newer Overview."""
+        rel = self.self_update
+        if rel is None or self._asked_update:
+            return
+        self._asked_update = True
+        if messagebox.askyesno(
+            TITLE + " - update",
+            "PingPong Overview v{} is available (you have v{}).\n\n"
+            "Update now? The Overview restarts in a few seconds;\n"
+            "its statistics and window settings are kept.".format(rel["version"], pp.__version__),
+            parent=self.root,
+        ):
+            self._update_self(rel)
+
+    def _update_self(self, rel=None):
+        rel = rel or self.self_update
+        if rel is None:
+            return
+        target = upd.exe_path()
+        self.update_button.configure(text="Downloading v{}…".format(rel["version"]), state=tk.DISABLED)
+
+        def work():
+            try:
+                new_file = upd.download(rel, target)
+                upd.swap_in(target, pp.__version__, new_file)
+                self.root.after(0, lambda: self._restart(target))
+            except Exception as exc:
+                msg = str(exc)
+                self.root.after(0, lambda: self._update_failed(rel, msg))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _update_failed(self, rel, msg):
+        self.update_button.configure(text="Update Overview…", state=tk.NORMAL)
+        messagebox.showerror(
+            TITLE, "Update to v{} failed:\n{}\n\nThis version (v{}) is unchanged.".format(
+                rel["version"], msg, pp.__version__), parent=self.root)
+
+    def _restart(self, target):
+        self._save_stats()
+        try:
+            upd.relaunch(target, sys.argv[1:])
+        except OSError as exc:
+            messagebox.showerror(TITLE, "Could not start the new version:\n{}".format(exc),
+                                 parent=self.root)
+            return
+        self._close()
 
     def _target_version(self, live):
         versions = [l.hello.get("version") for l in live if l.hello.get("version")]
@@ -615,6 +674,9 @@ class Overview:
             tk.Button(top, text="Allow web page in firewall…",
                       command=self._allow_firewall).pack(side=tk.RIGHT, padx=8)
         tk.Button(top, text="Update all lamps…", command=self._update_all).pack(side=tk.RIGHT)
+        # Shown only when a newer Overview is on GitHub (exe only).
+        self.update_button = tk.Button(top, text="Update Overview…", command=self._update_self,
+                                       bg="#ffe08a")
         tk.Button(top, text="Ready check", command=self._ready_check).pack(side=tk.RIGHT, padx=8)
         self._on_top(save=False)
 
@@ -832,6 +894,14 @@ class Overview:
         self.root.after(REFRESH_MS, self._refresh)
 
     def _refresh_body(self):
+        if self.self_update is not None:
+            if not self.update_button.winfo_ismapped():
+                self.update_button.configure(
+                    text="Update Overview to v{}…".format(self.self_update["version"]))
+                self.update_button.pack(side=tk.RIGHT, padx=8)
+            if not self._offer_scheduled:
+                self._offer_scheduled = True  # ask once per start
+                self.root.after(0, self._offer_self_update)
         snap = self._make_snapshot()
         self.snapshot = snap  # served to the web page as it is
         wanted = [r["id"] for r in snap["rows"]]

@@ -60,8 +60,11 @@ def _request(url):
     )
 
 
-def fetch_releases():
+def fetch_releases(asset_name=ASSET_NAME):
     """Published releases that carry the exe, newest version first.
+
+    asset_name: which exe of the release (n1mm_lamps.exe, or
+    pingpong_overview.exe for PingPong Overview).
 
     Each item: {"version", "tag", "url", "size", "sha256", "date"}.
     Raises OSError / ValueError on network or format problems.
@@ -76,7 +79,7 @@ def fetch_releases():
         if not parse_version(tag):
             continue
         for asset in rel.get("assets") or []:
-            if asset.get("name") != ASSET_NAME:
+            if asset.get("name") != asset_name:
                 continue
             digest = asset.get("digest") or ""
             releases.append(

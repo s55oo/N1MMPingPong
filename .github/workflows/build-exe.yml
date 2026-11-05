@@ -5,8 +5,13 @@ name: Build n1mm_lamps.exe
 # antivirus engines fingerprint - Trojan:Win32/Wacatac.B!ml false positives).
 # Result is an artifact of the run.
 #
+# Every run first runs the automated tests (tests/, Python's unittest);
+# if one fails nothing is built or released. Both exes get Windows version
+# information, and a Defender scan must come back clean before a release
+# is published.
+#
 # Automatic releases: on every push to main the version is read from
-# __version__ in n1mm_lamps.py. If release v<version> doesn't exist yet,
+# __version__ in pingpong_version.py. If release v<version> doesn't exist yet,
 # the tag and release are created and the exe is attached. Release notes
 # come from releases/v<version>.md if present, otherwise GitHub generates
 # them. So to publish: bump __version__ (and add releases/vX.Y.md), push.
@@ -43,11 +48,16 @@ jobs:
           python -m pip install --no-binary pyinstaller --no-deps "pyinstaller==$env:PYINSTALLER_VERSION"
           python -m PyInstaller --version
 
+      - name: Tests
+        run: python -m unittest discover -s tests -t tests -v
+
       - name: Build
         run: |
-          python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico n1mm_lamps.py
+          python tools/make_version_info.py
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --add-data "pingpong.ico;." pingpong_overview.py
+          python -m PyInstaller --onefile --windowed --noupx --name n1mm_lamps --manifest manifest.xml --icon pingpong.ico --version-file build\version_n1mm_lamps.txt n1mm_lamps.py
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python -m PyInstaller --onefile --windowed --noupx --name pingpong_overview --manifest manifest.xml --icon pingpong.ico --version-file build\version_pingpong_overview.txt --add-data "pingpong.ico;." pingpong_overview.py
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: SHA-256
@@ -58,13 +68,26 @@ jobs:
             "**$f** SHA-256: ``$h``" >> $env:GITHUB_STEP_SUMMARY
           }
 
-      # Informational: does Defender flag the fresh build? Never fails the job.
+      # A build Defender flags is never released (the job stops here).
+      # If Defender itself cannot run on the runner, that is only a warning.
       - name: Defender scan
-        continue-on-error: true
         run: |
-          Start-MpScan -ScanType CustomScan -ScanPath "$PWD\dist"
-          $t = Get-MpThreatDetection
-          if ($t) { $t | Format-List ThreatID, Resources; "Defender flagged the build" } else { "Defender: clean" }
+          try {
+            Update-MpSignature -ErrorAction SilentlyContinue
+            Start-MpScan -ScanType CustomScan -ScanPath "$PWD\dist" -ErrorAction Stop
+          } catch {
+            "::warning::Defender scan could not run: $_"
+            exit 0
+          }
+          $t = Get-MpThreatDetection | Where-Object { $_.Resources -match 'dist' }
+          if ($t) {
+            $t | Format-List ThreatID, Resources
+            "::error::Defender flagged the build - not released"
+            "**Defender flagged the build - not released**" >> $env:GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          "Defender: clean"
+          "Defender: clean" >> $env:GITHUB_STEP_SUMMARY
 
       - uses: actions/upload-artifact@v6
         with:
@@ -82,7 +105,7 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/*') {
             $tag = $env:GITHUB_REF_NAME
           } else {
-            $m = Select-String -Path n1mm_lamps.py -Pattern '^__version__\s*=\s*"([^"]+)"'
+            $m = Select-String -Path pingpong_version.py -Pattern '^__version__\s*=\s*"([^"]+)"'
             if (-not $m) { "No __version__ found - skipping release"; exit 0 }
             $tag = "v" + $m.Matches[0].Groups[1].Value
           }
