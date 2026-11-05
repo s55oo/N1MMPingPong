@@ -562,6 +562,8 @@ click only tells you so and nothing is sent. Lamps accept commands
 function key **F1–F12** started, **Other** (a caption without an F-key
 number), **Total** and the total **TX time** – plus an **All** row.
 
+![PingPong Overview – function keys](docs/overview-function-keys.png)
+
 - Counted when N1MM reports a transmission start with that key's caption,
   so keys that send nothing are not counted. Messages sent with Enter
   (ESM) count under their F-key.
@@ -699,7 +701,8 @@ manifest.xml        – PyInstaller manifest (modern common controls)
 pingpong.ico        – app icon (exe, title bar, taskbar)
 help.png            – help icon (embedded in the lamp)
 PingPong.png        – screenshot of the lamp
-docs/overview.png   – screenshot of the Overview
+docs/overview.png   – screenshot of the Overview (stations)
+docs/overview-function-keys.png – screenshot of the Overview (function keys)
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
 docs/SUMMARY.md     – what PingPong does, on one page

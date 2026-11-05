@@ -114,6 +114,8 @@ Full manual: [README](../README.md). How it talks on the network:
   other PCs. Lamps accept commands only from the master PC.
 - **Function key statistics:** per station, how many transmissions F1–F12
   started, plus total TX time. Kept over restarts, with CSV export.
+
+  ![PingPong Overview – function keys](overview-function-keys.png)
 - **Updates itself** when a new release is out (asks first).
 - It listens to the lamps and sends them only those two commands; it
   never touches N1MM's port, so it is safe to run next to the master's
