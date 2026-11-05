@@ -248,8 +248,19 @@ class ProblemsTest(unittest.TestCase):
         self.assertEqual(hello["problems"], probs)
 
     def test_no_problems(self):
-        app = make_lamp()
+        app = make_lamp(key_watcher=object())  # watcher running
         self.assertEqual(app._problems(time.time()), [])
+
+    def test_watcher_not_running_reported_on_windows(self):
+        app = make_lamp(key_watcher=None)
+        orig = m.keys.supported
+        try:
+            m.keys.supported = lambda: True  # as on Windows
+            self.assertIn("keyboard watcher not running", app._problems(time.time()))
+            m.keys.supported = lambda: False  # no keyboard hook possible: nothing to report
+            self.assertNotIn("keyboard watcher not running", app._problems(time.time()))
+        finally:
+            m.keys.supported = orig
 
 
 class AutoRoleTest(unittest.TestCase):
