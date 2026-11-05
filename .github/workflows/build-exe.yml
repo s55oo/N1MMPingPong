@@ -125,7 +125,8 @@ jobs:
           if (-not $exists) {
             $notes = "releases/$tag.md"
             $text = if (Test-Path $notes) { Get-Content $notes -Raw } else { "## PingPong $tag`n" }
-            $text += "`n`n### SHA-256`n`n``````n" + (Get-Content dist/SHA256SUMS.txt -Raw) + "``````n"
+            $fence = '```'
+            $text += "`n`n### SHA-256`n`n$fence`n" + (Get-Content dist/SHA256SUMS.txt -Raw) + "$fence`n"
             $text += "`nCheck a download in PowerShell: ``Get-FileHash .\n1mm_lamps.exe`` (or ``certutil -hashfile n1mm_lamps.exe SHA256``) and compare with the line above.`n"
             [IO.File]::WriteAllText("$PWD\dist\notes.md", $text)
             gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PingPong $tag" --notes-file dist/notes.md
