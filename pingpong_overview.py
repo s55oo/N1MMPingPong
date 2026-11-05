@@ -836,6 +836,53 @@ class Overview:
 
     # ------------------------------------------------------------ alarm
 
+    def _row_menu(self, event):
+        """Right click on a station row: remove it from the list if its lamp
+        is not heard any more (it comes back by itself when heard again)."""
+        node_id = self.tree.identify_row(event.y)
+        if not node_id:
+            return
+        now = time.time()
+        with self.lock:
+            lamp = self.lamps.get(node_id)
+            if lamp is None:
+                return
+            name = lamp.name()
+            quiet = now - lamp.hello_seen
+        menu = tk.Menu(self.root, tearoff=0)
+        if quiet > GONE_AFTER:
+            menu.add_command(label="Remove {} from the list (not heard for {})".format(name, ago(quiet)),
+                             command=lambda: self._remove_station(node_id))
+        else:
+            menu.add_command(label="{} is heard – only a station that is not heard can be "
+                                   "removed".format(name), state=tk.DISABLED)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _remove_station(self, node_id):
+        """Drop a dead / disconnected station: its rows, its alarm and its
+        place in the ready check. Its statistics stay. If its lamp is heard
+        again, it simply comes back (in the ready check until it transmits)."""
+        now = time.time()
+        with self.lock:
+            lamp = self.lamps.get(node_id)
+            if lamp is None or now - lamp.hello_seen <= GONE_AFTER:
+                return ""
+            key, name = lamp.stats_key(), lamp.name()
+            for other_id in [k for k, l in self.lamps.items()
+                             if l.stats_key() == key and now - l.hello_seen > GONE_AFTER]:
+                del self.lamps[other_id]
+            if not any(l.stats_key() == key for l in self.lamps.values()):
+                self.operating.discard(key)
+            self.silenced.discard(key)
+            self._alarm_logged.discard(key)
+            for band in [b for b, slot in self.slots.items() if slot[0] not in self.lamps]:
+                del self.slots[band]
+        self._event(name, "removed from the list")
+        return name
+
     def _forget(self, lamp, now, heard_keys):
         """Drop a lamp from the table? An operating station that went
         silent stays (and keeps the alarm) until it is heard again under
@@ -1307,6 +1354,7 @@ class Overview:
         xscroll.pack(side=tk.BOTTOM, fill=tk.X)  # narrow window: scroll sideways
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.bind("<Button-3>", self._row_menu)  # right click: remove a dead station
         sframe = tk.Frame(self.book)
         self.book.add(sframe, text="Function keys")
         bar = tk.Frame(sframe, pady=4)

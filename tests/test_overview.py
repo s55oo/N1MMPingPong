@@ -471,5 +471,38 @@ class TablesCacheTest(unittest.TestCase):
         self.assertEqual(tree.inserts, 2)
 
 
+class RemoveStationTest(unittest.TestCase):
+    """Right click → remove a dead station; it comes back when heard again."""
+
+    def setUp(self):
+        self.o = make_overview()
+        hello(self.o, "A", "PC1", "RUN1", block_time=30)
+        hello(self.o, "B", "PC2", "INB1")
+        self.o.operating.update({"pc:pc1", "pc:pc2"})
+
+    def test_dead_station_removed_and_alarm_gone(self):
+        self.o.lamps["B"].hello_seen -= 60
+        self.assertEqual(self.o._make_snapshot()["alarm"], ["INB1"])
+        self.assertEqual(self.o._remove_station("B"), "INB1")
+        self.assertNotIn("B", self.o.lamps)
+        self.assertNotIn("pc:pc2", self.o.operating)
+        snap = self.o._make_snapshot()
+        self.assertEqual(snap["alarm"], [])
+        self.assertEqual([r["id"] for r in snap["rows"]], ["A"])
+        self.assertIn("removed from the list", open(self.o.events_path, encoding="utf-8-sig").read())
+
+    def test_live_station_not_removed(self):
+        self.assertEqual(self.o._remove_station("A"), "")
+        self.assertIn("A", self.o.lamps)
+
+    def test_comes_back_when_heard(self):
+        self.o.lamps["B"].hello_seen -= 60
+        self.o._remove_station("B")
+        hello(self.o, "B", "PC2", "INB1")  # the lamp is back
+        self.assertIn("B", self.o.lamps)
+        row = [r for r in self.o._make_snapshot()["rows"] if r["id"] == "B"][0]
+        self.assertIn(row["tag"], ("ready_ok", "ready_bad"))  # in the ready check again
+
+
 if __name__ == "__main__":
     unittest.main()

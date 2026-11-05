@@ -38,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.87`.
+  `PingPong - MASTER UDP 12062 v1.88`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -140,6 +140,9 @@ the lamp downloads it if it is missing. One Overview per PC.
   not heard for 30 s (PC crashed, lamp closed, cable out) turns its row
   red, the status line flashes `🔔 NOT HEARD: INB2` and it beeps until
   **Silence alarm** – or until the station is back.
+- **Right click → Remove from the list:** a station that is no longer heard
+  (PC off or disconnected) leaves the table and stops the alarm; it comes
+  back by itself when its lamp is heard again.
 - **Setup ▾:** **save** every PC's name and color (by Windows computer
   name) plus the master's F12 times and ping-pong settings to a file, and
   **restore** them to all lamps before the next contest.
@@ -242,7 +245,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 132 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 135 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
