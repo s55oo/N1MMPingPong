@@ -64,7 +64,7 @@ def make_lamp(**over):
     app = m.DisplayApp.__new__(m.DisplayApp)
     now = time.time()
     state = dict(
-        root=Root(), port=12060, stale=5.0,
+        root=Root(), port=12062, stale=5.0,
         local={MY_IP, "127.0.0.1"}, local_nets={MY_IP}, self_seen=set(),
         stations={}, peers={}, node_id="ME0001", hints={}, used_colors=set(), tracked=None,
         var_sound=Var(True), var_keys=Var(True), var_block=Var(True), var_relay=Var(True),

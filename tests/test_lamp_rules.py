@@ -259,7 +259,7 @@ class ProblemsTest(unittest.TestCase):
     def test_problems_reported_in_hello(self):
         app = make_lamp()
         station(app, MY_IP, "INB2", band="7", running=False)
-        app._port_users[12060] = ["Callbooker.exe"]
+        app._port_users[12062] = ["Callbooker.exe"]
         old = m.ERROR_COUNT[0]
         m.ERROR_COUNT[0] = 2
         try:
@@ -268,14 +268,27 @@ class ProblemsTest(unittest.TestCase):
             hello = m.parse_hello(m.make_hello("X", "PC", [], **app._hello_state()))
         finally:
             m.ERROR_COUNT[0] = old
-        self.assertIn("UDP 12060 also used by Callbooker.exe", probs)
+        self.assertIn("UDP 12062 also used by Callbooker.exe", probs)
         self.assertIn("2 errors in pingpong_error.log", probs)
         self.assertIn("ping-pong: no RUN on 7 MHz", probs)
         self.assertEqual(hello["problems"], probs)
 
     def test_no_problems(self):
         app = make_lamp(key_watcher=object())  # watcher running
+        station(app, MY_IP, "G4", running=True)  # own N1MM heard
         self.assertEqual(app._problems(time.time()), [])
+
+    def test_no_own_n1mm_hint(self):
+        app = make_lamp(key_watcher=object())
+        self.assertIn("127.0.0.1:12062", app._n1mm_hint(time.time()))
+        self.assertIn("no N1MM data on UDP 12062", app._problems(time.time()))
+        station(app, MY_IP, "G4", running=True)
+        self.assertEqual(app._n1mm_hint(time.time()), "")
+        fresh = make_lamp(started=time.time())  # just started: give N1MM time
+        self.assertEqual(fresh._n1mm_hint(time.time()), "")
+
+    def test_default_port(self):
+        self.assertEqual(m.DEFAULT_PORT, 12062)
 
     def test_watcher_not_running_reported_on_windows(self):
         app = make_lamp(key_watcher=None)
@@ -361,7 +374,7 @@ class NotesTest(unittest.TestCase):
     def test_port_warning(self):
         app = make_lamp()
         self.assertEqual(app._port_warning(), "")
-        app._port_users[12060] = ["Callbooker.exe"]
+        app._port_users[12062] = ["Callbooker.exe"]
         self.assertIn("Callbooker.exe", app._port_warning())
 
 

@@ -81,7 +81,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - other PCs on a different version;
   - two masters;
   - a firewall blocking the lamps (with a one-click firewall rule);
-  - another program, e.g. Callbooker, taking N1MM's port 12060.
+  - no data from its own N1MM, or another program on its port.
 - **Updates** from GitHub: by itself, from the Options menu, or for all
   PCs at once from the Overview. It can switch back to the previous
   version.
@@ -142,7 +142,9 @@ Full manual: [README](../README.md). How it talks on the network:
 ## 3. A contest weekend with PingPong
 
 1. **Setup, once per PC:**
-   - In N1MM's External Broadcast, tick **RadioInfo**, port 12060.
+   - In N1MM's External Broadcast, tick **RadioInfo**, and add
+     `127.0.0.1:12062` to the Broadcast Address (e.g.
+     `127.0.0.1:12060 127.0.0.1:12062`).
    - Start the lamp.
    - Set **My name**. The ping-pong role follows N1MM by itself
      (Run = RUN, S&P = INB).
@@ -184,7 +186,7 @@ Full manual: [README](../README.md). How it talks on the network:
   exes are not compressed, and they carry Windows version information.
   A Defender scan must be clean before a release is published.
 - **Network:**
-  - N1MM's broadcast on **UDP 12060**, which PingPong only reads;
+  - N1MM's broadcast to the lamp on **UDP 12062**, which PingPong only reads;
   - lamp-to-lamp messages on **UDP 46070**;
   - the Overview's web page on **TCP 8046**;
   - GitHub, over HTTPS, for updates only.

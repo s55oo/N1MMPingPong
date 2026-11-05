@@ -24,7 +24,9 @@ Every operating PC runs **N1MM Logger+** and one **PingPong lamp**; the
 master PC can also run the **PingPong Overview**. There are four kinds of
 traffic:
 
-1. **N1MM → all lamps** (UDP 12060): N1MM's own External Broadcast.
+1. **N1MM → lamp** (UDP 12062): N1MM's own External Broadcast; its
+   Broadcast Address must include `127.0.0.1:12062` (other programs keep
+   N1MM's usual 12060).
    PingPong only listens to it and never sends anything on this port.
 2. **Lamp ↔ lamp** (UDP 46070): small `PingPongHello` messages with each
    PC's name, color, role, F12 call and state – the **master** adds the
@@ -37,7 +39,7 @@ traffic:
 4. **Overview** (optional, on the master PC): `pingpong_overview.exe`
    listens on UDP 46070 – hellos and relays – and shows all stations in a
    window and as a web page on **TCP 8046** (`http://<master PC>:8046`)
-   for any browser. It never opens 12060. From the relayed `RadioInfo` it
+   for any browser. It never opens N1MM's ports. From the relayed `RadioInfo` it
    also counts, per station, which function key started each transmission
    (`FunctionKeyCaption` at the moment `IsTransmitting` turns True).
    Its only messages to the lamps (`PPC1` + JSON on UDP 46070, obeyed only if
@@ -71,7 +73,7 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
-| **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
+| **UDP 12062** | N1MM → lamp (and LAN, if a subnet broadcast is added) | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
 | **UDP 46070** | lamp ↔ lamp, Overview → lamps | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, lamp test, ping, emergency restart/stop); `PPP1` + JSON ping answer (lamp → Overview, unicast) |
 | HTTPS 443 | lamp / Overview → `api.github.com`, `github.com` | PingPong | release list, exe download |
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
@@ -102,7 +104,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.75</Version>
+  <Version>1.76</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -121,7 +123,7 @@ from.
   <BlockTimeRun>5</BlockTimeRun>   <!-- Run-call block time in s (1-30), only from the master -->
   <PingPong>1</PingPong>           <!-- ping-pong lock 1 = on / 0 = off, only from the master -->
   <PPLimit>40</PPLimit>            <!-- ping-pong release time in s (0-40, 0 = only RUN frees), only from the master -->
-  <Problems>UDP 12060 also used by Callbooker.exe</Problems>  <!-- what is wrong on this PC, "|"-separated -->
+  <Problems>no N1MM data on UDP 12062</Problems>  <!-- what is wrong on this PC, "|"-separated -->
   <Urgent>0</Urgent>               <!-- 1 = urgent call (Shift+F2 or Shift+F4) on -->
   <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
   <UrgentMode>CW</UrgentMode>
@@ -142,7 +144,7 @@ sequenceDiagram
     participant LS as Lamp on S51CAB
     participant LG as Lamp on OO840G4 (only reachable over ZeroTier)
 
-    N->>LS: RadioInfo to 127.0.0.1:12060
+    N->>LS: RadioInfo to 127.0.0.1:12062
     LS->>LG: UDP 46070 broadcast on every network:<br/>"PPR1" + lamp id + the same RadioInfo
     Note over LG: treated exactly like N1MM's own packet<br/>(station keyed to S51CAB's lamp addresses)
 ```
@@ -251,7 +253,7 @@ station transmits. Each PC's role always comes from its N1MM's
 at once when it changes).
 
 Every lamp sees every transmission start (N1MM's `IsTransmitting`
-changing to True on port 12060), so each INB lamp keeps the same "slot"
+changing to True, directly or relayed), so each INB lamp keeps the same "slot"
 for its band without any extra messages:
 
 - **RUN starts transmitting** → the slot is free (new period). With
@@ -401,7 +403,7 @@ Defender and publishes release `v<version>` with notes from
 | N1MM relay | each own `RadioInfo` at once; direct N1MM data preferred if seen in the last 15 s |
 | Lamp considered gone | 12 s without a hello |
 | Network adapters re-read | every 30 s |
-| Check for other programs on 12060 | every 30 s (Windows' UDP table) |
+| Check for other programs on the lamp's port (12062) | every 30 s (Windows' UDP table) |
 | Lamp off if transmitting station goes silent | 5 s (`--stale`) |
 | Blink rhythm | 0.4 s on / 0.4 s off; urgent call 0.15 s |
 | Urgent call time | while the caller's F2/F4 transmits; ends if no TX starts within 3 s |
@@ -420,8 +422,8 @@ Defender and publishes release `v<version>` with notes from
 
 | Symptom | Likely link | Check |
 |---|---|---|
-| Lamp never lights | N1MM → lamp (12060) | N1MM *Broadcast Data*, *RadioInfo*, Broadcast Address; band/mode supported |
-| Red `⚠ UDP 12060 also used by …` | N1MM → lamp (12060) | another program on the PC (e.g. Callbooker) listens on 12060 and gets N1MM's `127.0.0.1` packets instead of the lamp – send N1MM to two ports (`127.0.0.1:12060 127.0.0.1:12061`) and move the other program |
+| Lamp never lights | N1MM → lamp (12062) | N1MM *Broadcast Data*, *RadioInfo*, Broadcast Address must include `127.0.0.1:12062`; band/mode supported |
+| Red `⚠ UDP 12062 also used by …` | N1MM → lamp (12062) | another program on the PC listens on the lamp's port and gets N1MM's `127.0.0.1` packets instead – give one of them another port (`--port`) and add it to N1MM's Broadcast Address |
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | RUN2's Broadcast Address |
 | Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
 | `PC5: no PingPong heard – firewall?` | lamp ↔ lamp (46070) | N1MM data arrives but no other lamp does: this PC's firewall blocks 46070 |
@@ -431,6 +433,6 @@ Defender and publishes release `v<version>` with notes from
 | Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |
 | Red `⚠ TWO MASTERS: …` | master (46070) | only the master sends `<BlockTime>`: if two lamps do, they don't hear each other – check the firewall on both |
 | Red `⚠ N1MM master on … and …` | N1MM settings | two N1MMs report `IsNetworkMaster=True` – check N1MM's Network Status |
-| Ping-pong lock never locks | 12060 + roles | lock **ON** on the master; a station in **Run** (role RUN) on the same band; check the Role column in the Overview |
-| INB stays locked although RUN transmits | 12060 / relay | RUN's messages must be N1MM-started (not paddle/PTT); RUN's data must reach the INB (Diagnostics shows `RUN transmits – slot free`) |
+| Ping-pong lock never locks | 12062 + roles | lock **ON** on the master; a station in **Run** (role RUN) on the same band; check the Role column in the Overview |
+| INB stays locked although RUN transmits | 12062 / relay | RUN's messages must be N1MM-started (not paddle/PTT); RUN's data must reach the INB (Diagnostics shows `RUN transmits – slot free`) |
 | No update offered | lamp → GitHub | internet access to github.com |

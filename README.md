@@ -1,12 +1,12 @@
-# PingPong – N1MM Logger+ UDP 12060 Lamps
+# PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.75 · Made by **S55OO** with AI assistance.
+> **Version:** 1.76 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
 PingPong shows which computer/station on the network is currently
 **transmitting**. It listens to the N1MM Logger+ external UDP broadcast
-(XML) on port **12060** and lights a small always-on-top lamp in that
+(XML) on port **12062** and lights a small always-on-top lamp in that
 station's color, with the caption of the function key that started the
 transmission.
 
@@ -65,34 +65,40 @@ Three tools are provided:
 1. On each N1MM Logger+ PC: **File → Settings → Configurer →
    External Broadcast**, enable **RadioInfo** (required) and any other
    reports you want (ContactInfo, Spot, AppInfo, dynamicresults …).
-2. **Broadcast Address**: `127.0.0.1:12060` is enough – the lamp on the
-   same PC passes this PC's N1MM data on to all other lamps, on **every**
-   network both PCs are on (LAN, Wi-Fi, ZeroTier, other VPNs).
-   You can also send to your subnet broadcast (e.g. `192.168.178.255`)
-   as before; then lamps on that LAN get it directly, which they prefer.
-3. **Broadcast Port**: `12060` (default, do not change).
-4. **"Broadcast Data" must be enabled on every N1MM PC** (e.g. Run2 too),
+2. **Broadcast Address** must include **`127.0.0.1:12062`** – the lamp
+   listens on **UDP 12062** (since v1.76; before it was 12060). The field
+   takes several destinations separated by spaces, so other programs that
+   use N1MM's usual 12060 (e.g. **Callbooker**) keep working:
+
+   ```
+   127.0.0.1:12060 127.0.0.1:12062
+   ```
+
+   That is enough: the lamp on the same PC passes this PC's N1MM data on
+   to all other lamps, on **every** network both PCs are on (LAN, Wi-Fi,
+   ZeroTier, other VPNs). You can also add your subnet broadcast on 12062
+   (e.g. `192.168.178.255:12062`); then lamps on that LAN get it directly,
+   which they prefer.
+3. **"Broadcast Data" must be enabled on every N1MM PC** (e.g. Run2 too),
    otherwise that PC sends nothing.
 
-### Another program on 12060
+If the lamp hears nothing from its own N1MM for 30 s, the line under it
+says `no data from this PC's N1MM on UDP 12062 – N1MM Broadcast Address
+must include 127.0.0.1:12062` (and the Overview's ready check shows
+`no N1MM data on UDP 12062`).
 
-Other programs may listen to N1MM's broadcast too (e.g. **Callbooker**).
-If two programs on one PC listen on UDP **12060**, Windows gives each
-packet N1MM sends to `127.0.0.1` to **only one** of them – the lamp then
-misses this PC's N1MM, and so do all other lamps (the lamp passes its own
-N1MM on). The line under the lamp then says, in red,
-`⚠ UDP 12060 also used by Callbooker.exe – N1MM data may be missing here`.
+### Another program on the same port
 
-Fix: let N1MM send to **two ports**. The Broadcast Address field takes
-several destinations separated by spaces, e.g.
+If two programs on one PC listen on the **same** UDP port, Windows gives
+each packet N1MM sends to `127.0.0.1` to **only one** of them – the lamp
+then misses this PC's N1MM, and so do all other lamps (the lamp passes
+its own N1MM on). That's why the lamp uses its own port 12062. If another
+program uses 12062 too, the line under the lamp says, in red,
+`⚠ UDP 12062 also used by … – N1MM data may be missing here`.
 
-```
-127.0.0.1:12060 127.0.0.1:12061
-```
-
-and set the other program to **12061** (PingPong stays on 12060). If the
-other program can't change its port, start the lamp on its own port
-instead: `n1mm_lamps.exe --port 12061`.
+Fix: give one of them another port and add it to N1MM's Broadcast
+Address, e.g. start the lamp with `n1mm_lamps.exe --port 12063` and add
+`127.0.0.1:12063`.
 
 What N1MM reports – and therefore what PingPong can show:
 
@@ -217,8 +223,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.75`
-  (the others just `PingPong v1.75`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.76`
+  (the others just `PingPong v1.76`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -409,7 +415,7 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
 
 ### Windows Firewall (Options ▾ → Allow PingPong in Windows Firewall…)
 
-Adds an inbound rule `PingPong lamps UDP` for UDP **12060** and **46070**
+Adds an inbound rule `PingPong lamps UDP` for UDP **12062** (N1MM data) and **46070**
 on private and domain networks. Windows asks for administrator rights
 (UAC); an older rule with the same name is replaced. Do it once per PC,
 if the lamp says `no PingPong heard – firewall?`.
@@ -442,11 +448,12 @@ Delete the file any time.
 ### Command line (optional)
 
 ```bat
-n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
+n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
                [--discovery-port 46070] [--no-discovery]
 ```
 
-- `--port` – N1MM broadcast port (default 12060).
+- `--port` – UDP port for this PC's N1MM data (default 12062; N1MM's
+  Broadcast Address must include `127.0.0.1:<port>`).
 - `--stale` – safety fallback in seconds: if the transmitting station
   sends nothing for this long, the lamp turns off (default 5.0).
 - `--config` – path to `lamps.cfg` (default: next to the exe).
@@ -479,7 +486,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.76 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.77 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -555,7 +562,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.75 ✔`), the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.76 ✔`), the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…**, **Always on top**.
 
 **Ready check.** When the Overview starts, every station's row is
@@ -572,7 +579,7 @@ day two). Checked for each lamp:
 - N1MM data arrives and its band/mode is supported (`no N1MM data`);
 - exactly one master (`no master`, `two masters`);
 - keyboard watcher running where F12 call, F-key block or INB needs it;
-- **problems the lamp reports itself:** another program on UDP 12060
+- **problems the lamp reports itself:** no data from its N1MM on UDP 12062, another program on that port
   (e.g. Callbooker), keyboard watcher not running, errors in
   `pingpong_error.log`, `ping-pong: no RUN on 7 MHz` (lamps v1.69+).
 
@@ -584,7 +591,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.75 ✔** when every lamp is current – then a
+lists them), **All lamps v1.76 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -662,7 +669,7 @@ administrator rights; rule `PingPong Overview web page`, TCP 8046).
 
 - It **listens** to the lamps (UDP 46070) and sends them only the two
   commands above (update, ping-pong lock on/off). It never opens N1MM's
-  port 12060, so it can run next to the master's lamp without taking
+  ports (12060, 12062), so it can run next to the master's lamp without taking
   N1MM's packets away.
 - It shows stations whose PC runs a PingPong lamp with **Share my N1MM
   with other lamps** on (the default).
@@ -681,14 +688,15 @@ administrator rights; rule `PingPong Overview web page`, TCP 8046).
 
 | Problem | What to check |
 |---|---|
-| Red `⚠ UDP 12060 also used by …` | Another program takes N1MM's packets – see [Another program on 12060](#another-program-on-12060). |
+| `no data from this PC's N1MM on UDP 12062` | N1MM's **Broadcast Address** must include `127.0.0.1:12062` (e.g. `127.0.0.1:12060 127.0.0.1:12062`) – see [N1MM Logger+ setup](#1-n1mm-logger-setup). |
+| Red `⚠ UDP 12062 also used by …` | Another program takes N1MM's packets – see [Another program on the same port](#another-program-on-the-same-port). |
 | Lamp never lights | **Broadcast Data** and **RadioInfo** enabled in N1MM, correct **Broadcast Address**; band/mode in the list above; the lamp only lights for N1MM-started transmissions (not mic PTT/paddle). |
 | My own transmissions don't show | The lamp shows only *your band and mode* – check the line under the lamp shows your station. |
 | A key doesn't show | That key sends nothing (empty message, `{WIPE}` …) – N1MM doesn't report it. |
 | Other PCs don't blink on F12 | All PCs on the same version; same **band**; an F12 from S&P reaches only **S&P** stations (from Run: all); **F12 call** option on, F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |
 | Ping-pong lock never locks | **Ping-pong lock: ON** (Overview / master's Options); a station in **Run** on the same band; the inband stations in **S&P** – check the **Role** column in the Overview. |
 | An INB stays locked although RUN transmits | RUN's messages must be N1MM-started (F-keys, Enter) – paddle/PTT are not reported; the lock releases itself after the release time (master's Options, 0–40 s; 0 = never by time). **Diagnostics** on the locked PC shows the slot events. |
-| One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12060 and 46070: **Options ▾ → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12060,46070 profile=private,domain` |
+| One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12062 and 46070: **Options ▾ → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12062,46070 profile=private,domain` |
 | Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all: **Update all lamps…** in the Overview (or **Options ▾ → Check for updates** on each PC). |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |
 | N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A very old lamp (it used port 12070, N1MM's multi-computer port) is still running somewhere – update it. |
@@ -767,7 +775,7 @@ Existing releases are never overwritten.
 ```
 n1mm_lamps.py       – lamp: window, Options menu, updates (start here)
 pingpong_rules.py   – lamp rules: calls, urgent calls, ping-pong lock, master
-pingpong_net.py     – messages and UDP loops (N1MM 12060, lamps 46070)
+pingpong_net.py     – messages and UDP loops (N1MM 12062, lamps 46070)
 pingpong_common.py  – constants, N1MM packet parsing, station records
 pingpong_keys.py    – keyboard watcher: F12, F-key block, Shift+F2/F4
 pingpong_update.py  – self-update / switch-version logic (lamp and Overview)

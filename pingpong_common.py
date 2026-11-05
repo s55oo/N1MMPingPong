@@ -12,7 +12,10 @@ import xml.etree.ElementTree as ET
 
 from pingpong_version import __version__
 
-DEFAULT_PORT = 12060
+# The lamp listens for its own N1MM on 12062 (since v1.76), so it never
+# shares a port with other programs that use N1MM's usual 12060 (e.g.
+# Callbooker). N1MM's Broadcast Address must include 127.0.0.1:12062.
+DEFAULT_PORT = 12062
 
 DEFAULT_STALE = 5.0
 

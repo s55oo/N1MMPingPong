@@ -1,4 +1,4 @@
-"""PingPong - N1MM Logger+ UDP 12060 station lamp.
+"""PingPong - N1MM Logger+ station lamp (N1MM data on UDP 12062).
 
 One compact always-on-top window that shows which station is
 currently transmitting. The lamp lights up in the station's color
@@ -24,7 +24,7 @@ The program is split into parts:
 
 - n1mm_lamps.py      - this file: the window, Options menu, updates
 - pingpong_rules.py  - what the lamp decides (calls, lock, master, ...)
-- pingpong_net.py    - messages and UDP loops (N1MM 12060, lamps 46070)
+- pingpong_net.py    - messages and UDP loops (N1MM 12062, lamps 46070)
 - pingpong_common.py - constants, N1MM packet parsing, station records
 - pingpong_keys.py   - keyboard watcher (F12, F-key block, Shift+F2/F4)
 - pingpong_update.py - self-update from GitHub releases
@@ -33,7 +33,7 @@ The program is split into parts:
 Made by S55OO with AI assistance.
 
 Usage:
-    python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
+    python n1mm_lamps.py [--port 12062] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
@@ -1679,6 +1679,9 @@ class DisplayApp(RulesMixin):
             note = self._my_color_note(owners)
             if note:
                 header = note + "  ·  " + header
+            hint = self._n1mm_hint(now)
+            if hint:
+                header = hint + "  ·  " + header
             pp_note = self._pingpong_note(now)
             if pp_note:
                 header = pp_note + "  ·  " + header
@@ -1991,7 +1994,7 @@ def claim_single_instance(wait):
         time.sleep(0.25)
 
 def main():
-    parser = argparse.ArgumentParser(description="N1MM UDP 12060 display")
+    parser = argparse.ArgumentParser(description="PingPong lamp for N1MM Logger+")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--stale", type=float, default=DEFAULT_STALE)
     parser.add_argument("--config", default=os.path.join(app_dir(), "lamps.cfg"))

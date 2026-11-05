@@ -60,19 +60,19 @@
   <text x="480" y="262" text-anchor="middle" font-size="10" fill="#2c6e2c">broadcast</text>
   <text x="480" y="276" text-anchor="middle" font-size="10" fill="#2c6e2c">x.x.x.255</text>
 
-  <!-- N1MM -> LAN (12060) -->
+  <!-- N1MM -> LAN (12062) -->
   <line x1="310" y1="112" x2="438" y2="112" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
-  <text x="374" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="374" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12062</text>
   <text x="374" y="128" text-anchor="middle" font-size="10" fill="#555">RadioInfo …</text>
   <line x1="650" y1="112" x2="522" y2="112" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
-  <text x="586" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="586" y="104" text-anchor="middle" font-size="11" font-weight="600">UDP 12062</text>
   <text x="586" y="128" text-anchor="middle" font-size="10" fill="#555">RadioInfo …</text>
 
-  <!-- LAN -> lamps (12060) -->
+  <!-- LAN -> lamps (12062) -->
   <line x1="440" y1="214" x2="312" y2="214" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
-  <text x="374" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="374" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12062</text>
   <line x1="520" y1="214" x2="648" y2="214" stroke="#333" stroke-width="2.4" marker-end="url(#a)"/>
-  <text x="586" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12060</text>
+  <text x="586" y="207" text-anchor="middle" font-size="11" font-weight="600">UDP 12062</text>
 
   <!-- lamps <-> LAN (46070) -->
   <line x1="312" y1="266" x2="438" y2="266" stroke="#c07a00" stroke-width="2.4" marker-start="url(#b)" marker-end="url(#b)"/>

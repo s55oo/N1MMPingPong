@@ -14,7 +14,7 @@ It only LISTENS to what the PingPong lamps already broadcast on UDP 46070:
 - relay packets: each lamp's own N1MM RadioInfo (frequency, mode,
   transmitting, function key caption, Run/S&P).
 
-It never sends anything to the lamps and never opens N1MM's port 12060,
+It never opens N1MM's ports (12060, the lamps' 12062),
 so it runs next to a lamp without taking N1MM's packets away from it.
 Stations whose PC runs no lamp are not shown.
 """

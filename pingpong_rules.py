@@ -333,7 +333,7 @@ class RulesMixin:
         if not names:
             return ""
         return "UDP {} also used by {} – N1MM data may be missing here " \
-            "(see README: Another program on 12060)".format(self.port, ", ".join(names))
+            "(see README: Another program on the same port)".format(self.port, ", ".join(names))
 
     def _master_warning(self, now):
         """Text when more than one PC acts or claims to be master, else "".
@@ -560,6 +560,16 @@ class RulesMixin:
         run = self._run_on_band(band, now)
         return run is not None and not run.tx
 
+    def _n1mm_hint(self, now):
+        """This PC's N1MM sends nothing to the lamp's port: say how to fix it."""
+        if now - self.started < 30:
+            return ""
+        mine = self._local_station()
+        if mine is not None and now - mine.last_seen < 30:
+            return ""
+        return ("no data from this PC's N1MM on UDP {0} – N1MM Broadcast Address "
+                "must include 127.0.0.1:{0}".format(self.port))
+
     def _pingpong_note(self, now):
         """Why the ping-pong lock does nothing for this INB, or ""."""
         if not self.pp_enabled or self._my_role_now() != "INB":
@@ -574,7 +584,10 @@ class RulesMixin:
         out = []
         port = self._port_warning()
         if port:
-            out.append(port.split(" – ")[0])  # "UDP 12060 also used by X"
+            out.append(port.split(" – ")[0])  # "UDP 12062 also used by X"
+        hint = self._n1mm_hint(now)
+        if hint:
+            out.append("no N1MM data on UDP {}".format(self.port))
         if keys.supported() and self.key_watcher is None and now - self.started > 10:
             out.append("keyboard watcher not running")
         if ERROR_COUNT[0]:

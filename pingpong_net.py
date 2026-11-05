@@ -2,7 +2,7 @@
 
 - PingPongHello (every 3 s), relay of each lamp's own N1MM RadioInfo
   (PPR1) and commands from PingPong Overview (PPC1) on UDP 46070;
-- the N1MM listener on UDP 12060;
+- the N1MM listener (UDP 12062, N1MM's Broadcast Address must include it);
 - this PC's network adapters and broadcast addresses (Windows API);
 - which other programs listen on N1MM's port.
 """
@@ -333,7 +333,7 @@ def discovery_loop(
 
     Every HELLO_INTERVAL seconds a small PingPongHello packet is broadcast
     on every active adapter (LAN, Wi-Fi, VPN) on the discovery port, which
-    is separate from N1MM's 12060 so N1MM and other loggers never see it.
+    is separate from N1MM's ports so N1MM and other loggers never see it.
     Hellos from other PCs make them known even if their N1MM sends nothing;
     our own hello coming back tells us which of our addresses are live.
     """
