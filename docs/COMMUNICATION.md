@@ -91,7 +91,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.62</Version>
+  <Version>1.63</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -231,8 +231,9 @@ one PC.
 
 One RUN and inband stations (INB1, INB2) on the same band take turns, like
 a doubles match: RUN transmits, and in RUN's listening gap **one** inband
-station transmits. Each PC's role (off / RUN / INB) is set under Options
-and sent in the hello (`<Role>`).
+station transmits. Each PC's role is **automatic by default** – N1MM's
+`IsRunning`: Run = RUN, S&P = INB – or fixed under Options, and is sent
+in the hello (`<Role>`, at once when it changes).
 
 Every lamp sees every transmission start (N1MM's `IsTransmitting`
 changing to True on port 12060), so each INB lamp keeps the same "slot"
@@ -398,5 +399,5 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |
 | Red `⚠ TWO MASTERS: …` | master (46070) | only the master sends `<BlockTime>`: if two lamps do, they don't hear each other – check the firewall on both |
 | Red `⚠ N1MM master on … and …` | N1MM settings | two N1MMs report `IsNetworkMaster=True` – check N1MM's Network Status |
-| Ping-pong lock never locks | 12060 + roles | a station with role **RUN** on the same band; roles set on every PC |
+| Ping-pong lock never locks | 12060 + roles | a station in **Run** (role RUN) on the same band; check the Role column in the Overview |
 | No update offered | lamp → GitHub | internet access to github.com |

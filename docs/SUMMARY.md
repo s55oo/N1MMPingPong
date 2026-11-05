@@ -55,7 +55,8 @@ Full manual: [README](../README.md). How it talks on the network:
   The flashing lasts exactly as long as the message is transmitted.
 
 ### Ping-pong lock (taking turns on one band)
-- Each PC has a role: **RUN**, **INB** (inband) or off.
+- Each PC's role comes **automatically from N1MM**: Run = **RUN**,
+  S&P = **INB** (inband). A fixed role can still be chosen in Options.
 - After RUN transmits, the **first INB that transmits takes the slot**.
   Every other INB is locked (F1–F11, Enter and Insert) until RUN
   transmits again.
@@ -118,7 +119,8 @@ Full manual: [README](../README.md). How it talks on the network:
 1. **Setup, once per PC:**
    - In N1MM's External Broadcast, tick **RadioInfo**, port 12060.
    - Start the lamp.
-   - Set **My name** and the **role** (RUN / INB).
+   - Set **My name**. The ping-pong role follows N1MM by itself
+     (Run = RUN, S&P = INB).
    - Turn on **F12 call** and, where wanted, **Block my F-keys**.
 2. **Before the start, on the master PC:**
    - Start the Overview.

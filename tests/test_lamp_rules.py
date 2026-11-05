@@ -162,6 +162,38 @@ class PingPongTest(unittest.TestCase):
         self.assertIsNone(app._keys_to_block())
 
 
+class AutoRoleTest(unittest.TestCase):
+    def test_auto_follows_n1mm(self):
+        app = make_lamp(my_role="auto")
+        me = station(app, MY_IP, "G4", running=True)
+        self.assertEqual(app._my_role_now(), "RUN")
+        me.running = False
+        self.assertEqual(app._my_role_now(), "INB")
+        me.running = None
+        self.assertEqual(app._my_role_now(), "off")
+        app.my_role = "RUN"  # fixed role wins
+        self.assertEqual(app._my_role_now(), "RUN")
+
+    def test_auto_role_is_announced_and_locks(self):
+        app = make_lamp(my_role="auto")
+        me = station(app, MY_IP, "INB2", running=False)  # S&P -> INB
+        run = station(app, "10.0.0.2", "RUN1", running=True)
+        inb1 = station(app, "10.0.0.3", "INB1", running=False)
+        peer(app, "R", ["10.0.0.2"], alias="RUN1", role="RUN")
+        peer(app, "I", ["10.0.0.3"], alias="INB1", role="INB")
+        app._status_text = lambda: ""
+        self.assertEqual(app._hello_state()["role"], "INB")
+        app._pingpong_tx(run)
+        app._pingpong_tx(inb1)
+        self.assertTrue(app._pingpong_state(time.time())[0])
+        me.running = True  # operator switches N1MM to Run: now RUN, never locked
+        self.assertFalse(app._pingpong_state(time.time())[0])
+        self.assertEqual(app._hello_state()["role"], "RUN")
+
+    def test_peer_never_announces_auto(self):
+        self.assertNotIn("auto", m.SENT_ROLES)
+
+
 class MasterTest(unittest.TestCase):
     def test_n1mm_master_wins_else_first_started(self):
         app = make_lamp(started=100.0)

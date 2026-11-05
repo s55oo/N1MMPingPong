@@ -22,6 +22,19 @@ from pingpong_net import *  # noqa: F401,F403
 
 
 class RulesMixin:
+    def _my_role_now(self):
+        """This PC's ping-pong role right now: RUN, INB or off.
+
+        "auto" (the default) follows this PC's N1MM: Run = RUN, S&P = INB,
+        unknown = off. A fixed role (RUN / INB / off) can be set in Options.
+        """
+        if self.my_role != "auto":
+            return self.my_role
+        mine = self._local_station()
+        if mine is None:
+            return "off"
+        return {True: "RUN", False: "INB"}.get(mine.running, "off")
+
     @locked
     def on_command(self, src, command):
         """Discovery thread: a command from PingPong Overview.
@@ -96,7 +109,7 @@ class RulesMixin:
             self.peers[info["id"]] = peer
         peer.host = info["host"] or src
         peer.alias = (info.get("alias") or "")[:MAX_ALIAS]
-        peer.role = info.get("role", "") if info.get("role") in ROLES else ""
+        peer.role = info.get("role", "") if info.get("role") in SENT_ROLES else ""
         nm = info.get("n1mm_master", "")
         peer.n1mm_master = True if nm == "1" else (False if nm == "0" else None)
         peer.started = info.get("started", 0.0) or 0.0
@@ -166,7 +179,8 @@ class RulesMixin:
             "PingPong master: " + ("this PC" if self._i_am_master else (
                 self.peer_name(self._master_peer) if self._master_peer else "?"
             )),
-            "ping-pong role " + self.my_role
+            "ping-pong role " + self._my_role_now()
+            + (" (auto)" if self.my_role == "auto" else "")
             + (" (LOCKED)" if self._pp_locked else ""),
         ])
 
@@ -181,7 +195,7 @@ class RulesMixin:
             "alert_time": self.alert_time,
             "status": self._status_text(),
             "alias": self.my_alias,
-            "role": self.my_role if self.my_role != "off" else "",
+            "role": self._my_role_now() if self._my_role_now() != "off" else "",
             "n1mm_master": {True: "1", False: "0"}.get(self.n1mm_master, ""),
             "started": self.started,
             "colors": format_colors(self.color_map) if self._i_am_master else "",
@@ -465,7 +479,8 @@ class RulesMixin:
     def role_of(self, st):
         """Ping-pong role of an N1MM station: "RUN", "INB" or ""."""
         if st.ip in self.local:
-            return self.my_role if self.my_role != "off" else ""
+            role = self._my_role_now()
+            return role if role != "off" else ""
         for peer in self._fresh_peers(time.time()):
             if st.ip in peer.ips and not getattr(peer, "same_pc", False):
                 return peer.role
@@ -507,7 +522,7 @@ class RulesMixin:
 
     def _pingpong_state(self, now):
         """(locked, holder station) for this PC as an INB."""
-        if self.my_role != "INB":
+        if self._my_role_now() != "INB":
             return False, None
         mine = self._local_station()
         if mine is None or not mine.key:
