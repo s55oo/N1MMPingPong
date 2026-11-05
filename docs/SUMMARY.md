@@ -87,6 +87,8 @@ Full manual: [README](../README.md). How it talks on the network:
 
 ## 2. The Overview (on the master PC)
 
+![PingPong Overview – ready check, all green](overview.png)
+
 - **One live table** of every station:
   - name (★ = master), PC and version;
   - band, mode, frequency, Run/S&P and role;

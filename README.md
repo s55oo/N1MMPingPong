@@ -501,6 +501,12 @@ table of every PingPong station. Download `pingpong_overview.exe` from
 the [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest),
 put it anywhere and start it – no setup.
 
+![PingPong Overview](docs/overview.png)
+
+*Ready check before the start: RUN1 (master ★, in Run) and the inband
+stations INB1 and INB2 (in S&P) on 7 MHz CW – all green, `✔ READY`,
+ping-pong lock ON.*
+
 | Column | Shows |
 |---|---|
 | Station | name (My name, else PC name); **★** = master |
@@ -692,7 +698,8 @@ build_exe.bat       – local one-click EXE build
 manifest.xml        – PyInstaller manifest (modern common controls)
 pingpong.ico        – app icon (exe, title bar, taskbar)
 help.png            – help icon (embedded in the lamp)
-PingPong.png        – screenshot
+PingPong.png        – screenshot of the lamp
+docs/overview.png   – screenshot of the Overview
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
 docs/SUMMARY.md     – what PingPong does, on one page
