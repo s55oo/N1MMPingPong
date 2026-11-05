@@ -106,14 +106,16 @@ Full manual: [README](../README.md). How it talks on the network:
 
   Each row switches to normal colors when that station starts operating.
 - **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
-- **Update all lamps:** one button. Every lamp downloads the newest
-  release and restarts, and no one has to touch the other PCs. Lamps
-  accept this only from the master PC.
+- **Update all lamps:** one button. It shows how many lamps are behind
+  (`Update 2 lamps…` / `All lamps v1.68 ✔`). Every lamp that needs it
+  downloads the newest release and restarts, and no one has to touch the
+  other PCs. Lamps accept commands only from the master PC.
 - **Function key statistics:** per station, how many transmissions F1–F12
   started, plus total TX time. Kept over restarts, with CSV export.
-- **Updates itself** when a new release is out.
-- It only **listens** to the lamps and never touches N1MM's port, so it
-  is safe to run next to the master's lamp.
+- **Updates itself** when a new release is out (asks first).
+- It listens to the lamps and sends them only those two commands; it
+  never touches N1MM's port, so it is safe to run next to the master's
+  lamp.
 
 ---
 
@@ -175,7 +177,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 55 tests) run on every push before
+- **Automated tests** (`tests/`, 66 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

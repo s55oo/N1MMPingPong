@@ -1,8 +1,9 @@
 # PingPong – how it communicates
 
-This page describes what travels between N1MM Logger+, the PingPong lamps
-and GitHub, and how a lamp decides what to show. For using the lamp see the
-[README](../README.md).
+This page describes what travels between N1MM Logger+, the PingPong lamps,
+the PingPong Overview and GitHub, and how a lamp decides what to show. For
+using the programs see the [README](../README.md); in short:
+[SUMMARY](SUMMARY.md).
 
 - [1. Overview](#1-overview)
 - [2. Ports and messages](#2-ports-and-messages)
@@ -19,26 +20,27 @@ and GitHub, and how a lamp decides what to show. For using the lamp see the
 
 ## 1. Overview
 
-Every operating PC runs **N1MM Logger+** and one **PingPong lamp**. There
-are three kinds of traffic:
+Every operating PC runs **N1MM Logger+** and one **PingPong lamp**; the
+master PC can also run the **PingPong Overview**. There are four kinds of
+traffic:
 
 1. **N1MM → all lamps** (UDP 12060): N1MM's own External Broadcast.
    PingPong only listens to it and never sends anything on this port.
 2. **Lamp ↔ lamp** (UDP 46070): small `PingPongHello` messages with each
    PC's name, color, role, F12 call and state – the **master** adds the
-   automatic colors and the F12 block time – and a **copy of each PC's own
+   automatic colors, both F12 block times and ping-pong lock on/off – and
+   a **copy of each PC's own
    N1MM `RadioInfo`** (relay), so every lamp sees every station on any
    network the lamps share (LAN, ZeroTier, VPN), even if N1MM only sends to
    `127.0.0.1`.
 3. **Lamp → GitHub** (HTTPS): only to check for and download updates.
 4. **Overview** (optional, on the master PC): `pingpong_overview.exe`
-   only **listens** on UDP 46070 – hellos and relays – and shows all
-   stations in a window and as a web page on **TCP 8046**
-   (`http://<master PC>:8046`) for any browser. It sends nothing to the
-   lamps and never opens 12060. From the relayed `RadioInfo` it also
-   counts, per station, which function key started each transmission
+   listens on UDP 46070 – hellos and relays – and shows all stations in a
+   window and as a web page on **TCP 8046** (`http://<master PC>:8046`)
+   for any browser. It never opens 12060. From the relayed `RadioInfo` it
+   also counts, per station, which function key started each transmission
    (`FunctionKeyCaption` at the moment `IsTransmitting` turns True).
-   Its messages to the lamps (`PPC1` + JSON on UDP 46070, obeyed only if
+   Its only messages to the lamps (`PPC1` + JSON on UDP 46070, obeyed only if
    they come from the master PC's address, once per `id`):
    `{"cmd": "update"}` – **Update all lamps** (lamps v1.60+);
    `{"cmd": "pingpong", "value": "1"/"0"}` – ping-pong lock on/off, applied
@@ -63,8 +65,8 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
 | **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
-| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update) |
-| HTTPS 443 | lamp → `api.github.com`, `github.com` | PingPong | release list, exe download |
+| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off) |
+| HTTPS 443 | lamp / Overview → `api.github.com`, `github.com` | PingPong | release list, exe download |
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
 
 Port 46070 is deliberately far away from N1MM's ports: N1MM parses
@@ -81,7 +83,7 @@ PingPong versions that used 12070 made N1MM show an
 | `Mode` | mode group: CW, RTTY, SSB (`USB`/`LSB` count as SSB) |
 | `IsTransmitting` | lamp on/off – True only while **N1MM itself** transmits |
 | `FunctionKeyCaption` | the big text, `Fx` prefix removed – only for keys that start a transmission |
-| `IsRunning` | Run or S&P – decides whether an F12 call applies |
+| `IsRunning` | Run or S&P – the ping-pong role (Run = RUN, S&P = INB) and who an F12 call reaches |
 
 N1MM sends `RadioInfo` immediately on every change and repeats it every
 10 seconds. The packet's source address tells PingPong which PC it came
@@ -118,8 +120,9 @@ from.
 </PingPongHello>
 ```
 
-A lamp sends this every **3 s**, and **at once** when F12 is pressed or the
-name changes. A lamp not heard for **12 s** is considered gone.
+A lamp sends this every **3 s**, and **at once** when something changes
+(F12 or urgent call, name, role, the master's settings). A lamp not heard
+for **12 s** is considered gone.
 
 ### Relay: a lamp passes on its own N1MM's data
 
@@ -248,7 +251,8 @@ for its band without any extra messages:
 - **An INB starts transmitting** while the slot is free → it holds the
   slot. Any other INB on that band is locked until RUN transmits again.
 - The slot holder may transmit again in the same period.
-- No RUN on the band, or RUN silent for 40 s → no lock.
+- No RUN on the band, RUN silent for 40 s, or the lock switched **OFF**
+  on the master (`<PingPong>0`, also from the Overview's button) → no lock.
 
 ```mermaid
 sequenceDiagram
@@ -359,9 +363,20 @@ sequenceDiagram
     end
 ```
 
+Two more ways to update:
+
+- **Update all lamps** (Overview on the master PC): a `PPC1` command
+  `{"cmd": "update"}` makes every lamp (v1.60+) run the same steps at once,
+  without asking on the PCs. A lamp that is already current does nothing.
+- **The Overview updates itself** the same way with
+  `pingpong_overview.exe` from the release (asks first; backup
+  `pingpong_overview.v<old>.exe`).
+
 Releases themselves are made by GitHub Actions: every push to `main` with
-a new `__version__` builds the exe on a clean Windows runner and publishes
-release `v<version>` with notes from `releases/v<version>.md`.
+a new `__version__` (in `pingpong_version.py`) first runs the automated
+tests, then builds both exes on a clean Windows runner, scans them with
+Defender and publishes release `v<version>` with notes from
+`releases/v<version>.md`.
 
 ---
 
@@ -369,7 +384,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 
 | What | Value |
 |---|---|
-| Lamp-to-lamp hello | every 3 s, immediately on F12 / name change |
+| Lamp-to-lamp hello | every 3 s, immediately on any change (calls, name, role, master settings) |
 | N1MM relay | each own `RadioInfo` at once; direct N1MM data preferred if seen in the last 15 s |
 | Lamp considered gone | 12 s without a hello |
 | Network adapters re-read | every 30 s |
@@ -383,7 +398,7 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | Ping-pong lock limit | 40 s without a RUN transmission |
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
-| Update check | once, 3 s after start |
+| Update check | lamp: once, 3 s after start; Overview: 3 s after start, then every 30 min |
 
 ---
 
@@ -396,11 +411,12 @@ release `v<version>` with notes from `releases/v<version>.md`.
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | RUN2's Broadcast Address |
 | Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
 | `PC5: no PingPong heard – firewall?` | lamp ↔ lamp (46070) | N1MM data arrives but no other lamp does: this PC's firewall blocks 46070 |
-| `RUN2: v1.45 – update it` | – | every lamp compares `<Version>` from the hellos with its own |
+| `RUN2: v1.67 – update it` | – | every lamp compares `<Version>` from the hellos with its own; Overview: **Update all lamps…** |
 | F12 does nothing locally | keyboard → lamp | N1MM must be the active window; if N1MM runs as administrator, run PingPong as administrator too |
 | A station seen only over a VPN is missing | relay (46070) | **Share my N1MM with other lamps** on on that PC; firewall allows UDP 46070 on that network |
 | Colors / F12 block time differ between PCs | master (46070) | only one lamp's title says `MASTER`; all PCs on the same version |
 | Red `⚠ TWO MASTERS: …` | master (46070) | only the master sends `<BlockTime>`: if two lamps do, they don't hear each other – check the firewall on both |
 | Red `⚠ N1MM master on … and …` | N1MM settings | two N1MMs report `IsNetworkMaster=True` – check N1MM's Network Status |
-| Ping-pong lock never locks | 12060 + roles | a station in **Run** (role RUN) on the same band; check the Role column in the Overview |
+| Ping-pong lock never locks | 12060 + roles | lock **ON** on the master; a station in **Run** (role RUN) on the same band; check the Role column in the Overview |
+| INB stays locked although RUN transmits | 12060 / relay | RUN's messages must be N1MM-started (not paddle/PTT); RUN's data must reach the INB (Diagnostics shows `RUN transmits – slot free`) |
 | No update offered | lamp → GitHub | internet access to github.com |
