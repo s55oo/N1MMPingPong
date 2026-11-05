@@ -270,7 +270,8 @@ class ProblemsTest(unittest.TestCase):
             m.ERROR_COUNT[0] = old
         self.assertIn("UDP 12062 also used by Callbooker.exe", probs)
         self.assertIn("2 errors in pingpong_error.log", probs)
-        self.assertIn("ping-pong: no RUN on 7 MHz", probs)
+        self.assertIn("no RUN on 7 MHz", probs)
+        self.assertNotIn("ping-pong:", str(probs))
         self.assertEqual(hello["problems"], probs)
 
     def test_no_problems(self):

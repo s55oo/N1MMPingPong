@@ -621,7 +621,7 @@ class RulesMixin:
             return ""
         band = self._my_band()
         if band and self._run_on_band(band, now) is None:
-            return "ping-pong: no RUN on {} MHz – lock off".format(band)
+            return "no RUN on {} MHz – lock off".format(band)
         return ""
 
     def _problems(self, now):

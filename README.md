@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.84 · Made by **S55OO** with AI assistance.
+> **Version:** 1.85 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -259,8 +259,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.84`
-  (the others just `PingPong UDP 12062 v1.84`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.85`
+  (the others just `PingPong UDP 12062 v1.85`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -412,7 +412,7 @@ keeps the current setting.
   disappears as soon as an inband station takes the slot (the others then
   show `WAIT`). GO is visual only, without sound.
 - **No RUN on the band:** an inband lamp says
-  `ping-pong: no RUN on 7 MHz – lock off` (and the Overview's ready check
+  `no RUN on 7 MHz – lock off` (and the Overview's ready check
   shows it in red) – e.g. when the run station is in S&P by mistake.
 - RUN's transmissions must be started by N1MM (F-keys, Enter/Insert) –
   a CQ keyed by paddle or PTT is not reported, so it does not free the
@@ -612,7 +612,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.84 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.85 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -632,7 +632,7 @@ day two). Checked for each lamp:
 - keyboard watcher running where F12 call, F-key block or INB needs it;
 - **problems the lamp reports itself:** no data from its N1MM on UDP 12062, another program on that port
   (e.g. Callbooker), keyboard watcher not running, errors in
-  `pingpong_error.log`, `ping-pong: no RUN on 7 MHz` (lamps v1.69+).
+  `pingpong_error.log`, `no RUN on 7 MHz` (lamps v1.69+).
 
 **Ping-pong lock: ON / OFF** (button, green when on) switches the
 ping-pong lock for all PCs with one click: the master's lamp takes it and
@@ -642,7 +642,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.84 ✔** when every lamp is current – then a
+lists them), **All lamps v1.85 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
