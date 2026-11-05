@@ -128,7 +128,7 @@ async function tick() {
     const L = d.lamp || {};
     const lamp = document.getElementById("lamp");
     lamp.style.background = L.bg || "#3a3a3a";
-    lamp.style.color = textOn(L.bg);
+    lamp.style.color = L.fg || textOn(L.bg);  // same text color as on the PC (GO: black)
     lamp.style.borderColor = L.border || "transparent";
     document.getElementById("text").textContent = L.text || "—";
     document.getElementById("who").textContent = L.who || "";

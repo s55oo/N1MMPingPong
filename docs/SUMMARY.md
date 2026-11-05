@@ -31,14 +31,15 @@ Full manual: [README](../README.md). How it talks on the network:
   band and mode as this PC (1.8–28 MHz; CW, RTTY, SSB). It shows:
   - the station's color;
   - the message, e.g. `CQ` or `5NN TU`;
-  - who is sending, e.g. `RUN1`, and the frequency.
+  - who is sending, e.g. `RUN1`, in big letters top left, and the
+    frequency.
 - Each PC has a **name** (`RUN1`, `INB2` …) and a **color** that are the
   same on every lamp. The master gives out automatic colors, and each
   PC can choose its own.
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.93`.
+  `PingPong - MASTER UDP 12062 v1.94`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -81,8 +82,8 @@ Full manual: [README](../README.md). How it talks on the network:
   transmits again.
 - **Switched on or off for all PCs on the master** – off means nobody is
   locked and every station may transmit without priority.
-- When RUN's transmission ends, the inband lamps show a green **GO**
-  (visual only). The locked lamp shows `WAIT · INB1 · 32 s`; the
+- When RUN's transmission ends, the inband lamps show a green **GO** in
+  black letters (visual only). The locked lamp shows `WAIT · INB1 · 32 s`; the
   lock releases itself after the release time set on the master
   (0–40 s, default 40 s; 0 = only RUN frees it).
 - An inband lamp warns when there is no RUN on its band (lock off).
@@ -261,7 +262,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 174 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 177 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

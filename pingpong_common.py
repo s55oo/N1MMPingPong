@@ -90,6 +90,8 @@ MAX_ALIAS = 12  # characters for "My name"
 SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the same"
 
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
+WHO_FONT = 16  # pt: who sends (RUN1, INB1) in the lamp's top-left corner (was 8)
+LAMP_HEIGHT = 100  # px: lamp height at normal size (was 88; room for the big name)
 
 URGENT_WAIT = 3.0  # s: urgent call ends if N1MM starts no transmission by then
 PRIORITY_DELAY = 0.6  # s: Ctrl+F2/F4 - the others get Esc first, then my F2/F4 is sent
@@ -144,6 +146,8 @@ SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
 GO_COLOR = "#2ea043"  # green GO for inband stations
+GO_COLOR_NIGHT = "#2a7d3c"  # GO in night mode: dimmer, still light enough for black text
+GO_TEXT = "black"  # GO is written in black (white on this green was hard to read)
 TEST_COLOR = "#8957e5"  # lamp test from the Overview
 TEST_TIME = 3.0  # s
 LAMP_SIZES = {"normal": 1.0, "large": 1.4, "xlarge": 1.8}  # lamp size option

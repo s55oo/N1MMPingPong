@@ -121,6 +121,7 @@ class PhoneMixin:
         border = self.canvas.cget("highlightbackground")
         lamp = {
             "bg": self._hex(self.canvas.cget("bg")),
+            "fg": self._hex(self.canvas.itemcget(self.text_id, "fill")),
             "text": self.canvas.itemcget(self.text_id, "text"),
             "who": self._who_text,
             "freq": self._freq_text,

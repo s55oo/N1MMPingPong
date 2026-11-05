@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.93 · Made by **S55OO** with AI assistance.
+> **Version:** 1.94 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -133,8 +133,9 @@ What N1MM reports – and therefore what PingPong can show:
   station in kHz** (e.g. `14025.00 kHz`; also the caller's frequency
   during an F12 call).
 - The lamp's top-left corner shows **who is sending on this band right
-  now** (e.g. `OO840G3`), or `F12: <PC>` during an F12 call; empty when
-  idle.
+  now** in **big letters** (e.g. `RUN1`, `INB1`; 16 pt, larger with the
+  lamp size), or `F12: <PC>` during an F12 call; empty when idle. The lamp
+  is a little taller for it, the message sits a little lower.
 - The line under the lamp lists every station with band, mode and role,
   this PC first, e.g. `RUN1 14 CW RUN (me) · INB1 14 CW INB · PC5 7 SSB RUN`.
   Stations not heard for a minute drop off the list.
@@ -260,8 +261,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.93`
-  (the others just `PingPong UDP 12062 v1.93`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.94`
+  (the others just `PingPong UDP 12062 v1.94`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -434,7 +435,7 @@ keeps the current setting.
   (`ping-pong lock: ON (release 40 s)`). With 0 the locked lamp shows
   `WAIT · INB1` without a countdown.
 - **GO:** when RUN's transmission ends and the slot is free, every inband
-  lamp shows a green **GO** for 3 s – the moment to transmit. It
+  lamp shows a green **GO** (black letters) for 3 s – the moment to transmit. It
   disappears as soon as an inband station takes the slot (the others then
   show `WAIT`). GO is visual only, without sound.
 - **No RUN on the band:** an inband lamp says
@@ -682,7 +683,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.93 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.94 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -712,7 +713,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.93 ✔** when every lamp is current – then a
+lists them), **All lamps v1.94 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.

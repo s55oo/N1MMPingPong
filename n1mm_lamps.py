@@ -650,7 +650,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.canvas = tk.Canvas(
             frame,
             width=330,
-            height=88,
+            height=LAMP_HEIGHT,
             bg=COLOR_IDLE,
             highlightthickness=CALL_BORDER,
             highlightbackground=self.root.cget("bg"),
@@ -659,7 +659,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self._window_bg = self.root.cget("bg") or "SystemButtonFace"
         self.canvas.pack(fill=tk.X)
         self.text_id = self.canvas.create_text(
-            165, 44, text="—", font=("Segoe UI", 26, "bold"), fill="white"
+            165, LAMP_HEIGHT / 2 + 6, text="—", font=("Segoe UI", 26, "bold"), fill="white"
         )
         self.canvas.bind("<Configure>", self._recenter_text)
         # Left click = silence a call; in compact mode dragging moves the
@@ -670,9 +670,9 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.canvas.bind("<Button-3>", self._show_options)
         # Small texts drawn on the lamp itself, used in compact mode.
         # (Canvas coordinates include the call border, so stay inside it.)
-        self.c_who = self.canvas.create_text(
-            CALL_BORDER + 6, CALL_BORDER + 3, text="", anchor="nw",
-            font=("Segoe UI", 8, "bold"), fill="white",
+        self.c_who = self.canvas.create_text(  # who sends (RUN1, INB1): big
+            CALL_BORDER + 6, CALL_BORDER + 1, text="", anchor="nw",
+            font=("Segoe UI", WHO_FONT, "bold"), fill="white",
         )
         self.c_freq = self.canvas.create_text(
             330 - 6, CALL_BORDER + 3, text="", anchor="ne",
@@ -680,7 +680,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         )
         self._freq_text = ""
         self.c_info = self.canvas.create_text(
-            165, 84, text="", anchor="s", font=("Segoe UI", 7),
+            165, LAMP_HEIGHT - 4, text="", anchor="s", font=("Segoe UI", 7),
             fill="white", width=320, justify="center",
         )
         self.info = tk.Label(
@@ -711,11 +711,16 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self._who_text = text
 
     def _set_bg(self, bg):
-        """Lamp background + matching text color (dimmed in night mode)."""
+        """Lamp background + matching text color (dimmed in night mode).
+        GO is always written in black (in night mode too, on a lighter green)."""
+        go = bg == GO_COLOR
         bg = self._shade(bg)
-        if self.canvas.cget("bg") != bg:
+        if go and getattr(self, "night", False):
+            bg = GO_COLOR_NIGHT
+        fg = GO_TEXT if go else self.text_on(bg)
+        if self.canvas.cget("bg") != bg or self.canvas.itemcget(self.text_id, "fill") != fg:
             self.canvas.configure(bg=bg)
-            self.canvas.itemconfigure(self.text_id, fill=self.text_on(bg))
+            self.canvas.itemconfigure(self.text_id, fill=fg)
 
     def _set_border(self, color):
         """The wide call border (dimmed in night mode; window color = none)."""
@@ -737,9 +742,9 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
     def _apply_size(self):
         """Lamp size option: scale the lamp, its texts and the status line."""
         s = self.scale
-        self.canvas.configure(width=int(330 * s), height=int(88 * s))
+        self.canvas.configure(width=int(330 * s), height=int(LAMP_HEIGHT * s))
         self.info.configure(wraplength=int(340 * s), font=("Segoe UI", max(8, int(8 * s))))
-        self.canvas.itemconfigure(self.c_who, font=("Segoe UI", int(8 * s), "bold"))
+        self.canvas.itemconfigure(self.c_who, font=("Segoe UI", int(WHO_FONT * s), "bold"))
         self.canvas.itemconfigure(self.c_freq, font=("Segoe UI", int(8 * s), "bold"))
         self.canvas.itemconfigure(self.c_info, font=("Segoe UI", int(7 * s)))
         text = self.canvas.itemcget(self.text_id, "text")
@@ -783,9 +788,11 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         h = event.height if event else self.canvas.winfo_height()
         # In compact mode the status line sits on the lamp: lift the text.
         lift = 9 if self._compact else 0
-        self.canvas.coords(self.text_id, w / 2.0, h / 2.0 - lift)
+        # A little below the middle: the big name (RUN1, INB1) sits top left.
+        down = 6 * getattr(self, "scale", 1.0)
+        self.canvas.coords(self.text_id, w / 2.0, h / 2.0 + down - lift)
         inset = CALL_BORDER
-        self.canvas.coords(self.c_who, inset + 6, inset + 3)
+        self.canvas.coords(self.c_who, inset + 6, inset + 1)
         self.canvas.coords(self.c_freq, w - inset - 6, inset + 3)
         self.canvas.coords(self.c_info, w / 2.0, h - inset - 2)
         self.canvas.itemconfigure(self.c_info, width=max(50, w - 2 * inset - 12))

@@ -622,5 +622,44 @@ class SetupRestoreTest(unittest.TestCase):
         self.assertEqual(app.my_color, "")
 
 
+class GoTextTest(unittest.TestCase):
+    """GO is written in black; other colors keep the readable black/white rule."""
+
+    class Canvas:
+        def __init__(self):
+            self.bg, self.fill = "", ""
+
+        def cget(self, key):
+            return self.bg
+
+        def configure(self, bg=None, **kw):
+            self.bg = bg
+
+        def itemcget(self, item, key):
+            return self.fill
+
+        def itemconfigure(self, item, fill=None, **kw):
+            self.fill = fill
+
+    def lamp(self, night=False):
+        app = make_lamp(night=night, text_id=1)
+        app.canvas = self.Canvas()
+        app.root.winfo_rgb = lambda c: {m.GO_COLOR: (0x2e00, 0xa000, 0x4300),
+                                        "#c00000": (0xc000, 0, 0)}.get(c, (0, 0, 0))
+        return app
+
+    def test_go_black(self):
+        app = self.lamp()
+        app._set_bg(m.GO_COLOR)
+        self.assertEqual((app.canvas.bg, app.canvas.fill), (m.GO_COLOR, "black"))
+        app._set_bg("#c00000")  # a dark station color: white text as before
+        self.assertEqual(app.canvas.fill, "white")
+
+    def test_go_black_at_night(self):
+        app = self.lamp(night=True)
+        app._set_bg(m.GO_COLOR)
+        self.assertEqual((app.canvas.bg, app.canvas.fill), (m.GO_COLOR_NIGHT, "black"))
+
+
 if __name__ == "__main__":
     unittest.main()
