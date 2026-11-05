@@ -24,9 +24,11 @@ Every operating PC runs **N1MM Logger+** and one **PingPong lamp**; the
 master PC can also run the **PingPong Overview**. There are four kinds of
 traffic:
 
-1. **N1MM → lamp** (UDP 12062): N1MM's own External Broadcast; its
-   Broadcast Address must include `127.0.0.1:12062` (other programs keep
-   N1MM's usual 12060).
+1. **N1MM → lamp** (UDP 12062): N1MM's own External Broadcast; the
+   **Radio** line on N1MM's **Broadcast Data** tab must include
+   `127.0.0.1:12062`, e.g. `127.0.0.1:12060 127.0.0.1:12062` (other
+   programs keep N1MM's usual 12060; the other lines need no change).
+   See the [screenshot](n1mm-broadcast-data.png).
    PingPong only listens to it and never sends anything on this port.
 2. **Lamp ↔ lamp** (UDP 46070): small `PingPongHello` messages with each
    PC's name, color, role, F12 call and state – the **master** adds the

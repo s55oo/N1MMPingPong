@@ -142,9 +142,12 @@ Full manual: [README](../README.md). How it talks on the network:
 ## 3. A contest weekend with PingPong
 
 1. **Setup, once per PC:**
-   - In N1MM's External Broadcast, tick **RadioInfo**, and add
-     `127.0.0.1:12062` to the Broadcast Address (e.g.
-     `127.0.0.1:12060 127.0.0.1:12062`).
+   - In N1MM: **Config → Configure Ports, Mode Control, Winkey, etc… →
+     Broadcast Data**. Tick **Radio** and set its line to
+     `127.0.0.1:12060 127.0.0.1:12062`. Only the Radio line needs 12062;
+     leave the others as they are.
+
+     ![N1MM Broadcast Data – Radio line](n1mm-broadcast-data.png)
    - Start the lamp.
    - Set **My name**. The ping-pong role follows N1MM by itself
      (Run = RUN, S&P = INB).

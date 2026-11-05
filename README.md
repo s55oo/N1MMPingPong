@@ -62,17 +62,23 @@ Three tools are provided:
 
 ## 1. N1MM Logger+ setup
 
-1. On each N1MM Logger+ PC: **File → Settings → Configurer →
-   External Broadcast**, enable **RadioInfo** (required) and any other
-   reports you want (ContactInfo, Spot, AppInfo, dynamicresults …).
-2. **Broadcast Address** must include **`127.0.0.1:12062`** – the lamp
-   listens on **UDP 12062** (since v1.76; before it was 12060). The field
-   takes several destinations separated by spaces, so other programs that
-   use N1MM's usual 12060 (e.g. **Callbooker**) keep working:
+1. On each N1MM Logger+ PC: **Config → Configure Ports, Mode Control,
+   Winkey, etc… → Broadcast Data** tab. Tick **Radio** (required) and any
+   other data you want (Application Info, Contacts, Spots, Score …).
+2. In the **Radio** line add **`127.0.0.1:12062`** – the lamp listens on
+   **UDP 12062** (since v1.76; before it was 12060). A line takes several
+   destinations separated by spaces, so other programs that use N1MM's
+   usual 12060 (e.g. **Callbooker**) keep working:
 
    ```
    127.0.0.1:12060 127.0.0.1:12062
    ```
+
+   Only the **Radio** line needs 12062 – PingPong reads only N1MM's
+   `RadioInfo`. Leave the other lines (Application Info, Contacts, Spots,
+   Score, External Callsign Lookup) as they are. Click **OK**.
+
+   ![N1MM Configurer – Broadcast Data with the Radio line sending to 12060 and 12062](docs/n1mm-broadcast-data.png)
 
    That is enough: the lamp on the same PC passes this PC's N1MM data on
    to all other lamps, on **every** network both PCs are on (LAN, Wi-Fi,
@@ -688,7 +694,7 @@ administrator rights; rule `PingPong Overview web page`, TCP 8046).
 
 | Problem | What to check |
 |---|---|
-| `no data from this PC's N1MM on UDP 12062` | N1MM's **Broadcast Address** must include `127.0.0.1:12062` (e.g. `127.0.0.1:12060 127.0.0.1:12062`) – see [N1MM Logger+ setup](#1-n1mm-logger-setup). |
+| `no data from this PC's N1MM on UDP 12062` | N1MM's **Broadcast Data → Radio** line must include `127.0.0.1:12062` (e.g. `127.0.0.1:12060 127.0.0.1:12062`) – see [N1MM Logger+ setup](#1-n1mm-logger-setup). |
 | Red `⚠ UDP 12062 also used by …` | Another program takes N1MM's packets – see [Another program on the same port](#another-program-on-the-same-port). |
 | Lamp never lights | **Broadcast Data** and **RadioInfo** enabled in N1MM, correct **Broadcast Address**; band/mode in the list above; the lamp only lights for N1MM-started transmissions (not mic PTT/paddle). |
 | My own transmissions don't show | The lamp shows only *your band and mode* – check the line under the lamp shows your station. |
