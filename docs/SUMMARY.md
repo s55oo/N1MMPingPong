@@ -37,14 +37,15 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.81`.
+  `PingPong - MASTER UDP 12062 v1.82`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
 - **Phone lamp:** every lamp is also a web page on **TCP 8047** – the same
   big lamp on a phone or tablet, plus a tile per band showing who
   transmits. The top line of the lamp shows the address to open, e.g.
-  `phone 192.168.1.20:8047 · ZT 10.147.17.3:8047` (LAN and ZeroTier).
+  `192.168.1.20:8047 · 10.147.17.3:8047` (LAN, plus ZeroTier if the PC
+  is on it).
 
   ![Phone lamp](phone-lamp.png)
 

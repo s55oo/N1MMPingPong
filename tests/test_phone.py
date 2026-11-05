@@ -17,13 +17,13 @@ class AddressTest(unittest.TestCase):
             "192.168.1.20")
         self.assertEqual(addrs, {"lan": "192.168.1.20", "zt": "10.147.17.3"})
         self.assertEqual(phone.address_text(addrs, 8047),
-                         "phone 192.168.1.20:8047  ·  ZT 10.147.17.3:8047")
+                         "192.168.1.20:8047  ·  10.147.17.3:8047")
 
     def test_no_zerotier(self):
         addrs = phone.pick_addresses([("192.168.1.20", "Wi-Fi"), ("10.0.0.5", "Ethernet")],
                                      "10.0.0.5")
         self.assertEqual(addrs, {"lan": "10.0.0.5", "zt": ""})
-        self.assertEqual(phone.address_text(addrs, 8047), "phone 10.0.0.5:8047")
+        self.assertEqual(phone.address_text(addrs, 8047), "10.0.0.5:8047")
 
     def test_route_over_zerotier_still_shows_lan(self):
         addrs = phone.pick_addresses(

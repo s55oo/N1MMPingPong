@@ -63,13 +63,10 @@ def pick_addresses(adapters, route_ip=""):
 
 
 def address_text(addrs, port):
-    """'phone 192.168.1.20:8047 · ZT 10.147.17.3:8047' for the lamp header."""
-    parts = []
-    if addrs.get("lan"):
-        parts.append("{}:{}".format(addrs["lan"], port))
-    if addrs.get("zt"):
-        parts.append("ZT {}:{}".format(addrs["zt"], port))
-    return ("phone " + "  ·  ".join(parts)) if parts else ""
+    """'192.168.1.20:8047 · 10.147.17.3:8047' for the lamp header: the LAN
+    address, plus the ZeroTier one when this PC is on ZeroTier."""
+    parts = ["{}:{}".format(addrs[k], port) for k in ("lan", "zt") if addrs.get(k)]
+    return "  ·  ".join(parts)
 
 
 PAGE = """<!doctype html>
