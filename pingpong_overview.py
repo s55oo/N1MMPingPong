@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from tkinter import filedialog, messagebox, ttk
 
 import n1mm_lamps as pp
+import pingpong_update as upd
 
 TITLE = "PingPong Overview"
 SETTINGS_FILE = "pingpong_overview.ini"
@@ -52,6 +53,7 @@ STATUS_N1MM = re.compile(r"N1MM (\S+) (\S+) from [^,]*, (Run|S&P)")
 COLUMNS = [
     # id, heading, width, anchor
     ("station", "Station", 110, "w"),
+    ("check", "Check", 170, "w"),
     ("pc", "PC", 100, "w"),
     ("band", "Band", 50, "center"),
     ("mode", "Mode", 50, "center"),
@@ -66,13 +68,17 @@ COLUMNS = [
     ("seen", "Seen", 55, "e"),
 ]
 # Web page order: what matters during the contest first (phones scroll).
-WEB_ORDER = ["station", "band", "mode", "run", "role", "tx", "calls", "keys",
+WEB_ORDER = ["station", "check", "band", "mode", "run", "role", "tx", "calls", "keys",
              "freq", "last", "pc", "ver", "seen"]
 ROW_STYLE = {  # tag -> (background, text); "tx" uses the station color
     "gone": ("", "#999999"),
     "urgent": ("#ff3030", "#ffffff"),
     "call": ("#ffe08a", "#000000"),
+    "ready_ok": ("#3fb950", "#ffffff"),   # before the station starts operating
+    "ready_bad": ("#8b1a1a", "#ffffff"),  # darker than the "red" station color
 }
+REMOTE_UPDATE_FROM = (1, 60)  # lamps from this version accept "update"
+RELEASE_CHECK = 1800.0  # s: how often to look for the newest release
 
 
 def app_dir():
@@ -170,6 +176,8 @@ class Overview:
         self.error = ""
         self.web_error = ""
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
+        self.operating = set()  # stats keys of PCs that transmitted since the ready check
+        self.newest = ""  # newest release on GitHub ("" = unknown)
         self.stats_path = os.path.join(app_dir(), STATS_FILE)
         self.stats = {}  # stats key -> {"name", "keys": {F1: n}, "other", "tx_time"}
         self.stats_since = time.time()
@@ -189,6 +197,7 @@ class Overview:
         threading.Thread(target=self._listen, daemon=True).start()
         if web_port:
             threading.Thread(target=self._serve_web, daemon=True).start()
+        threading.Thread(target=self._release_loop, daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         self.root.after(REFRESH_MS, self._refresh)
 
@@ -243,6 +252,7 @@ class Overview:
                 if is_tx and not lamp.tx:
                     lamp.tx_start = now
                     self._pingpong_tx(lamp, now)
+                    self.operating.add(lamp.stats_key())  # ready check ends for it
                     self._count_key(lamp, payload, caption)
                 if not is_tx and lamp.tx:
                     lamp.last_tx_end = now
@@ -259,6 +269,117 @@ class Overview:
                 lamp.hello = info
                 lamp.hello_seen = now
                 lamp.src = src
+
+    # ------------------------------------------------------------ ready check / update
+
+    def _release_loop(self):
+        while not self.stop.is_set():
+            try:
+                releases = upd.fetch_releases()
+                if releases:
+                    self.newest = releases[0]["version"]
+            except Exception:
+                pass  # no internet: compare the lamps with each other only
+            self.stop.wait(RELEASE_CHECK)
+
+    def _target_version(self, live):
+        versions = [l.hello.get("version") for l in live if l.hello.get("version")]
+        if self.newest:
+            versions.append(self.newest)
+        return max(versions, key=version_key) if versions else ""
+
+    def _problems(self, lamp, now, masters, target):
+        """What is not ready on this lamp's PC (empty list = all fine)."""
+        h = lamp.hello
+        status = h.get("status", "")
+        live = now - max(lamp.hello_seen, lamp.radio_seen)
+        if live > GONE_AFTER:
+            return ["not heard for {}".format(ago(live))]
+        out = []
+        ver = h.get("version", "")
+        if target and ver and version_key(ver) < version_key(target):
+            out.append("v{} – update to v{}".format(ver, target))
+        if now - lamp.radio_seen > 30:
+            out.append("no N1MM data")
+        elif not lamp.key():
+            out.append("band/mode not supported")
+        if not masters:
+            out.append("no master")
+        elif len(masters) > 1 and lamp in masters:
+            out.append("two masters")
+        needs_keys = (
+            "F12 call option on" in status or "block option on" in status
+            or h.get("role") == "INB"
+        )
+        if needs_keys and "keyboard watcher off" in status:
+            out.append("keyboard watcher not running")
+        return out
+
+    def _ready_check(self):
+        """Start the ready check again: every row green/red until it transmits."""
+        with self.lock:
+            self.operating.clear()
+
+    def _send_command(self, payload):
+        sent = 0
+        try:
+            nets = pp.local_networks()
+        except Exception:
+            nets = []
+        for ip, bcast in nets:
+            try:
+                sock = pp._sender_socket(ip)
+            except OSError:
+                continue
+            try:
+                for target in (bcast, "255.255.255.255"):
+                    try:
+                        sock.sendto(payload, (target, self.port))
+                        sent += 1
+                    except OSError:
+                        pass
+            finally:
+                sock.close()
+        return sent
+
+    def _on_master_pc(self, now):
+        """Is the master lamp on this PC? Lamps take commands only from it."""
+        try:
+            mine = {ip for ip, _ in pp.local_networks()} | {"127.0.0.1"}
+        except Exception:
+            return True
+        masters = self._masters(now)
+        return any(m.src in mine or set(m.hello.get("ips") or []) & mine for m in masters)
+
+    def _update_all(self):
+        now = time.time()
+        with self.lock:
+            live = [l for l in self.lamps.values() if now - l.hello_seen <= GONE_AFTER]
+            target = self._target_version(live)
+            old = sorted(
+                (l.name(), l.hello.get("version", "?")) for l in live
+                if version_key(l.hello.get("version", "")) < version_key(target)
+            )
+            manual = [n for n, v in old if version_key(v) < REMOTE_UPDATE_FROM]
+            on_master = self._on_master_pc(now)
+        lines = []
+        if self.newest:
+            lines.append("Newest release on GitHub: v{}.".format(self.newest))
+        if old:
+            lines.append("Not on v{}: {}.".format(target, ", ".join("{} (v{})".format(n, v) for n, v in old)))
+        else:
+            lines.append("All lamps already run v{}.".format(target or "?"))
+        if manual:
+            lines.append("\nOlder than v1.60, update these by hand once: {}.".format(", ".join(manual)))
+        if not on_master:
+            lines.append("\n⚠ This PC is not the master PC – the lamps will ignore the request.")
+        lines.append("\nAsk every lamp to install the newest release now?\n"
+                     "Each lamp downloads it and restarts (a few seconds).")
+        if not messagebox.askyesno(TITLE + " - update all lamps", "\n".join(lines), parent=self.root):
+            return
+        sent = self._send_command(pp.make_command("update"))
+        if not sent:
+            messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
 
     # ------------------------------------------------------------ statistics
 
@@ -493,6 +614,8 @@ class Overview:
         if self.web_port and sys.platform == "win32":
             tk.Button(top, text="Allow web page in firewall…",
                       command=self._allow_firewall).pack(side=tk.RIGHT, padx=8)
+        tk.Button(top, text="Update all lamps…", command=self._update_all).pack(side=tk.RIGHT)
+        tk.Button(top, text="Ready check", command=self._ready_check).pack(side=tk.RIGHT, padx=8)
         self._on_top(save=False)
 
         style = ttk.Style(self.root)
@@ -565,8 +688,10 @@ class Overview:
 
     # ------------------------------------------------------------ table data
 
-    def _row(self, lamp, now, masters):
+    def _row(self, lamp, now, masters, target=""):
         h = lamp.hello
+        problems = self._problems(lamp, now, masters, target)
+        ready_mode = lamp.stats_key() not in self.operating
         key = lamp.key()
         band, mode = key if key else ("", "")
         status = h.get("status", "")
@@ -594,6 +719,7 @@ class Overview:
         name = lamp.name() + ("  ★" if lamp in masters else "")
         values = {
             "station": name,
+            "check": ("✖ " + "; ".join(problems)) if problems else "✔ OK",
             "pc": h.get("host", "") or lamp.src,
             "band": band,
             "mode": mode,
@@ -608,7 +734,10 @@ class Overview:
             "seen": ago(live),
         }
         bg, fg = "", ""
-        if live > GONE_AFTER:
+        if ready_mode:
+            # Before this station starts operating: green = ready, red = not.
+            tag = "ready_bad" if problems else "ready_ok"
+        elif live > GONE_AFTER:
             tag = "gone"
         elif h.get("urgent"):
             tag = "urgent"
@@ -637,7 +766,10 @@ class Overview:
                 del self.lamps[node_id]
             lamps = list(self.lamps.values())
             masters = self._masters(now)
-            rows = [self._row(lamp, now, masters) for lamp in lamps]
+            live_all = [l for l in lamps if now - l.hello_seen <= GONE_AFTER]
+            target = self._target_version(live_all)
+            rows = [self._row(lamp, now, masters, target) for lamp in lamps]
+            waiting = [l for l in lamps if l.stats_key() not in self.operating]
             slots = dict(self.slots)
         rows.sort(key=lambda r: r["sort"])
         live = [l for l in lamps if now - l.hello_seen <= GONE_AFTER]
@@ -653,6 +785,15 @@ class Overview:
                 len(live), ", ".join(sorted(m.name() for m in masters)))
         else:
             head = "{} lamps  ·  no master heard".format(len(live))
+        ready = None
+        if waiting:
+            bad = [r for r in rows if r["tag"] == "ready_bad"]
+            if bad:
+                ready = "bad"
+                head = "✖ NOT READY ({} of {})  ·  ".format(len(bad), len(waiting)) + head
+            else:
+                ready = "ok"
+                head = "✔ READY  ·  " + head
         notes = []
         for err in (self.error, self.web_error):
             if err:
@@ -678,7 +819,7 @@ class Overview:
                 "since": time.strftime("%d.%m. %H:%M", time.localtime(self.stats_since)),
             },
             "title": "{} v{}".format(TITLE, pp.__version__),
-            "head": head, "warn": warn, "rows": rows, "notes": notes,
+            "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
             "columns": [[cid, dict((c[0], c[1]) for c in COLUMNS)[cid]] for cid in WEB_ORDER],
             "time": time.strftime("%H:%M:%S"),
         }
@@ -710,7 +851,9 @@ class Overview:
                     self.tree.move(row["id"], "", index)
             else:
                 self.tree.insert("", index, iid=row["id"], values=vals, tags=tags)
-        self.head.configure(text=snap["head"], fg="#c00000" if snap["warn"] else "black")
+        self.head.configure(text=snap["head"], fg=(
+            "#c00000" if snap["warn"] or snap["ready"] == "bad"
+            else "#1f8a3b" if snap["ready"] == "ok" else "black"))
         self.stats_label.configure(
             text="Transmissions started by each function key, since {}".format(snap["stats"]["since"]))
         self.stree.delete(*self.stree.get_children())
@@ -742,6 +885,7 @@ PAGE = """<!doctype html>
   h1 { font-size:18px; margin:0 0 4px; }
   #head { font-weight:600; }
   #head.warn { color:var(--warn); }
+  #head.ok { color:#1f8a3b; }
   #status { color:var(--muted); font-size:12px; }
   #status.lost { color:var(--warn); font-weight:600; }
   .wrap { overflow-x:auto; margin:0 16px; background:var(--card);
@@ -791,7 +935,8 @@ function render(d) {
   document.getElementById("title").textContent = d.title;
   document.title = d.title;
   const head = document.getElementById("head");
-  head.textContent = d.head; head.className = d.warn ? "warn" : "";
+  head.textContent = d.head;
+  head.className = (d.warn || d.ready === "bad") ? "warn" : (d.ready === "ok" ? "ok" : "");
   if (cols.length !== d.columns.length) {
     cols = d.columns;
     const tr = document.getElementById("cols"); tr.innerHTML = "";

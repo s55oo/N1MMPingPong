@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.59 · Made by **S55OO** with AI assistance.
+> **Version:** 1.60 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently
@@ -476,6 +476,7 @@ put it anywhere and start it – no setup.
 | Column | Shows |
 |---|---|
 | Station | name (My name, else PC name); **★** = master |
+| Check | `✔ OK`, or what is not ready (see *Ready check*) |
 | PC, Version | Windows name and PingPong version |
 | Band, Mode, Frequency, Run/S&P | from that PC's N1MM |
 | Role | ping-pong role (RUN / INB / –) |
@@ -488,6 +489,27 @@ put it anywhere and start it – no setup.
 Above the table: number of lamps, the master and both F12 block times – or
 a red `⚠ TWO MASTERS`. Below it: different versions, who holds the
 ping-pong slot per band, and lamps whose N1MM data doesn't arrive.
+
+**Ready check.** When the Overview starts, every station's row is
+**green** (ready) or **dark red** (a problem, shown in **Check**), until
+that station **transmits for the first time** – from then on its row is
+colored as usual (station color while transmitting, yellow for an F12
+call …). The line above the table says `✔ READY` or
+`✖ NOT READY (2 of 3)`. Press **Ready check** to start it again (e.g. before
+day two). Checked for each lamp:
+
+- heard on the network (`not heard for …`);
+- same version as the newest lamp / the newest release on GitHub
+  (`v1.59 – update to v1.60`);
+- N1MM data arrives and its band/mode is supported (`no N1MM data`);
+- exactly one master (`no master`, `two masters`);
+- keyboard watcher running where F12 call, F-key block or INB needs it.
+
+**Update all lamps…** asks every lamp to download the newest release from
+GitHub and restart – no need to go to each PC. The dialog first lists
+which lamps are not up to date. Lamps accept this **only from the master
+PC** (where the Overview runs) and only from **v1.60** on; older lamps
+must be updated by hand once.
 
 **Function keys tab.** For every station: how many transmissions each
 function key **F1–F12** started, **Other** (a caption without an F-key

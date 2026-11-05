@@ -22,14 +22,14 @@ are kept in pingpong.ini next to the exe.
 
 Made by S55OO with AI assistance.
 
-Version: 1.59
+Version: 1.60
 
 Usage:
     python n1mm_lamps.py [--port 12060] [--stale 5.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
-__version__ = "1.59"
+__version__ = "1.60"
 
 import argparse
 import base64
@@ -643,6 +643,34 @@ def make_relay(node_id, data):
     return RELAY_MAGIC + node_id.encode("ascii") + b"\n" + data
 
 
+COMMAND_MAGIC = b"PPC1"  # command from PingPong Overview on the master PC
+
+
+def make_command(cmd, to="*", **args):
+    """Overview -> lamps: e.g. make_command("update")."""
+    import json
+    import uuid
+
+    body = {"id": uuid.uuid4().hex, "cmd": cmd, "to": to}
+    body.update(args)
+    return COMMAND_MAGIC + json.dumps(body).encode("utf-8")
+
+
+def parse_command(data):
+    """dict of a command message, or None."""
+    if not data.startswith(COMMAND_MAGIC):
+        return None
+    import json
+
+    try:
+        body = json.loads(data[len(COMMAND_MAGIC):].decode("utf-8"))
+    except ValueError:
+        return None
+    if not isinstance(body, dict) or not body.get("id") or not body.get("cmd"):
+        return None
+    return body
+
+
 def parse_relay(data):
     """(node_id, N1MM packet) of a relay message, or None."""
     if not data.startswith(RELAY_MAGIC):
@@ -664,7 +692,7 @@ def send_relay(share, payload):
 
 def discovery_loop(
     port, node_id, get_state, on_networks, on_hello, stop, hello_now=None,
-    share=None, on_relay=None,
+    share=None, on_relay=None, on_command=None,
 ):
     """Active discovery between PCs running PingPong.
 
@@ -739,6 +767,11 @@ def discovery_loop(
             continue
         except OSError:
             stop.wait(0.3)
+            continue
+        command = parse_command(data)
+        if command is not None:
+            if on_command is not None:
+                guarded("command", on_command)(addr[0], command)
             continue
         relay = parse_relay(data)
         if relay is not None:
@@ -982,6 +1015,7 @@ class DisplayApp:
                     self.hello_now,
                     self._share,
                     self.on_relay,
+                    self.on_command,
                 ),
                 daemon=True,
             )
@@ -1003,6 +1037,62 @@ class DisplayApp:
                 self.root.after(3000, lambda: self._check_updates(manual=False))
 
     # ---------------------------------------------------------- updates
+
+    def on_command(self, src, command):
+        """Discovery thread: a command from PingPong Overview.
+
+        Accepted only from the master PC (the Overview runs there), never
+        twice (it arrives on every network), only if meant for this lamp.
+        """
+        seen = self.__dict__.setdefault("_commands_seen", [])
+        if command["id"] in seen:
+            return
+        seen.append(command["id"])
+        del seen[:-50]
+        if command.get("to") not in ("*", self.node_id):
+            return
+        master = self._master_peer
+        from_master = (
+            (self._i_am_master and src in self.local)
+            or (master is not None and src in master.ips)
+        )
+        if not from_master:
+            self._key_event("command '{}' from {} ignored - not the master PC".format(
+                command["cmd"], src))
+            return
+        self._key_event("command '{}' from the master PC".format(command["cmd"]))
+        if command["cmd"] == "update":
+            self._ui_calls.append(self._remote_update)
+
+    def _remote_update(self):
+        """'Update all lamps' from the Overview: install the newest release
+        without asking (the master's operator asked for it)."""
+        if not upd.is_frozen():
+            self._show_status("update request ignored - running from source")
+            return
+        if self._busy:
+            return
+        self._busy = True
+        self._status = "update requested by the master – checking…"
+
+        def done(releases, error):
+            self._busy = False
+            self._status = ""
+            if error is not None:
+                self._show_status("update check failed: {}".format(error))
+                return
+            new = upd.newer_release(releases, __version__)
+            if new is None:
+                self._show_status("already the newest version (v{})".format(__version__))
+                return
+            self._install(new)
+
+        self._run_bg(upd.fetch_releases, done)
+
+    def _show_status(self, text, seconds=10):
+        self._status = text
+        self.root.after(int(seconds * 1000), lambda: (
+            setattr(self, "_status", "") if self._status == text else None))
 
     def _run_bg(self, work, done):
         """Run work() in a thread, then done(result, error) in the UI."""
