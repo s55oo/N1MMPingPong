@@ -36,6 +36,8 @@ Full manual: [README](../README.md). How it talks on the network:
   PC can choose its own.
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
+- The **title bar** shows the N1MM port and version, e.g.
+  `PingPong - MASTER UDP 12062 v1.80`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -209,7 +211,7 @@ the lamp downloads it if it is missing. One Overview per PC.
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 99 tests) run on every push before
+- **Automated tests** (`tests/`, 100 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

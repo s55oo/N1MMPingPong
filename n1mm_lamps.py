@@ -498,8 +498,8 @@ class DisplayApp(RulesMixin):
         )
         menu.add_separator()
         menu.add_command(
-            label="PingPong v{}{}".format(
-                __version__, "" if frozen else "  (source - updates only in exe)"
+            label="PingPong  UDP {}  v{}{}".format(
+                self.port, __version__, "" if frozen else "  (source - updates only in exe)"
             ),
             state=tk.DISABLED,
         )
@@ -787,8 +787,8 @@ class DisplayApp(RulesMixin):
     def _set_title(self, master):
         """Title bar: 'MASTER' on the master PC only."""
         title = (
-            "PingPong  -  MASTER  v{}" if master else "PingPong  v{}"
-        ).format(__version__)
+            "PingPong  -  MASTER  UDP {}  v{}" if master else "PingPong  UDP {}  v{}"
+        ).format(self.port, __version__)
         if getattr(self, "_title", None) != title:
             self._title = title
             self.root.title(title)

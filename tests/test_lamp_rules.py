@@ -555,5 +555,16 @@ class OpenOverviewTest(unittest.TestCase):
         self.assertIn("Overview started", app.events)
 
 
+class TitleTest(unittest.TestCase):
+    def test_title_shows_port_before_version(self):
+        titles = []
+        app = make_lamp(port=12062)
+        app.root.title = titles.append
+        app._set_title(True)
+        app._set_title(False)
+        self.assertEqual(titles, ["PingPong  -  MASTER  UDP 12062  v" + m.__version__,
+                                  "PingPong  UDP 12062  v" + m.__version__])
+
+
 if __name__ == "__main__":
     unittest.main()
