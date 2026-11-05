@@ -682,6 +682,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         )
         self.info.pack(fill=tk.X)
         self._info_fg = self.info.cget("fg")
+        # Click on the line under the lamp: enter the network password when asked for.
+        self.info.bind("<Button-1>", lambda e: self._password_click())
 
     def _rgb(self, color):
         """(r, g, b) 0-255 of any Tk color name or #rrggbb, or None."""
@@ -1094,7 +1096,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
     def _update_tail(self):
         self._phone_tail()
         warns = [w for w in (self._master_warn, self._port_warning()) if w]
-        warns += auth_problems(time.time(), self.local)
+        warns += self._password_warnings(time.time())
         if warns:
             self.info.configure(
                 text="  ·  ".join("⚠ " + w for w in warns) + "  ·  " + self.info.cget("text"),

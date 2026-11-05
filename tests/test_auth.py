@@ -124,5 +124,86 @@ class CsvSafeTest(unittest.TestCase):
         self.assertEqual(rows[0]["station"], "=HYPERLINK(\"http://x\")")  # shown as typed
 
 
+class JoinTest(unittest.TestCase):
+    """A lamp without (or with an old) password asks for it and checks it."""
+
+    def setUp(self):
+        net.set_network_key(b"")
+        net.AUTH_SEEN.clear()
+        del net.AUTH_SAMPLES[:]
+        net.AUTH_NAMES.clear()
+        self.key = net.derive_key("cqww")
+        hello = m.make_hello("M", "PC1", ["10.0.0.9"], True, alias="RUN1")
+        net.unseal(net.seal(hello, key=self.key), "10.0.0.9")  # heard from the master
+
+    def tearDown(self):
+        net.set_network_key(b"")
+        net.AUTH_SEEN.clear()
+        del net.AUTH_SAMPLES[:]
+
+    def test_needed_and_checked(self):
+        self.assertEqual(net.password_needed(time.time()), (True, "RUN1"))
+        self.assertTrue(net.password_matches("cqww"))
+        self.assertFalse(net.password_matches("wrong"))
+        net.set_network_key(self.key)
+        self.assertFalse(net.password_needed(time.time())[0])
+
+    def test_no_sample_cannot_check(self):
+        del net.AUTH_SAMPLES[:]
+        self.assertIsNone(net.password_matches("cqww"))
+
+    def lamp(self, answers):
+        import pingpong_lamp_menu as menu
+
+        class Settings:
+            values = {}
+
+            def set_text(self, sec, key, value):
+                self.values[(sec, key)] = value
+
+        app = make_lamp(settings=Settings())
+        asked = []
+        self.saved = (menu.simpledialog.askstring, menu.messagebox.showinfo)
+        menu.simpledialog.askstring = lambda *a, **k: (asked.append(a[1]), answers.pop(0))[1]
+        menu.messagebox.showinfo = lambda *a, **k: None
+        self.addCleanup(self.restore, menu)
+        return app, asked
+
+    def restore(self, menu):
+        menu.simpledialog.askstring, menu.messagebox.showinfo = self.saved
+
+    def test_wrong_then_right(self):
+        app, asked = self.lamp(["nope", "cqww"])
+        app._ask_network_password()
+        self.assertEqual(len(asked), 2)
+        self.assertIn("Wrong password", asked[1])
+        self.assertEqual(net.AUTH["key"], self.key)
+        self.assertEqual(app.settings.values[("network", "auth_key")], self.key.hex())
+        self.assertTrue(app.hello_now.is_set())
+
+    def test_cancel_changes_nothing(self):
+        app, _ = self.lamp([None])
+        app._ask_network_password()
+        self.assertEqual(net.AUTH["key"], b"")
+
+    def test_red_line_and_popup_only_after_start(self):
+        app = make_lamp(started=time.time())
+        lines = app._password_warnings(time.time())
+        self.assertIn("click here", lines[0])
+        self.assertIn("RUN1", lines[0])
+        self.assertEqual(len(app.root.scheduled), 1)  # one pop-up, right after start
+        app._password_warnings(time.time())
+        self.assertEqual(len(app.root.scheduled), 1)
+        late = make_lamp(started=time.time() - 3600)  # mid-contest: never a pop-up
+        late._password_warnings(time.time())
+        self.assertEqual(late.root.scheduled, [])
+
+    def test_names_in_warnings(self):
+        net.set_network_key(net.derive_key("other"))
+        net.unseal(m.make_hello("B", "PC2", ["10.0.0.5"], True, alias="INB2"), "10.0.0.5")
+        texts = net.auth_problems(time.time())
+        self.assertIn("INB2 (10.0.0.5): no network password – ignored", texts)
+
+
 if __name__ == "__main__":
     unittest.main()

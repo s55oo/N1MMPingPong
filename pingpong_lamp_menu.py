@@ -298,6 +298,62 @@ class OptionsMixin:
             side=tk.LEFT, padx=4
         )
 
+    # ----- joining a protected PingPong network
+
+    def _password_warnings(self, now):
+        """Red line texts: a request for the password, or what is ignored."""
+        needed, who = password_needed(now)
+        if needed:
+            if not getattr(self, "_pw_asked", False) and now - self.started < 60:
+                self._pw_asked = True  # once, right after the start - never mid-contest
+                self.root.after(500, lambda: self._ask_network_password(auto=True))
+            if AUTH["key"]:
+                return ["🔒 {} uses a different network password – click here to enter it".format(who)]
+            return ["{} ({})".format(PASSWORD_NEEDED_TEXT, who)]
+        return auth_problems(now, self.local)
+
+    def _password_click(self):
+        if password_needed(time.time())[0]:
+            self._ask_network_password(auto=False)
+
+    def _ask_network_password(self, auto=False):
+        """Ask for the password of the PingPong network heard here and check
+        it at once against a message just received from it."""
+        if getattr(self, "_pw_dialog_open", False):
+            return
+        needed, who = password_needed(time.time())
+        if not needed:
+            return
+        self._pw_dialog_open = True
+        try:
+            prompt = ("This PingPong network uses a password (heard from {}).\n"
+                      "Enter it to connect – the same as on the master.\n\n"
+                      "Cancel = later: click the red line under the lamp.").format(who)
+            while True:
+                text = simpledialog.askstring("PingPong - network password", prompt,
+                                              show="*", parent=self.root)
+                if not text or not text.strip():
+                    return
+                ok = password_matches(text.strip())
+                if ok is False:
+                    prompt = ("Wrong password – it doesn't match the messages from {}.\n"
+                              "Try again (Cancel = later).").format(who)
+                    continue
+                break
+            key = derive_key(text.strip())
+            set_network_key(key)
+            self.settings.set_text("network", "auth_key", key.hex())
+            AUTH_SEEN.clear()
+            self._key_event("network password entered{}".format("" if ok else " (not checked)"))
+            self.hello_now.set()
+            if not auto or ok is None:
+                messagebox.showinfo("PingPong", "Connected ✔" if ok else
+                                    "Password saved – it couldn't be checked yet (no recent "
+                                    "message); a red line will tell if it's wrong.",
+                                    parent=self.root)
+        finally:
+            self._pw_dialog_open = False
+
     def _choose_network_password(self):
         """Same password on every PC (and in the Overview): the lamps then
         sign their messages and ignore any without the right signature."""
@@ -325,12 +381,14 @@ class OptionsMixin:
         key = derive_key(text)
         set_network_key(key)
         self.settings.set_text("network", "auth_key", key.hex())
+        AUTH_SEEN.clear()
         self._key_event("network password {}".format("set" if key else "off"))
         self.hello_now.set()
         messagebox.showinfo(
             "PingPong",
-            "Network password {}.\n\nSet the same on every PC (Options ▾ → Network password…) "
-            "and in the Overview (Setup ▾ → Network password…).".format("set" if key else "off"),
+            "Network password {}.\n\nThe other lamps notice it and ask for it themselves "
+            "(red line under the lamp – click it). The Overview on this PC uses it too."
+            .format("set" if key else "off") if key else "Network password off.",
             parent=self.root)
 
     def _firewall_rules(self):

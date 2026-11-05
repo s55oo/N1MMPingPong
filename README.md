@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.91 · Made by **S55OO** with AI assistance.
+> **Version:** 1.92 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -260,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.91`
-  (the others just `PingPong UDP 12062 v1.91`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.92`
+  (the others just `PingPong UDP 12062 v1.92`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -470,10 +470,19 @@ device on the same LAN or ZeroTier network could pretend to be a lamp or
 the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
 **network password** that can't happen:
 
-- Set the **same password on every PC** (Options ▾ → **Network
-  password…**, typed twice) and in the Overview (**Setup ▾ → Network
-  password…**; on the master PC it also takes the lamp's setting from
-  `pingpong.ini` next to it).
+- Set it **once on the master's lamp** (Options ▾ → **Network
+  password…**, typed twice). The Overview on the master PC takes it from
+  the lamp by itself (or set it there: **Setup ▾ → Network password…**).
+- **The other lamps ask for it themselves:** a lamp that hears protected
+  messages it can't read shows a red line
+  `🔒 this PingPong network has a password – click here to enter it (RUN1)`.
+  Click it, type the password once – the lamp checks it at once against a
+  message just received from the master (`Wrong password – try again`) and
+  saves it. Right after a lamp starts the question pops up by itself;
+  later it never does (no window jumps in front of N1MM during a QSO) –
+  then only the red line. The same happens when the password is changed
+  on the master. The password itself never goes over the network – each
+  PC has it typed in once.
 - Every hello, relay, command and ping answer then carries a time stamp
   and an **HMAC-SHA256** signature. Messages without it, with a different
   password, changed on the way, or **older than 5 minutes** (a recorded
@@ -481,8 +490,8 @@ the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
   5 minutes (NTP).
 - Only a key made from the password is stored (`pingpong.ini`, section
   `[network]`), never the password itself.
-- The lamp says what it ignores, in red: `10.0.0.5: different network
-  password – ignored`, `… no network password – ignored`,
+- The lamp and the Overview say what they ignore, in red, with the
+  station's name: `INB2 (10.0.0.5): no network password – ignored`,
   `… wrong time (check the PC clock) – ignored`. A lamp **without** a
   password still hears a protected group and says
   `other lamps use a network password – set it…`.
@@ -648,7 +657,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.91 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.92 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -678,7 +687,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.91 ✔** when every lamp is current – then a
+lists them), **All lamps v1.92 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.

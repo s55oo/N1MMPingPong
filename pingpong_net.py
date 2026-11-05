@@ -377,6 +377,9 @@ AUTH_MARK = b"\n#PPS1 "
 AUTH_WINDOW = 300.0  # s: accepted age of a signed message (PC clocks must agree)
 AUTH = {"key": b""}  # derived key; b"" = no password
 AUTH_SEEN = {}  # (status, src ip) -> last time; for the warnings on the lamp / Overview
+AUTH_SAMPLES = []  # [(time, src, signed message)] we could not check: to test a typed password
+AUTH_NAMES = {}  # src ip -> name from a rejected hello (shown in warnings only)
+PASSWORD_NEEDED_TEXT = "🔒 this PingPong network has a password – click here to enter it"
 
 
 def derive_key(password):
@@ -441,7 +444,43 @@ def unseal(data, src="", now=None, key=None):
         AUTH_SEEN[(status, src)] = now
     elif src and status == "none" and key:
         AUTH_SEEN[("none", src)] = now
+    if src and status not in ("ok",) and not (status == "none" and not key):
+        _remember(src, payload, data if status in ("foreign", "bad") else None, now)
     return payload, status
+
+
+def _remember(src, payload, signed, now):
+    """Keep a name for the warnings and a sample to check a typed password."""
+    import re
+
+    m = re.search(rb"<Alias>([^<]{1,40})</Alias>", payload) or \
+        re.search(rb"<Host>([^<]{1,40})</Host>", payload)
+    if m:
+        AUTH_NAMES[src] = m.group(1).decode("utf-8", "replace")
+    if signed is not None:
+        AUTH_SAMPLES.append((now, src, signed))
+        del AUTH_SAMPLES[:-20]
+
+
+def password_matches(password, now=None, within=600.0):
+    """Does this password sign the protected messages heard lately?
+    None = no recent signed message to check against."""
+    now = time.time() if now is None else now
+    recent = [data for when, _src, data in AUTH_SAMPLES if now - when <= within]
+    if not recent:
+        return None
+    key = derive_key(password)
+    return any(unseal(data, key=key, now=now)[1] in ("ok", "old") for data in recent)
+
+
+def password_needed(now, within=30.0):
+    """(True, who) when lamps nearby use a password this PC doesn't have
+    (none set, or a different one); who = the name heard from them."""
+    status = "bad" if AUTH["key"] else "foreign"
+    srcs = [src for (st, src), when in AUTH_SEEN.items() if st == status and now - when <= within]
+    if not srcs:
+        return False, ""
+    return True, ", ".join(sorted({AUTH_NAMES.get(s, s) for s in srcs}))
 
 
 def accepted(status):
@@ -466,7 +505,9 @@ def auth_problems(now, local=(), within=30.0, where="Options ▾ → Network pas
         if status == "foreign":
             continue
         if status in labels and AUTH["key"]:
-            out.append("{}: {} – ignored".format(src, labels[status]))
+            name = AUTH_NAMES.get(src)
+            out.append("{}: {} – ignored".format(
+                "{} ({})".format(name, src) if name else src, labels[status]))
     if not AUTH["key"] and any(st == "foreign" and now - w <= within
                                for (st, _), w in AUTH_SEEN.items()):
         out.append("other lamps use a network password – set it: " + where)

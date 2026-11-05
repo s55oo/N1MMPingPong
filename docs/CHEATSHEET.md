@@ -48,7 +48,7 @@ One page for every operating position. **Printable PDF:**
 | red `⚠ UDP 12062 also used by …` | Another program on this PC is taking N1MM's data. Tell the captain. |
 | `no PingPong heard – firewall?` | Options ▾ → **Allow PingPong in Windows Firewall…** (it asks for administrator rights). |
 | `⚠ TWO MASTERS`, or different versions | Tell the captain (Overview: **Update all lamps…**). |
-| `… different network password – ignored` | That PC has another network password, or none. Use the same password on every PC: Options ▾ → **Network password…**. |
+| `🔒 this PingPong network has a password – click here…` | Click the line and type the network password (ask the captain). It is checked at once. |
 | Lamp gone or closed | Start `n1mm_lamps.exe` again; only one lamp runs per PC. The Overview raises an alarm when an operating lamp is silent for 30 s. |
 
 *PingPong prevents mistakes, but it is not a hardware interlock. N1MM's own interlock still applies.*

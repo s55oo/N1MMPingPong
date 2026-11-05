@@ -630,7 +630,9 @@ class Overview:
     # ------------------------------------------------------------ network password
 
     def _load_network_key(self):
-        """Own setting, else the lamp's (pingpong.ini next to the exe)."""
+        """Own setting, else the lamp's (pingpong.ini next to the exe) - so a
+        password set on the master's lamp is used here too, also later."""
+        self._key_checked = time.time()
         key = self.cfg.get("network", "auth_key", fallback="") if self.cfg.has_section("network") else ""
         if not key:
             lamp_ini = configparser.ConfigParser()
@@ -1826,6 +1828,8 @@ class Overview:
         self.root.after(REFRESH_MS, self._refresh)
 
     def _refresh_body(self):
+        if pp.password_needed(time.time())[0] and time.time() - getattr(self, "_key_checked", 0) > 5:
+            self._load_network_key()  # the master's lamp may have just set one
         self._check_planned_reset(time.time())
         self._show_reset_plan()
         if self.self_update is not None:
