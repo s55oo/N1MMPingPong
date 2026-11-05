@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.68 · Made by **S55OO** with AI assistance.
+> **Version:** 1.69 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -208,8 +208,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.68`
-  (the others just `PingPong v1.68`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.69`
+  (the others just `PingPong v1.69`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -350,6 +350,14 @@ keeps the current setting.
 - The lock applies only on the **same band**, only when a station in
   **Run** (role RUN) is on that band, and only while the lock is **ON** on
   the master. It releases itself if RUN stays silent for **40 s**.
+- **GO:** when RUN's transmission ends and the slot is free, every inband
+  lamp shows a green **GO** for 3 s – the moment to transmit. It
+  disappears as soon as an inband station takes the slot (the others then
+  show `WAIT`). **Options ▾ → Sound on GO** adds a short soft click (off
+  by default).
+- **No RUN on the band:** an inband lamp says
+  `ping-pong: no RUN on 7 MHz – lock off` (and the Overview's ready check
+  shows it in red) – e.g. when the run station is in S&P by mistake.
 - RUN's transmissions must be started by N1MM (F-keys, Enter/Insert) –
   a CQ keyed by paddle or PTT is not reported, so it does not free the
   slot (the 40 s release still does).
@@ -456,7 +464,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.69 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.70 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -526,7 +534,7 @@ versions, who holds the ping-pong slot per band, and lamps whose N1MM data
 doesn't arrive.
 
 Buttons at the top: **Ready check**, **Ping-pong lock: ON/OFF**,
-**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.68 ✔`),
+**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.69 ✔`),
 **Allow web page in firewall…**, **Always on top** – and, only when a
 newer Overview exists, the yellow **Update Overview to vX…**.
 
@@ -543,7 +551,10 @@ day two). Checked for each lamp:
   (`v1.59 – update to v1.60`);
 - N1MM data arrives and its band/mode is supported (`no N1MM data`);
 - exactly one master (`no master`, `two masters`);
-- keyboard watcher running where F12 call, F-key block or INB needs it.
+- keyboard watcher running where F12 call, F-key block or INB needs it;
+- **problems the lamp reports itself:** another program on UDP 12060
+  (e.g. Callbooker), keyboard watcher not running, errors in
+  `pingpong_error.log`, `ping-pong: no RUN on 7 MHz` (lamps v1.69+).
 
 **Ping-pong lock: ON / OFF** (button, green when on) switches the
 ping-pong lock for all PCs with one click: the master's lamp takes it and
@@ -553,7 +564,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.68 ✔** when every lamp is current – then a
+lists them), **All lamps v1.69 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -571,6 +582,12 @@ number), **Total** and the total **TX time** – plus an **All** row.
   and on close), so a restart during the contest loses nothing.
 - **Save CSV…** exports the table (for Excel: `;`-separated);
   **Reset…** sets everything to zero, e.g. before the contest starts.
+
+**Activity tab.** Per station: how often it had to **wait** (ping-pong
+`WAIT`) and for how long in total, how many **F12** and **urgent calls** it
+made, its total **TX time** – and a chart of **TX minutes per hour**
+(darker = more transmitting; the last 12 hours with activity). Reset and
+**Save CSV…** on the Function keys tab cover these too.
 
 **Web page.** The same tables are served at `http://<master PC>:8046` –
 open it in any browser on the network, also on a **phone or tablet**
@@ -722,5 +739,5 @@ pingpong_error.log  – unexpected errors (only if one happens)
 n1mm_lamps.vX.exe   – backup kept by the updater for "Revert"
 pingpong_overview.exe / .ini – Overview program and its window settings (master PC)
 pingpong_overview.vX.exe – backup kept when the Overview updated itself
-pingpong_stats.json – Overview's function key statistics
+pingpong_stats.json – Overview's statistics (function keys, activity)
 ```

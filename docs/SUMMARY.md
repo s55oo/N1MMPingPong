@@ -62,8 +62,10 @@ Full manual: [README](../README.md). How it talks on the network:
   transmits again.
 - **Switched on or off for all PCs on the master** – off means nobody is
   locked and every station may transmit without priority.
-- The lock releases itself after 40 s. The locked lamp shows
-  `WAIT · INB1 · 32 s`.
+- When RUN's transmission ends, the inband lamps show a green **GO**
+  (optional soft click). The locked lamp shows `WAIT · INB1 · 32 s`; the
+  lock releases itself after 40 s.
+- An inband lamp warns when there is no RUN on its band (lock off).
 - Several RUN stations are allowed, and all of them are treated the same.
 
 ### Keeps itself working
@@ -104,7 +106,9 @@ Full manual: [README](../README.md). How it talks on the network:
   - old version;
   - no N1MM data;
   - no master, or two;
-  - keyboard watcher not running.
+  - keyboard watcher not running;
+  - problems the lamp reports itself: another program on N1MM's port,
+    errors, no RUN on its band.
 
   Each row switches to normal colors when that station starts operating.
 - **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
@@ -114,6 +118,8 @@ Full manual: [README](../README.md). How it talks on the network:
   other PCs. Lamps accept commands only from the master PC.
 - **Function key statistics:** per station, how many transmissions F1–F12
   started, plus total TX time. Kept over restarts, with CSV export.
+- **Activity:** per station, how often and how long it waited
+  (ping-pong), F12 and urgent calls, and a chart of TX minutes per hour.
 
   ![PingPong Overview – function keys](overview-function-keys.png)
 - **Updates itself** when a new release is out (asks first).
@@ -181,7 +187,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 66 tests) run on every push before
+- **Automated tests** (`tests/`, 75 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.
