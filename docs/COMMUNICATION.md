@@ -44,7 +44,9 @@ traffic:
    they come from the master PC's address, once per `id`):
    `{"cmd": "update"}` – **Update all lamps** (lamps v1.60+);
    `{"cmd": "pingpong", "value": "1"/"0"}` – ping-pong lock on/off, applied
-   by the master lamp, which passes it on in its hello (`<PingPong>`).
+   by the master lamp, which passes it on in its hello (`<PingPong>`);
+   `{"cmd": "restart"}` / `{"cmd": "stop"}` – **Emergency**: every lamp
+   (v1.71+) starts itself again / closes (the Overview asks twice first).
 
 On its own PC the lamp also **watches the keyboard** while N1MM is the
 active window: F12 starts or ends a call, during a call it can swallow
@@ -65,7 +67,7 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
 | **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
-| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off) |
+| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, emergency restart/stop) |
 | HTTPS 443 | lamp / Overview → `api.github.com`, `github.com` | PingPong | release list, exe download |
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
 
@@ -95,7 +97,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.70</Version>
+  <Version>1.71</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->

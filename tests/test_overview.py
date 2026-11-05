@@ -253,6 +253,32 @@ class LampProblemsTest(unittest.TestCase):
         self.assertEqual(row["tag"], "ready_bad")
 
 
+class EmergencyTest(unittest.TestCase):
+    def run_emergency(self, yes, typed, master_pc=True):
+        o = make_overview()
+        sent = []
+        o._send_command = lambda payload: sent.append(m.parse_command(payload)["cmd"]) or 1
+        o._on_master_pc = lambda now: master_pc
+        ov.messagebox.askyesno = lambda *a, **k: yes
+        ov.messagebox.showinfo = lambda *a, **k: None
+        ov.messagebox.showwarning = lambda *a, **k: None
+        ov.simpledialog.askstring = lambda *a, **k: typed
+        o._emergency("stop")
+        return sent
+
+    def test_needs_yes_and_typed_yes(self):
+        self.assertEqual(self.run_emergency(True, "YES"), ["stop"])
+
+    def test_no_or_wrong_word_sends_nothing(self):
+        self.assertEqual(self.run_emergency(False, "YES"), [])
+        self.assertEqual(self.run_emergency(True, "yes"), [])
+        self.assertEqual(self.run_emergency(True, None), [])  # dialog closed
+        self.assertEqual(self.run_emergency(True, "Y"), [])
+
+    def test_not_from_other_pc(self):
+        self.assertEqual(self.run_emergency(True, "YES", master_pc=False), [])
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()

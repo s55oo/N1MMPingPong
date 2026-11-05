@@ -30,7 +30,7 @@ import threading
 import time
 import tkinter as tk
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import n1mm_lamps as pp
 import pingpong_update as upd
@@ -439,6 +439,37 @@ class Overview:
                 sock.close()
         return sent
 
+    EMERGENCY = {
+        "restart": ("Restart all lamps",
+                    "Every PingPong lamp closes and starts again (a few seconds without lamps).\n"
+                    "Use it only if lamps hang or behave wrongly."),
+        "stop": ("Stop all lamps",
+                 "Every PingPong lamp is CLOSED: no lamps, no F12 calls, no ping-pong lock\n"
+                 "until each lamp is started again by hand on its PC."),
+    }
+
+    def _emergency(self, action):
+        """Emergency only: restart / stop every lamp. Asks twice - Yes, then
+        the word YES typed and Enter - before anything is sent."""
+        title, text = self.EMERGENCY[action]
+        if not self._on_master_pc(time.time()):
+            messagebox.showwarning(TITLE, "This PC is not the master PC – the lamps take this "
+                                   "only from the master PC.", parent=self.root)
+            return
+        if not messagebox.askyesno(TITLE + " - EMERGENCY", "{} – are you sure?\n\n{}".format(title, text),
+                                   icon="warning", default="no", parent=self.root):
+            return
+        typed = simpledialog.askstring(
+            TITLE + " - EMERGENCY",
+            "{}: type YES and press Enter to confirm.".format(title), parent=self.root)
+        if (typed or "").strip() != "YES":
+            messagebox.showinfo(TITLE, "Cancelled – nothing was sent.", parent=self.root)
+            return
+        if not self._send_command(pp.make_command(action)):
+            messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
+            return
+        messagebox.showinfo(TITLE, "{}: sent to all lamps.".format(title), parent=self.root)
+
     def _toggle_pingpong(self):
         """Ping-pong lock ON <-> OFF: asks the master lamp, which passes the
         setting on to every lamp (the button follows the master's hello)."""
@@ -805,6 +836,13 @@ class Overview:
         self.pp_button = tk.Button(top, text="Ping-pong lock: ?", width=20,
                                    command=self._toggle_pingpong)
         self.pp_button.pack(side=tk.RIGHT)
+        emergency = tk.Menubutton(top, text="Emergency ▾", fg="#b00020", relief=tk.RAISED,
+                                  activeforeground="#b00020")
+        menu = tk.Menu(emergency, tearoff=0)
+        menu.add_command(label="Restart all lamps…", command=lambda: self._emergency("restart"))
+        menu.add_command(label="Stop all lamps…", command=lambda: self._emergency("stop"))
+        emergency.configure(menu=menu)
+        emergency.pack(side=tk.RIGHT, padx=8)
         self._pp_sent = 0.0
         self._on_top(save=False)
 

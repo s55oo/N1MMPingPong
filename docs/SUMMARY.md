@@ -113,6 +113,8 @@ Full manual: [README](../README.md). How it talks on the network:
 
   Each row switches to normal colors when that station starts operating.
 - **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
+- **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
+  typing `YES` + Enter).
 - **Update all lamps:** one button. It shows how many lamps are behind
   (`Update 2 lamps…` / `All lamps v1.68 ✔`). Every lamp that needs it
   downloads the newest release and restarts, and no one has to touch the

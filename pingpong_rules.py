@@ -58,6 +58,10 @@ class RulesMixin:
         self._key_event("command '{}' from the master PC".format(command["cmd"]))
         if command["cmd"] == "update":
             self._ui_calls.append(self._remote_update)
+        elif command["cmd"] == "restart":  # emergency, from the Overview
+            self._ui_calls.append(self._remote_restart)
+        elif command["cmd"] == "stop":  # emergency, from the Overview
+            self._ui_calls.append(self._remote_stop)
         elif command["cmd"] == "pingpong" and command.get("value") in ("1", "0"):
             if self._i_am_master:
                 on = command["value"] == "1"

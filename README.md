@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.70 · Made by **S55OO** with AI assistance.
+> **Version:** 1.71 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -208,8 +208,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.70`
-  (the others just `PingPong v1.70`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.71`
+  (the others just `PingPong v1.71`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -470,7 +470,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.71 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.72 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -539,8 +539,8 @@ Above the table: number of lamps, the master, both F12 block times and
 versions, who holds the ping-pong slot per band, and lamps whose N1MM data
 doesn't arrive.
 
-Buttons at the top: **Ready check**, **Ping-pong lock: ON/OFF**,
-**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.70 ✔`),
+Buttons at the top: **Emergency ▾**, **Ready check**, **Ping-pong lock: ON/OFF**,
+**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.71 ✔`),
 **Allow web page in firewall…**, **Always on top** – and, only when a
 newer Overview exists, the yellow **Update Overview to vX…**.
 
@@ -570,7 +570,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.70 ✔** when every lamp is current – then a
+lists them), **All lamps v1.71 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -588,6 +588,17 @@ number), **Total** and the total **TX time** – plus an **All** row.
   and on close), so a restart during the contest loses nothing.
 - **Save CSV…** exports the table (for Excel: `;`-separated);
   **Reset…** sets everything to zero, e.g. before the contest starts.
+
+**Emergency ▾ – for emergencies only.** Two commands for every lamp:
+
+- **Restart all lamps…** – each lamp closes and starts again (a few
+  seconds without lamps), e.g. if lamps hang or behave wrongly.
+- **Stop all lamps…** – each lamp is **closed**: no lamps, no F12 calls,
+  no ping-pong lock until each lamp is started again by hand on its PC.
+
+Both ask twice: first **Yes / No**, then you must **type `YES`** and press
+**Enter** – anything else cancels and nothing is sent. Like the other
+commands they are accepted only from the master PC (lamps v1.71+).
 
 **Activity tab.** Per station: how often it had to **wait** (ping-pong
 `WAIT`) and for how long in total, how many **F12** and **urgent calls** it

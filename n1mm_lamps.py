@@ -679,6 +679,27 @@ class DisplayApp(RulesMixin):
             )
         self.on_close()
 
+    def _remote_restart(self):
+        """Emergency 'Restart all lamps' from the Overview: start this lamp
+        again (same exe / script, same options) and close this one."""
+        self._key_event("restart requested by the master PC")
+        if upd.is_frozen():
+            target, args = sys.executable, sys.argv[1:]
+        else:
+            target, args = sys.executable, [os.path.abspath(sys.argv[0])] + sys.argv[1:]
+        try:
+            upd.relaunch(target, args)  # the new lamp waits until this one is gone
+        except OSError:
+            log_error("remote restart")
+            return  # could not start a new one: keep running
+        self.on_close()
+
+    def _remote_stop(self):
+        """Emergency 'Stop all lamps' from the Overview: close this lamp
+        (keyboard watcher removed, nothing blocked any more)."""
+        self._key_event("stop requested by the master PC")
+        self.on_close()
+
     def _station(self, src, station_name):
         ip = src
         if ip in self.stations:

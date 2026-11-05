@@ -396,6 +396,24 @@ class CommandTest(unittest.TestCase):
         self.assertGreater(master.hello_now.count, 0)  # passed on to all lamps at once
 
 
+class EmergencyCommandTest(unittest.TestCase):
+    def test_restart_and_stop_from_master_pc_only(self):
+        app = make_lamp()
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        app.on_command("10.0.0.5", m.parse_command(m.make_command("stop")))
+        self.assertEqual(app._ui_calls, [])  # not from the master PC
+        app.on_command("10.0.0.9", m.parse_command(m.make_command("restart")))
+        app.on_command("10.0.0.9", m.parse_command(m.make_command("stop")))
+        self.assertEqual([f.__name__ for f in app._ui_calls], ["_remote_restart", "_remote_stop"])
+
+    def test_stop_closes_the_lamp(self):
+        app = make_lamp()
+        closed = []
+        app.on_close = lambda: closed.append(1)
+        app._remote_stop()
+        self.assertEqual(closed, [1])
+
+
 class FakeSettings:
     def __init__(self):
         self.values = {}
