@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.61 · Made by **S55OO** with AI assistance.
+> **Version:** 1.62 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 
 PingPong shows which computer/station on the network is currently

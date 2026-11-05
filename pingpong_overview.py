@@ -273,6 +273,23 @@ class Overview:
                 lamp.hello = info
                 lamp.hello_seen = now
                 lamp.src = src
+                self._replace_old(lamp)
+
+    def _replace_old(self, lamp):
+        """One row per PC: a restarted lamp (e.g. after an update) has a new
+        id - drop the old entry of the same PC, keep its last transmission."""
+        host = (lamp.hello.get("host") or "").lower()
+        if not host:
+            return
+        for old_id, old in list(self.lamps.items()):
+            if old is lamp or (old.hello.get("host") or "").lower() != host:
+                continue
+            if not lamp.last_tx_end and old.last_tx_end:
+                lamp.last_caption, lamp.last_tx_end = old.last_caption, old.last_tx_end
+            for band, slot in self.slots.items():
+                if slot[0] == old_id:
+                    slot[0] = lamp.id
+            del self.lamps[old_id]
 
     # ------------------------------------------------------------ ready check / update
 

@@ -147,6 +147,24 @@ class SelfUpdateTest(unittest.TestCase):
         self.assertEqual(ov.OVERVIEW_ASSET, "pingpong_overview.exe")
 
 
+class RestartTest(unittest.TestCase):
+    def test_restarted_lamp_replaces_old_row(self):
+        o = make_overview()
+        hello(o, "OLD", "OO840G4", "RUN1", block_time=30)
+        relay(o, "OLD", "RUN1", "True", "F1 CQ")
+        relay(o, "OLD", "RUN1", "False", "F1 CQ")
+        hello(o, "NEW", "OO840G4", "RUN1", block_time=30)  # same PC after an update
+        self.assertEqual(list(o.lamps), ["NEW"])
+        self.assertEqual(o.lamps["NEW"].last_caption, "CQ")
+        self.assertEqual(len(o._make_snapshot()["rows"]), 1)
+
+    def test_different_pcs_stay(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1")
+        hello(o, "B", "PC2", "RUN2")
+        self.assertEqual(sorted(o.lamps), ["A", "B"])
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()
