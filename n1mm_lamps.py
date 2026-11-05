@@ -350,6 +350,10 @@ class DisplayApp(RulesMixin):
             label="My name…  ({})".format(self.my_alias or "PC name"),
             command=self._choose_alias,
         )
+        menu.add_command(
+            label="My color…  ({})".format(self.my_color or "automatic"),
+            command=self._choose_color,
+        )
         if self._i_am_master:
             menu.add_command(
                 label="F12 block time, S&P call…  ({:g} s, blocks S&P)".format(self.block_limit),
@@ -368,10 +372,6 @@ class DisplayApp(RulesMixin):
                 ),
                 state=tk.DISABLED,
             )
-        menu.add_command(
-            label="My color…  ({})".format(self.my_color or "automatic"),
-            command=self._choose_color,
-        )
         menu.add_checkbutton(
             label="F12 call – blink stations on my band (Shift+F2/F4 = urgent)",
             variable=self.var_keys,
