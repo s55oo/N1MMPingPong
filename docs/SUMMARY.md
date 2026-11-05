@@ -47,7 +47,7 @@ Full manual: [README](../README.md). How it talks on the network:
   `192.168.1.20:8047 · 10.147.17.3:8047` (LAN, plus ZeroTier if the PC
   is on it).
 
-  ![Phone lamp](phone-lamp.png)
+  ![Phone lamp – RUN1 on an iPhone over ZeroTier](phone-lamp.png)
 
 ### Warn other operators without transmitting
 - **F12 call:** "hold off, please".

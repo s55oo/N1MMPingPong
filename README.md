@@ -187,6 +187,9 @@ the phone. It refreshes about 3 times a second and says
 
 ![Phone lamp](docs/phone-lamp.png)
 
+*RUN1's lamp on an iPhone over ZeroTier (`10.147.17.61:8047`): RUN1 is sending
+`S55OO` on 7032.95 kHz; the 7 MHz CW tile lists INB1, INB2 and RUN1.*
+
 The **addresses** are shown in the lamp's top line, left of **Options ▾**:
 `192.168.1.20:8047 · 10.147.17.3:8047` – the LAN address and, if this PC
 is on **ZeroTier**, its ZeroTier address too (otherwise only the LAN one). Click it to open
