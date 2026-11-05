@@ -81,7 +81,7 @@ def make_lamp(**over):
         _i_am_master=False, _master_peer=None,
         _slots={}, _pp_locked=False, _pp_holder=None, _pp_left=0,
         my_color="", my_color_time=0.0, _ui_calls=[], _busy=False, _status="",
-        lock=threading.RLock(), pp_enabled=True,
+        lock=threading.RLock(), pp_enabled=True, _go_time=0.0, _go_band="",
     )
     state.update(over)
     app.__dict__.update(state)

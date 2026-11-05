@@ -158,7 +158,7 @@ def make_hello(
     node_id, host, ips, local_n1mm, color="", color_time=0.0,
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
     n1mm_master="", started=0.0, colors="", block_time=0.0,
-    alert_run=False, block_time_run=0.0, pingpong="",
+    alert_run=False, block_time_run=0.0, pingpong="", problems="",
     urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0,
 ):
     root = ET.Element("PingPongHello")
@@ -183,6 +183,7 @@ def make_hello(
         ("AlertRun", "1" if alert_run else "0"),
         ("BlockTimeRun", "{:g}".format(block_time_run) if block_time_run else ""),
         ("PingPong", pingpong or ""),  # master only: ping-pong lock "1" on / "0" off
+        ("Problems", problems or ""),  # what is wrong on this PC, "|"-separated
         ("Urgent", "1" if urgent else "0"),
         ("UrgentBand", urgent_band or ""),
         ("UrgentMode", urgent_mode or ""),
@@ -226,6 +227,7 @@ def parse_hello(data):
         "alert_run": get("AlertRun") == "1",
         "block_time_run": _float(get("BlockTimeRun")),
         "pingpong": get("PingPong"),
+        "problems": [p for p in get("Problems").split("|") if p],
         "urgent": get("Urgent") == "1",
         "urgent_band": get("UrgentBand"),
         "urgent_mode": get("UrgentMode"),

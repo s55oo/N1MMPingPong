@@ -33,10 +33,15 @@ TEST_LOG = "pingpong_test.log"
 
 ERROR_LOG = "pingpong_error.log"
 
+ERROR_COUNT = [0]  # errors written since start (reported to the Overview)
+
+
 def log_error(where):
     """Write the current exception to pingpong_error.log (next to the exe)
     instead of letting a network thread die silently."""
     import traceback
+
+    ERROR_COUNT[0] += 1
 
     try:
         path = os.path.join(app_dir(), ERROR_LOG)
@@ -105,6 +110,7 @@ def clamp_block(value, default=BLOCK_LIMIT):
         return default
     return float(min(max(value, BLOCK_RANGE[0]), BLOCK_RANGE[1]))
 
+GO_TIME = 3.0  # s: green GO on an inband lamp after RUN's transmission ends
 PP_LIMIT = 40.0  # s: ping-pong slot lock ends by itself if RUN stays silent
 
 NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
@@ -116,6 +122,7 @@ FIREWALL_RULE = "PingPong lamps UDP"
 SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
+GO_COLOR = "#2ea043"  # green GO for inband stations
 
 COLOR_PALETTE = [
     "red",

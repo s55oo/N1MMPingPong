@@ -235,6 +235,10 @@ class DisplayApp(RulesMixin):
         # The ping-pong role always follows N1MM (Run = RUN, S&P = INB);
         # an old fixed "role" in pingpong.ini is ignored.
         self._last_role = ""
+        self._go_time = 0.0  # when RUN's last transmission on my band ended
+        self._go_band = ""
+        self._go_beeped = 0.0
+        self.var_go_sound = tk.BooleanVar(value=self.settings.get("go_sound", False))
         # Ping-pong lock on/off: set on the master, used by every lamp.
         self.pp_enabled = self.settings.get_text("network", "pingpong", "yes") != "no"
         self._slots = {}  # band -> [holder station ip, time of its last TX start]
@@ -386,6 +390,11 @@ class DisplayApp(RulesMixin):
             label="Sound on F12 call",
             variable=self.var_sound,
             command=lambda: self.settings.set("call_sound", self.var_sound.get()),
+        )
+        menu.add_checkbutton(
+            label="Sound on GO (ping-pong: RUN has finished)",
+            variable=self.var_go_sound,
+            command=lambda: self.settings.set("go_sound", self.var_go_sound.get()),
         )
         menu.add_checkbutton(
             label="Share my N1MM with other lamps (all networks)",
@@ -704,6 +713,7 @@ class DisplayApp(RulesMixin):
             if running is not None:
                 station.running = running
             started = is_tx and not station.tx
+            ended = station.tx and not is_tx
             station.tx = is_tx
             station.last_seen = time.time()
             if caption:
@@ -719,6 +729,8 @@ class DisplayApp(RulesMixin):
                 self.tracked = station.key
             if started:
                 self._pingpong_tx(station)
+            if ended:
+                self._pingpong_end(station)
 
     def _set_title(self, master):
         """Title bar: 'MASTER' on the master PC only."""
@@ -1441,6 +1453,7 @@ class DisplayApp(RulesMixin):
                 "ON - slot held by " if locked else "off",
                 self.station_name(holder) if locked and holder else "",
             ))
+            self.hello_now.set()  # the Overview counts locks
         self._pp_locked, self._pp_holder = locked, holder
         calls = all_calls if active is None else []
         self._show_border(owners, now, all_calls)
@@ -1498,6 +1511,14 @@ class DisplayApp(RulesMixin):
                 )
             elif self.urgent_on:
                 idle = "URGENT"
+            elif self._go_active(now):
+                # RUN has finished: the inband stations may transmit now.
+                idle = "GO"
+                self._set_bg(GO_COLOR)
+                if self._go_beeped != self._go_time:
+                    self._go_beeped = self._go_time
+                    if self.var_go_sound.get():
+                        self._click()
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
             if now - self._f12_refused <= 2.0 and self._band_busy is not None:
@@ -1519,6 +1540,9 @@ class DisplayApp(RulesMixin):
             note = self._my_color_note(owners)
             if note:
                 header = note + "  ·  " + header
+            pp_note = self._pingpong_note(now)
+            if pp_note:
+                header = pp_note + "  ·  " + header
             if self._pp_locked:
                 header = "slot taken by {} – wait for RUN (free in {} s at the latest)  ·  ".format(
                     self.station_name(self._pp_holder) if self._pp_holder else "INB",
@@ -1647,6 +1671,18 @@ class DisplayApp(RulesMixin):
         self.settings.set_text("network", "pingpong", "yes" if on else "no")
         self._key_event("ping-pong lock {} (for all PCs)".format("ON" if on else "OFF"))
         self.hello_now.set()  # tell all lamps right away
+
+    def _click(self):
+        """Short soft click (GO), without blocking the window."""
+        def beep():
+            try:
+                import winsound
+
+                winsound.Beep(1400, 40)
+            except Exception:
+                pass
+
+        threading.Thread(target=beep, daemon=True).start()
 
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())

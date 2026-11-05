@@ -204,6 +204,47 @@ class VersionStateTest(unittest.TestCase):
         self.assertIn("Nothing to update", shown[0])
 
 
+class ActivityTest(unittest.TestCase):
+    def test_locks_calls_and_hours(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "INB1", "INB", "N1MM 7 CW from x, S&P")
+        hello(o, "A", "PC1", "INB1", "INB", "N1MM 7 CW from x, S&P; ping-pong role INB (LOCKED)")
+        hello(o, "A", "PC1", "INB1", "INB", "N1MM 7 CW from x, S&P; ping-pong role INB (LOCKED)")
+        hello(o, "A", "PC1", "INB1", "INB", "N1MM 7 CW from x, S&P")  # WAIT over
+        hello(o, "A", "PC1", "INB1", alert=True, alert_band="7", alert_time=100.0)
+        hello(o, "A", "PC1", "INB1", alert=True, alert_band="7", alert_time=100.0)  # same call
+        hello(o, "A", "PC1", "INB1", urgent=True, urgent_band="7", urgent_mode="CW", urgent_time=200.0)
+        relay(o, "A", "INB1", "True", "F1 CQ", freq="701500")
+        relay(o, "A", "INB1", "False", "F1 CQ", freq="701500")
+        st = o.stats["pc:pc1"]
+        self.assertEqual((st["locked"], st["f12"], st["urgent"]), (1, 1, 1))
+        self.assertEqual(len(st["hours"]), 1)
+        act = o._activity_table()
+        self.assertEqual(act["rows"][0][0], "INB1")
+        self.assertEqual(act["rows"][0][1], 1)  # locked once
+        self.assertEqual(len(act["hours"]), 1)
+        self.assertEqual(act["heat"][0][0], "INB1")
+
+    def test_old_stats_file_still_works(self):
+        o = make_overview()
+        o.stats = {"pc:pc1": {"name": "RUN1", "keys": {"F1": 3}, "other": 0, "tx_time": 5.0}}
+        self.assertEqual(o._activity_table()["rows"][0][0], "RUN1")
+        hello(o, "A", "PC1", "RUN1")
+        relay(o, "A", "RUN1", "True", "F1 CQ")
+        relay(o, "A", "RUN1", "False", "F1 CQ")
+        self.assertEqual(o.stats["pc:pc1"]["keys"]["F1"], 4)
+
+
+class LampProblemsTest(unittest.TestCase):
+    def test_lamp_reported_problems_in_check(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, problems="UDP 12060 also used by Callbooker.exe")
+        relay(o, "A", "RUN1", "False")
+        row = o._make_snapshot()["rows"][0]
+        self.assertIn("Callbooker.exe", row["values"]["check"])
+        self.assertEqual(row["tag"], "ready_bad")
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()

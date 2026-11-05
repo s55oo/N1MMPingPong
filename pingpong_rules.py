@@ -204,6 +204,7 @@ class RulesMixin:
             "alert_run": self.alert_on and self.alert_run,
             "block_time_run": self.block_limit_run if self._i_am_master else 0.0,
             "pingpong": ("1" if self.pp_enabled else "0") if self._i_am_master else "",
+            "problems": "|".join(self._problems(time.time())),
             "urgent": self.urgent_on,
             "urgent_band": self.urgent_key[0],
             "urgent_mode": self.urgent_key[1],
@@ -511,6 +512,52 @@ class RulesMixin:
                 )
             elif slot[0] == st.ip:
                 slot[1] = now  # holder keeps transmitting in its slot
+
+    def _pingpong_end(self, st):
+        """UDP thread: a station stopped transmitting. When RUN's
+        transmission on this PC's band ends, the inband stations may go."""
+        if not st.key or self.role_of(st) != "RUN":
+            return
+        if self._my_band() == st.key[0]:
+            self._go_time = time.time()
+            self._go_band = st.key[0]
+
+    def _go_active(self, now):
+        """Show GO on this lamp? (INB, lock on, RUN just finished, slot free)"""
+        if not self.pp_enabled or self._pp_locked or self._my_role_now() != "INB":
+            return False
+        band = self._go_band
+        if now - self._go_time > GO_TIME or band != self._my_band():
+            return False
+        if self._slots.get(band) is not None:
+            return False  # an inband station already took the slot
+        run = self._run_on_band(band, now)
+        return run is not None and not run.tx
+
+    def _pingpong_note(self, now):
+        """Why the ping-pong lock does nothing for this INB, or ""."""
+        if not self.pp_enabled or self._my_role_now() != "INB":
+            return ""
+        band = self._my_band()
+        if band and self._run_on_band(band, now) is None:
+            return "ping-pong: no RUN on {} MHz – lock off".format(band)
+        return ""
+
+    def _problems(self, now):
+        """What is wrong on this PC - sent to the Overview (Check column)."""
+        out = []
+        port = self._port_warning()
+        if port:
+            out.append(port.split(" – ")[0])  # "UDP 12060 also used by X"
+        if keys.supported() and self.key_watcher is None and now - self.started > 10:
+            out.append("keyboard watcher not running")
+        if ERROR_COUNT[0]:
+            out.append("{} error{} in pingpong_error.log".format(
+                ERROR_COUNT[0], "" if ERROR_COUNT[0] == 1 else "s"))
+        note = self._pingpong_note(now)
+        if note:
+            out.append(note.replace(" – lock off", ""))
+        return out
 
     def _run_on_band(self, band, now):
         for st in list(self.stations.values()):

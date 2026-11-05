@@ -107,6 +107,13 @@ def ago_long(seconds):
     return "{}:{:02d}:{:02d}".format(seconds // 3600, seconds // 60 % 60, seconds % 60)
 
 
+def tx_minutes(seconds):
+    """TX seconds as minutes, 1 decimal; any transmission shows at least 0.1."""
+    if seconds <= 0:
+        return 0
+    return max(0.1, round(seconds / 60.0, 1))
+
+
 def band_sort(band):
     try:
         return float(band)
@@ -137,6 +144,9 @@ class Lamp:
         self.last_caption = ""
         self.last_tx_end = 0.0
         self.n1mm_name = ""
+        self.locked_since = 0.0  # ping-pong WAIT started (activity statistics)
+        self.last_alert = 0.0  # last F12 call counted (its AlertTime)
+        self.last_urgent = 0.0  # last urgent call counted (its UrgentTime)
 
     def stats_key(self):
         """Stats belong to the PC (the lamp id changes at every restart)."""
@@ -260,7 +270,11 @@ class Overview:
                     self._count_key(lamp, payload, caption)
                 if not is_tx and lamp.tx:
                     lamp.last_tx_end = now
-                    self._stat(lamp)["tx_time"] += min(now - lamp.tx_start, 600.0)
+                    dur = min(now - lamp.tx_start, 600.0)
+                    st = self._stat(lamp)
+                    st["tx_time"] += dur
+                    hour = time.strftime("%Y-%m-%d %H", time.localtime(lamp.tx_start))
+                    st["hours"][hour] = st["hours"].get(hour, 0.0) + dur
                 if is_tx and caption:
                     lamp.caption = caption
                     lamp.last_caption = caption
@@ -274,6 +288,7 @@ class Overview:
                 lamp.hello_seen = now
                 lamp.src = src
                 self._replace_old(lamp)
+                self._track_activity(lamp, info, now)
 
     def _replace_old(self, lamp):
         """One row per PC: a restarted lamp (e.g. after an update) has a new
@@ -286,6 +301,9 @@ class Overview:
                 continue
             if not lamp.last_tx_end and old.last_tx_end:
                 lamp.last_caption, lamp.last_tx_end = old.last_caption, old.last_tx_end
+            lamp.locked_since = lamp.locked_since or old.locked_since
+            lamp.last_alert = lamp.last_alert or old.last_alert
+            lamp.last_urgent = lamp.last_urgent or old.last_urgent
             for band, slot in self.slots.items():
                 if slot[0] == old_id:
                     slot[0] = lamp.id
@@ -389,6 +407,9 @@ class Overview:
         )
         if needs_keys and "keyboard watcher off" in status:
             out.append("keyboard watcher not running")
+        for problem in h.get("problems") or []:  # reported by the lamp itself (v1.69+)
+            if problem not in out:
+                out.append(problem)
         return out
 
     def _ready_check(self):
@@ -490,9 +511,51 @@ class Overview:
         key = lamp.stats_key()
         st = self.stats.get(key)
         if st is None:
-            st = self.stats[key] = {"name": lamp.name(), "keys": {}, "other": 0, "tx_time": 0.0}
+            st = self.stats[key] = {"name": lamp.name()}
+        for field, empty in (("keys", {}), ("other", 0), ("tx_time", 0.0), ("hours", {}),
+                             ("locked", 0), ("locked_time", 0.0), ("f12", 0), ("urgent", 0)):
+            st.setdefault(field, type(empty)())  # also fills records from older versions
         st["name"] = lamp.name()  # keep the newest name (My name may change)
         return st
+
+    def _track_activity(self, lamp, info, now):
+        """From the hellos: ping-pong WAIT (count, time), F12 and urgent calls."""
+        st = self._stat(lamp)
+        locked = "(LOCKED)" in info.get("status", "")
+        if locked and not lamp.locked_since:
+            lamp.locked_since = now
+            st["locked"] += 1
+        elif not locked and lamp.locked_since:
+            st["locked_time"] += min(now - lamp.locked_since, PP_LIMIT + 10)
+            lamp.locked_since = 0.0
+        if info.get("alert") and info.get("alert_time") and info["alert_time"] != lamp.last_alert:
+            lamp.last_alert = info["alert_time"]
+            st["f12"] += 1
+        if info.get("urgent") and info.get("urgent_time") and info["urgent_time"] != lamp.last_urgent:
+            lamp.last_urgent = info["urgent_time"]
+            st["urgent"] += 1
+
+    def _activity_table(self):
+        """Activity per station + TX minutes per hour (window, web, CSV)."""
+        cols = ["Station", "Locked (WAIT)", "Locked time", "F12 calls", "Urgent calls", "TX time"]
+        rows, heat = [], []
+        with self.lock:
+            items = sorted(self.stats.values(), key=lambda s: s["name"].lower())
+            hours = sorted({h for st in items for h in (st.get("hours") or {})})[-12:]
+            tot = [0, 0.0, 0, 0, 0.0]
+            for st in items:
+                vals = [st.get("locked", 0), st.get("locked_time", 0.0), st.get("f12", 0),
+                        st.get("urgent", 0), st.get("tx_time", 0.0)]
+                tot = [a + b for a, b in zip(tot, vals)]
+                rows.append([st["name"], vals[0] or "", ago_long(vals[1]) if vals[1] else "",
+                             vals[2] or "", vals[3] or "", ago_long(vals[4])])
+                heat.append([st["name"], [tx_minutes((st.get("hours") or {}).get(h, 0.0))
+                                          for h in hours]])
+        if len(rows) > 1:
+            rows.append(["All", tot[0] or "", ago_long(tot[1]) if tot[1] else "",
+                         tot[2] or "", tot[3] or "", ago_long(tot[4])])
+        labels = [h[-2:] + ":00" for h in hours]
+        return {"columns": cols, "rows": rows, "hours": labels, "heat": heat}
 
     def _count_key(self, lamp, payload, caption):
         """One transmission started: count the function key that started it."""
@@ -564,12 +627,20 @@ class Overview:
                 writer.writerow(["since", time.strftime("%Y-%m-%d %H:%M", time.localtime(self.stats_since))])
                 writer.writerow(cols)
                 writer.writerows(rows)
+                act = self._activity_table()
+                writer.writerow([])
+                writer.writerow(act["columns"])
+                writer.writerows(act["rows"])
+                writer.writerow([])
+                writer.writerow(["TX minutes per hour"] + act["hours"])
+                for name, mins in act["heat"]:
+                    writer.writerow([name] + [str(v).replace(".", ",") for v in mins])
         except OSError as exc:
             messagebox.showerror(TITLE, "Could not save:\n{}".format(exc), parent=self.root)
 
     def _reset_stats(self):
         if not messagebox.askyesno(
-            TITLE, "Reset all function key statistics to zero?", parent=self.root
+            TITLE, "Reset all statistics (function keys and activity) to zero?", parent=self.root
         ):
             return
         with self.lock:
@@ -762,6 +833,25 @@ class Overview:
                               anchor="w" if cid == "station" else "center", stretch=cid == "station")
         self.stree.tag_configure("all", font=("Segoe UI", 10, "bold"))
         self.stree.pack(fill=tk.BOTH, expand=True)
+
+        aframe = tk.Frame(self.book)
+        self.book.add(aframe, text="Activity")
+        tk.Label(aframe, text="Ping-pong waiting, calls and TX time per station (same Reset / "
+                 "Save CSV as Function keys)", anchor="w", pady=4).pack(fill=tk.X)
+        acols = ["station", "locked", "ltime", "f12", "urgent", "tx"]
+        self.atree = ttk.Treeview(aframe, columns=acols, show="headings", selectmode="none", height=5)
+        for cid, text, w in zip(acols, ["Station", "Locked (WAIT)", "Locked time", "F12 calls",
+                                         "Urgent calls", "TX time"], (140, 100, 90, 80, 90, 80)):
+            self.atree.heading(cid, text=text)
+            self.atree.column(cid, width=w, anchor="w" if cid == "station" else "center",
+                              stretch=cid == "station")
+        self.atree.tag_configure("all", font=("Segoe UI", 10, "bold"))
+        self.atree.pack(fill=tk.X)
+        tk.Label(aframe, text="TX minutes per hour", anchor="w", pady=4,
+                 font=("Segoe UI", 9, "bold")).pack(fill=tk.X)
+        self.heat = tk.Canvas(aframe, height=120, bg="white", highlightthickness=0)
+        self.heat.pack(fill=tk.BOTH, expand=True)
+        self._heat_key = None
         for tag, (bg, fg) in ROW_STYLE.items():
             opts = {"foreground": fg}
             if bg:
@@ -773,6 +863,34 @@ class Overview:
         self.foot.pack(fill=tk.X)
         geo = self.cfg.get("window", "geometry", fallback="")
         self.root.geometry(geo or "1250x360")
+
+    def _draw_heat(self, act):
+        """TX minutes per hour: one row per station, darker = more TX."""
+        key = repr((act["hours"], act["heat"], self.heat.winfo_width()))
+        if key == self._heat_key:
+            return
+        self._heat_key = key
+        c = self.heat
+        c.delete("all")
+        if not act["hours"]:
+            c.create_text(10, 20, anchor="w", text="no transmissions yet", fill="#888")
+            return
+        left, top, cw, ch = 130, 20, 52, 22
+        for i, label in enumerate(act["hours"]):
+            c.create_text(left + i * cw + cw / 2, 10, text=label, font=("Segoe UI", 8), fill="#555")
+        for r, (name, mins) in enumerate(act["heat"]):
+            y = top + r * ch
+            c.create_text(6, y + ch / 2, anchor="w", text=name, font=("Segoe UI", 9))
+            for i, v in enumerate(mins):
+                share = min(v / 30.0, 1.0)  # 30 min of TX in an hour = darkest
+                shade = int(240 - 180 * share)
+                fill = "#{:02x}{:02x}ff".format(shade, shade) if v else "#f4f4f4"
+                x = left + i * cw
+                c.create_rectangle(x + 1, y + 1, x + cw - 1, y + ch - 1, fill=fill, outline="")
+                if v:
+                    c.create_text(x + cw / 2, y + ch / 2, text="{:g}'".format(v),
+                                  font=("Segoe UI", 8), fill="white" if share > 0.5 else "#222")
+        c.configure(height=max(60, top + len(act["heat"]) * ch + 6))
 
     def _on_top(self, save=True):
         self.root.attributes("-topmost", bool(self.var_top.get()))
@@ -930,6 +1048,7 @@ class Overview:
             r.pop("sort")
         stat_cols, stat_rows = self._stats_table()
         return {
+            "activity": self._activity_table(),
             "stats": {
                 "columns": stat_cols, "rows": stat_rows,
                 "since": time.strftime("%d.%m. %H:%M", time.localtime(self.stats_since)),
@@ -1002,6 +1121,11 @@ class Overview:
         self.stree.delete(*self.stree.get_children())
         for row in snap["stats"]["rows"]:
             self.stree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        act = snap["activity"]
+        self.atree.delete(*self.atree.get_children())
+        for row in act["rows"]:
+            self.atree.insert("", tk.END, values=row, tags=("all",) if row[0] == "All" else ())
+        self._draw_heat(act)
         if time.time() - self._stats_saved > STATS_SAVE:
             self._save_stats()
         notes = list(snap["notes"])
@@ -1050,6 +1174,7 @@ PAGE = """<!doctype html>
   table.stats td, table.stats th { text-align:center; }
   table.stats td:first-child, table.stats th:first-child { text-align:left; }
   table.stats tr.all td { font-weight:700; }
+  table.heat td { min-width:44px; }
   .foot { color:var(--muted); font-size:12px; margin:8px 16px 24px; }
 </style>
 </head>
@@ -1065,6 +1190,11 @@ PAGE = """<!doctype html>
 <h2>Function keys <span id="since"></span></h2>
 <div class="wrap"><table class="stats"><thead><tr id="scols"></tr></thead><tbody id="srows"></tbody></table></div>
 <p class="foot">Transmissions started by each function key, per station. Reset and CSV export in the Overview window.</p>
+<h2>Activity</h2>
+<div class="wrap"><table class="stats"><thead><tr id="acols"></tr></thead><tbody id="arows"></tbody></table></div>
+<h2>TX minutes per hour</h2>
+<div class="wrap"><table class="stats heat"><thead><tr id="hcols"></tr></thead><tbody id="hrows"></tbody></table></div>
+<p class="foot">Ping-pong waiting, F12 and urgent calls, and transmit time per station.</p>
 <script>
 const CENTER = new Set(["band","mode","run","role","ver"]), RIGHT = new Set(["freq","seen"]);
 let cols = [];
@@ -1110,6 +1240,32 @@ function render(d) {
       const tr = document.createElement("tr"); if (row[0] === "All") tr.className = "all";
       for (const v of row) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
       sb.appendChild(tr);
+    }
+  }
+  if (d.activity) {
+    const a = d.activity;
+    const ac = document.getElementById("acols"); ac.innerHTML = "";
+    for (const name of a.columns) { const th = document.createElement("th"); th.textContent = name; ac.appendChild(th); }
+    const ab = document.getElementById("arows"); ab.innerHTML = "";
+    for (const row of a.rows) {
+      const tr = document.createElement("tr"); if (row[0] === "All") tr.className = "all";
+      for (const v of row) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+      ab.appendChild(tr);
+    }
+    const hc = document.getElementById("hcols"); hc.innerHTML = "<th>Station</th>";
+    for (const h of a.hours) { const th = document.createElement("th"); th.textContent = h; hc.appendChild(th); }
+    const hb = document.getElementById("hrows"); hb.innerHTML = "";
+    for (const [name, mins] of a.heat) {
+      const tr = document.createElement("tr");
+      const n = document.createElement("td"); n.textContent = name; tr.appendChild(n);
+      for (const v of mins) {
+        const td = document.createElement("td");
+        const share = Math.min(v / 30, 1);
+        if (v) { td.textContent = v + "'"; td.style.background = "rgba(31,111,235," + (0.15 + 0.75 * share) + ")";
+                 if (share > 0.5) td.style.color = "#fff"; }
+        tr.appendChild(td);
+      }
+      hb.appendChild(tr);
     }
   }
   const st = document.getElementById("status");

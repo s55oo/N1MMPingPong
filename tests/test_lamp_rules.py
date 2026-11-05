@@ -180,6 +180,78 @@ class PingPongTest(unittest.TestCase):
         self.assertIsNone(app._keys_to_block())
 
 
+class GoTest(unittest.TestCase):
+    def setUp(self):
+        self.app = make_lamp()
+        self.me = station(self.app, MY_IP, "INB2", running=False)  # INB
+        self.run = station(self.app, "10.0.0.2", "RUN1", running=True)
+        self.inb1 = station(self.app, "10.0.0.3", "INB1", running=False)
+        peer(self.app, "R", ["10.0.0.2"], alias="RUN1", role="RUN")
+        peer(self.app, "I", ["10.0.0.3"], alias="INB1", role="INB")
+
+    def test_go_after_run_finishes_until_slot_taken(self):
+        app = self.app
+        self.run.tx = True
+        app._pingpong_tx(self.run)
+        self.assertFalse(app._go_active(time.time()))  # RUN still sending
+        self.run.tx = False
+        app._pingpong_end(self.run)
+        self.assertTrue(app._go_active(time.time()))
+        self.assertFalse(app._go_active(time.time() + m.GO_TIME + 0.5))  # short
+        app._pingpong_tx(self.inb1)  # INB1 took the slot
+        self.assertFalse(app._go_active(time.time()))
+
+    def test_no_go_when_lock_off_or_not_inb(self):
+        app = self.app
+        app._pingpong_end(self.run)
+        app.pp_enabled = False
+        self.assertFalse(app._go_active(time.time()))
+        app.pp_enabled = True
+        self.me.running = True  # I am in Run
+        self.assertFalse(app._go_active(time.time()))
+
+    def test_inb_end_gives_no_go(self):
+        app = self.app
+        app._pingpong_end(self.inb1)
+        self.assertFalse(app._go_active(time.time()))
+
+
+class PingPongNoteTest(unittest.TestCase):
+    def test_no_run_on_band_note(self):
+        app = make_lamp()
+        station(app, MY_IP, "INB2", band="7", running=False)
+        self.assertIn("no RUN on 7 MHz", app._pingpong_note(time.time()))
+        run = station(app, "10.0.0.2", "RUN1", band="7", running=True)
+        peer(app, "R", ["10.0.0.2"], alias="RUN1", role="RUN")
+        self.assertEqual(app._pingpong_note(time.time()), "")
+        app.pp_enabled = False
+        run.key = ("14", "CW")
+        self.assertEqual(app._pingpong_note(time.time()), "")  # lock off: nothing to say
+
+
+class ProblemsTest(unittest.TestCase):
+    def test_problems_reported_in_hello(self):
+        app = make_lamp()
+        station(app, MY_IP, "INB2", band="7", running=False)
+        app._port_users[12060] = ["Callbooker.exe"]
+        old = m.ERROR_COUNT[0]
+        m.ERROR_COUNT[0] = 2
+        try:
+            app._status_text = lambda: ""
+            probs = app._problems(time.time())
+            hello = m.parse_hello(m.make_hello("X", "PC", [], **app._hello_state()))
+        finally:
+            m.ERROR_COUNT[0] = old
+        self.assertIn("UDP 12060 also used by Callbooker.exe", probs)
+        self.assertIn("2 errors in pingpong_error.log", probs)
+        self.assertIn("ping-pong: no RUN on 7 MHz", probs)
+        self.assertEqual(hello["problems"], probs)
+
+    def test_no_problems(self):
+        app = make_lamp()
+        self.assertEqual(app._problems(time.time()), [])
+
+
 class AutoRoleTest(unittest.TestCase):
     def test_auto_follows_n1mm(self):
         app = make_lamp()
