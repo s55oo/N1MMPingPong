@@ -712,11 +712,9 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
 
     def _set_bg(self, bg):
         """Lamp background + matching text color (dimmed in night mode).
-        GO is always written in black (in night mode too, on a lighter green)."""
+        GO: black lamp, white "GO" (also in night mode)."""
         go = bg == GO_COLOR
         bg = self._shade(bg)
-        if go and getattr(self, "night", False):
-            bg = GO_COLOR_NIGHT
         fg = GO_TEXT if go else self.text_on(bg)
         if self.canvas.cget("bg") != bg or self.canvas.itemcget(self.text_id, "fill") != fg:
             self.canvas.configure(bg=bg)

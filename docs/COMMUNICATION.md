@@ -283,7 +283,7 @@ for its band without any extra messages:
   slot. Any other INB on that band is locked until RUN transmits again.
 - The slot holder may transmit again in the same period.
 - **RUN stops transmitting** (`IsTransmitting` back to False) and the
-  slot is free → each INB lamp on that band shows a green **GO** for 3 s,
+  slot is free → each INB lamp on that band turns black with a white **GO** for 3 s,
   until an INB takes the slot.
 - No RUN on the band, RUN silent for the release time (`<PPLimit>`, set on
   the master, 0–40 s, default 40; 0 = never by time), or the lock switched **OFF**

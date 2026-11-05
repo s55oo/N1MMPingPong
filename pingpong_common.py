@@ -145,9 +145,8 @@ FIREWALL_PHONE_RULE = "PingPong phone lamp TCP"
 SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
-GO_COLOR = "#2ea043"  # green GO for inband stations
-GO_COLOR_NIGHT = "#2a7d3c"  # GO in night mode: dimmer, still light enough for black text
-GO_TEXT = "black"  # GO is written in black (white on this green was hard to read)
+GO_COLOR = "#000000"  # GO for inband stations: black lamp, white "GO"
+GO_TEXT = "white"
 TEST_COLOR = "#8957e5"  # lamp test from the Overview
 TEST_TIME = 3.0  # s
 LAMP_SIZES = {"normal": 1.0, "large": 1.4, "xlarge": 1.8}  # lamp size option
