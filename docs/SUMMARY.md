@@ -19,7 +19,8 @@ themselves on the LAN, over Wi-Fi or over a VPN such as ZeroTier.
 
 Download: [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest).
 Full manual: [README](../README.md). How it talks on the network:
-[COMMUNICATION](COMMUNICATION.md).
+[COMMUNICATION](COMMUNICATION.md). For the operators: a one-page
+[cheat sheet](CHEATSHEET.md) ([PDF to print](PingPong-cheat-sheet.pdf)).
 
 ---
 
@@ -37,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.86`.
+  `PingPong - MASTER UDP 12062 v1.87`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -144,6 +145,9 @@ the lamp downloads it if it is missing. One Overview per PC.
   **restore** them to all lamps before the next contest.
 - **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,
   lamps lost or restarted, setting changes, commands).
+- **Contest report…:** after the contest, one page (HTML, printable) with
+  TX time and share per station, function keys, waits, calls, ping, alarms,
+  TX minutes per hour and the notable events.
 - **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
   typing `YES` + Enter).
 - **Update all lamps:** one button. It shows how many lamps are behind
@@ -190,7 +194,11 @@ the lamp downloads it if it is missing. One Overview per PC.
    - Shift+F2 / Shift+F4 sends an urgent message to everyone on the band.
    - The ping-pong lock keeps RUN and the inband stations taking turns.
    - The captain watches the Overview, also on a phone.
-4. **After the contest:** **Save CSV…** of the function key statistics.
+4. **After the contest:** **Contest report…** on the Activity tab (and
+   **Save CSV…** if you want the raw numbers).
+
+Print the [operator cheat sheet](PingPong-cheat-sheet.pdf) for every
+operating position.
 
 ---
 
@@ -232,8 +240,9 @@ the lamp downloads it if it is missing. One Overview per PC.
   - `pingpong_phone.py`: the phone lamp page;
   - `pingpong_qr.py`: QR codes for the phone lamp address;
   - `pingpong_overview.py`: the Overview;
+  - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 127 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 132 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

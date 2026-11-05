@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PingPong – operator cheat sheet</title>
+<style>
+  @page { size: A4; margin: 9mm 11mm 8mm; }
+  * { box-sizing: border-box; }
+  body { font: 9.4pt/1.3 "Segoe UI", "Inter", Arial, sans-serif; color: #1d2330; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: baseline;
+           border-bottom: 2px solid #1d2330; padding-bottom: 4px; margin-bottom: 8px; }
+  h1 { font-size: 17pt; margin: 0; letter-spacing: -0.2px; }
+  header span { color: #555; font-size: 9pt; }
+  h2 { font-size: 11pt; margin: 8px 0 4px; padding-left: 6px; border-left: 4px solid #3b82f6; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border-bottom: 1px solid #e3e6eb; padding: 3px 5px; vertical-align: top; text-align: left; }
+  th { font-size: 8.4pt; color: #555; font-weight: 600; border-bottom: 1px solid #c9ced6; }
+  .lamp { display: inline-block; min-width: 118px; padding: 3px 7px; border-radius: 4px;
+          color: #fff; font-weight: 700; font-size: 9pt; text-align: center; white-space: nowrap; }
+  .idle { background: #3a3a3a; } .tx { background: #c00000; } .go { background: #2ea043; }
+  .wait { background: #3a3a3a; } .call { background: #3a3a3a; outline: 4px solid #1f6feb; outline-offset: -4px; }
+  .urgent { background: #c00000; outline: 3px dashed #c00000; outline-offset: 1px; }
+  .test { background: #8957e5; outline: 3px dashed #8957e5; outline-offset: 1px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  kbd { font: 600 8.6pt "Segoe UI", Arial, sans-serif; border: 1px solid #b8bec8; border-bottom-width: 2px;
+        border-radius: 3px; padding: 0 4px; background: #f6f7f9; white-space: nowrap; }
+  ul { margin: 0; padding-left: 15px; } li { margin: 2px 0; }
+  .flow { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 9pt; margin: 2px 0 4px; }
+  .flow b { background: #eef2f7; border-radius: 4px; padding: 2px 6px; }
+  code { font: 8.6pt Consolas, monospace; background: #f3f5f8; padding: 0 3px; border-radius: 3px; }
+  .note { color: #555; font-size: 8.6pt; }
+  footer { margin-top: 8px; border-top: 1px solid #c9ced6; padding-top: 4px; color: #555; font-size: 8.2pt;
+           display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header><h1>PingPong – operator cheat sheet</h1><span>N1MM Logger+ multi-op · S55OO</span></header>
+
+<h2>1 · What the lamp shows</h2>
+<table>
+  <tr><th style="width:150px">Lamp</th><th>Means</th><th style="width:32%">You</th></tr>
+  <tr><td><span class="lamp idle">—</span></td><td>Nobody on your band and mode is transmitting.</td><td>Operate normally.</td></tr>
+  <tr><td><span class="lamp tx">CQ</span></td><td>A station on your band and mode is transmitting – its color, its message, its name (top left) and frequency (top right).</td><td>Inband: don't transmit over it.</td></tr>
+  <tr><td><span class="lamp go">GO</span></td><td>RUN has just finished (3 s) – the slot is free for the inband stations.</td><td>Now is the moment. First inband to transmit gets the slot.</td></tr>
+  <tr><td><span class="lamp wait">WAIT · INB1 · 32 s</span></td><td>Another inband holds the slot. Your <kbd>F1</kbd>–<kbd>F11</kbd>, <kbd>Enter</kbd>, <kbd>Insert</kbd> are blocked.</td><td>Wait for RUN to transmit; frees itself after the release time.</td></tr>
+  <tr><td><span class="lamp wait">BLOCKED · F1</span></td><td>You pressed a blocked key – nothing was sent.</td><td>Wait, then press again.</td></tr>
+  <tr><td><span class="lamp call">F12 · RUN1 · 25 s</span></td><td>F12 call: the border blinks in the caller's color – "hold off, please". Your F-keys may be blocked meanwhile.</td><td>Stop transmitting. Left click on the lamp stops the blinking.</td></tr>
+  <tr><td><span class="lamp urgent">RUN1 · QRL? ⚡</span></td><td>Urgent call (Shift+F2/F4) from a station on your band and mode – flashes fast (color ↔ white) as long as its message is sent.</td><td>Stop and listen – at once.</td></tr>
+  <tr><td><span class="lamp test">INB2 · INB</span></td><td>Lamp test from the master PC: purple ↔ white for 3 s, <code>TEST</code> in the corner.</td><td>Nothing – it shows your own name.</td></tr>
+</table>
+
+<div class="cols">
+<div>
+<h2>2 · Your keys</h2>
+<table>
+  <tr><td style="width:96px"><kbd>F12</kbd> in S&amp;P</td><td>The S&amp;P stations on your band blink in your color and hold off (call time, default 30 s). <kbd>F12</kbd> again = end the call.</td></tr>
+  <tr><td><kbd>F12</kbd> in Run</td><td><b>All</b> stations on your band hold off for a few seconds (default 5 s).</td></tr>
+  <tr><td><kbd>Shift</kbd>+<kbd>F2</kbd> / <kbd>F4</kbd></td><td>N1MM sends F2/F4 as usual, and every lamp on your band and mode flashes your name and the message while it is sent.</td></tr>
+  <tr><td>Run / S&amp;P</td><td>Your role follows N1MM: Run = <b>RUN</b>, S&amp;P = <b>INB</b> – nothing to set.</td></tr>
+  <tr><td>Mouse</td><td>Left click on lamp = stop blinking · right click = Options · <kbd>Shift</kbd>+<kbd>F</kbd> = compact lamp.</td></tr>
+</table>
+<p class="note">"F12 busy · RUN2" = a call is already running on your band; wait until it ends.</p>
+</div>
+<div>
+<h2>3 · Taking turns (ping-pong)</h2>
+<div class="flow"><b>RUN transmits</b>→<b>GO</b>→<b>first INB takes slot</b>→<b>other INBs WAIT</b>→<b>RUN transmits</b></div>
+<ul>
+  <li>The slot also frees itself after the <b>release time</b> (set on the master, default 40 s; 0 = only RUN frees it).</li>
+  <li>The master can switch the lock <b>off</b> – then everybody may transmit, no priority.</li>
+  <li><code>no RUN on 7 MHz – lock off</code>: there is no RUN on your band, so nobody is locked.</li>
+  <li>Only transmissions <b>N1MM starts</b> count. Paddle, microphone PTT or footswitch are not seen and not blocked.</li>
+</ul>
+<h2>Phone lamp</h2>
+<p style="margin:0">Options ▾ → <b>Phone lamp QR code…</b> → scan it with the phone. The phone shows the same lamp (needs the firewall rule).</p>
+</div>
+</div>
+
+<h2>4 · Messages under the lamp – what to do</h2>
+<table>
+  <tr><th style="width:44%">Message</th><th>Do</th></tr>
+  <tr><td><code>no data from this PC's N1MM on UDP 12062</code></td><td>N1MM: Config → Configure Ports… → <b>Broadcast Data</b> → <b>Radio</b> ticked, line <code>127.0.0.1:12060 127.0.0.1:12062</code> → OK.</td></tr>
+  <tr><td><code>⚠ UDP 12062 also used by …</code> (red)</td><td>Another program takes N1MM's data on this PC – tell the captain.</td></tr>
+  <tr><td><code>no PingPong heard – firewall?</code></td><td>Options ▾ → <b>Allow PingPong in Windows Firewall…</b> (asks for administrator rights).</td></tr>
+  <tr><td><code>⚠ TWO MASTERS</code> · different versions</td><td>Tell the captain (Overview: <b>Update all lamps…</b>).</td></tr>
+  <tr><td>Lamp gone / closed</td><td>Start <code>n1mm_lamps.exe</code> again – only one lamp per PC. The Overview raises an alarm when an operating lamp is silent for 30 s.</td></tr>
+</table>
+
+<footer><span>PingPong · github.com/s55oo/N1MMPingPong</span><span>It prevents mistakes – it is not a hardware interlock. N1MM's own interlock still applies.</span></footer>
+</body>
+</html>

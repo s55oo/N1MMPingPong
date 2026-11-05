@@ -1,8 +1,9 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.86 · Made by **S55OO** with AI assistance.
+> **Version:** 1.87 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
+> **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
 
 PingPong shows which computer/station on the network is currently
 **transmitting**. It listens to the N1MM Logger+ external UDP broadcast
@@ -259,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.86`
-  (the others just `PingPong UDP 12062 v1.86`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.87`
+  (the others just `PingPong UDP 12062 v1.87`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -612,7 +613,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.86 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.87 ✔`), **Setup ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -642,7 +643,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.86 ✔** when every lamp is current – then a
+lists them), **All lamps v1.87 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -737,6 +738,26 @@ calls, ping-pong WAIT and free, master changes, ping-pong lock and
 release time changes, and the commands sent from the Overview (update,
 test, ping-pong, emergency). **Open event log** on the Activity tab
 opens it. Delete the file any time; it starts again with a header.
+
+**Contest report…** (Activity tab) – after the contest: one page that is
+saved next to the exe as `pingpong_report_<date>_<time>.html` and opens
+in the browser (print it or save it as PDF from there). It covers the
+time since the last **Reset** of the statistics:
+
+- totals: TX time, transmissions, ping-pong waits, F12 and urgent calls,
+  "not heard" alarms;
+- per station: TX time and share, transmissions, busiest hour, waits and
+  time waited, F12 / urgent calls, ping average / max / lost, times not
+  heard, alarms and lamp restarts;
+- function keys F1–F12 per station;
+- TX minutes per hour for every station (all hours of the contest);
+- notable events from the event log (alarms, lost lamps, master and
+  setting changes, commands) – routine lines like WAIT or F12 are counted,
+  not listed.
+
+![Contest report (example data)](docs/contest-report.png)
+
+*Example with made-up data for a 48-hour contest.*
 
 **Web page.** The same tables are served at `http://<master PC>:8046` –
 open it in any browser on the network, also on a **phone or tablet**
@@ -867,9 +888,11 @@ pingpong_keys.py    – keyboard watcher: F12, F-key block, Shift+F2/F4
 pingpong_update.py  – self-update / switch-version logic (lamp and Overview)
 pingpong_version.py – the version number (one place)
 pingpong_overview.py – Overview: window + web page
+pingpong_report.py  – Overview: after-contest report (HTML)
 tests/              – automated tests (run on every push; test_windows.py
                       checks the Windows-only parts on the Windows build runner)
 tools/make_version_info.py – Windows version info for the exes
+tools/make_cheatsheet_pdf.py – docs/cheatsheet.html → PingPong-cheat-sheet.pdf
 n1mm_watch.py       – traffic watcher (source)
 PingPong.bat        – watcher launcher
 build_exe.bat       – local one-click EXE build
@@ -885,6 +908,8 @@ docs/n1mm-broadcast-data.png – N1MM Broadcast Data setup
 lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
 docs/SUMMARY.md     – what PingPong does, on one page
+docs/CHEATSHEET.md  – operator cheat sheet (and PingPong-cheat-sheet.pdf, from cheatsheet.html)
+docs/contest-report.png – example contest report
 docs/COMMUNICATION.md – how it communicates (diagrams)
 docs/communication.svg – overview diagram
 .github/workflows/build-exe.yml – automatic build and release

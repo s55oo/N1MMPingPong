@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import n1mm_lamps as pp
+import pingpong_report as report
 import pingpong_update as upd
 
 TITLE = "PingPong Overview"
@@ -925,6 +926,34 @@ class Overview:
             messagebox.showinfo(TITLE, "Event log: {}\n({})".format(self.events_path, exc),
                                 parent=self.root)
 
+    def _report_html(self, now=None):
+        """The after-contest report page, from the statistics (since the
+        last Reset) and the event log of the same period."""
+        now = now or time.time()
+        with self.lock:
+            stats = json.loads(json.dumps(self.stats))  # a copy, outside the lock below
+            since = self.stats_since
+        events = report.read_events(self.events_path, since)
+        return report.build_report(stats, since, now, events)
+
+    def _contest_report(self):
+        """Activity tab: write the report next to the exe and open it."""
+        path = os.path.join(app_dir(), "pingpong_report_{}.html".format(time.strftime("%Y-%m-%d_%H%M")))
+        try:
+            page = self._report_html()
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(page)
+        except OSError as exc:
+            messagebox.showerror(TITLE, "Could not write the report:\n{}".format(exc), parent=self.root)
+            return
+        self._event("-", "contest report", os.path.basename(path))
+        try:
+            os.startfile(path)  # Windows: opens in the default browser
+        except (AttributeError, OSError):
+            import webbrowser
+
+            webbrowser.open("file://" + path)
+
     def _activity_table(self):
         """Activity per station + TX minutes per hour (window, web, CSV)."""
         cols = ["Station", "Locked (WAIT)", "Locked time", "F12 calls", "Urgent calls", "TX time",
@@ -1301,7 +1330,8 @@ class Overview:
         abar.pack(fill=tk.X)
         tk.Label(abar, text="Ping-pong waiting, calls and TX time per station (same Reset / "
                  "Save CSV as Function keys)", anchor="w").pack(side=tk.LEFT)
-        tk.Button(abar, text="Open event log", command=self._open_events).pack(side=tk.RIGHT)
+        tk.Button(abar, text="Contest report…", command=self._contest_report).pack(side=tk.RIGHT)
+        tk.Button(abar, text="Open event log", command=self._open_events).pack(side=tk.RIGHT, padx=6)
         tk.Button(abar, text="Ping now", command=self._ping_now.set).pack(side=tk.RIGHT, padx=6)
         acols = ["station", "locked", "ltime", "f12", "urgent", "tx", "pavg", "pmax", "plost"]
         self.atree = ttk.Treeview(aframe, columns=acols, show="headings", selectmode="none", height=5)
