@@ -1,7 +1,7 @@
 # PingPong – N1MM Logger+ Lamps
 
 > **Version:** 1.87 · Made by **S55OO** with AI assistance.
-> **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
+> **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
 
@@ -865,7 +865,8 @@ released.
 yet, it creates the tag and the release, with notes from
 `releases/v<version>.md`, and attaches both freshly built EXEs
 (`n1mm_lamps.exe`, `pingpong_overview.exe`; the lamp's updater only
-uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`). To publish a
+uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`) plus the
+operator cheat sheet `PingPong-cheat-sheet.pdf`. To publish a
 new version: bump `__version__` in `pingpong_version.py`, add
 `releases/vX.Y.md`, push to `main`.
 Existing releases are never overwritten.

@@ -125,4 +125,9 @@ jobs:
           }
           gh release upload $tag dist/n1mm_lamps.exe dist/pingpong_overview.exe --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          # The operator cheat sheet (one A4 page) goes with every release too.
+          if (Test-Path docs/PingPong-cheat-sheet.pdf) {
+            gh release upload $tag docs/PingPong-cheat-sheet.pdf --repo $env:GITHUB_REPOSITORY --clobber
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
           "Released $tag" >> $env:GITHUB_STEP_SUMMARY
