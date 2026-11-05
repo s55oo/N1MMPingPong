@@ -102,7 +102,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.73</Version>
+  <Version>1.74</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->

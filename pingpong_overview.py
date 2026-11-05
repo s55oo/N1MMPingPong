@@ -991,33 +991,44 @@ class Overview:
 
     def _build(self):
         self.root.title("{}  v{}".format(TITLE, pp.__version__))
-        top = tk.Frame(self.root, padx=8, pady=6)
+        # Status line on its own row (wraps), buttons in two rows under it:
+        # contest controls first, then maintenance - the window stays narrow.
+        top = tk.Frame(self.root, padx=8, pady=4)
         top.pack(fill=tk.X)
-        self.head = tk.Label(top, text="", anchor="w", font=("Segoe UI", 10, "bold"))
-        self.head.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.var_top = tk.BooleanVar(value=self.cfg.get("window", "on_top", fallback="no") == "yes")
-        tk.Checkbutton(top, text="Always on top", variable=self.var_top,
-                       command=self._on_top).pack(side=tk.RIGHT)
-        if self.web_port and sys.platform == "win32":
-            tk.Button(top, text="Allow web page in firewall…",
-                      command=self._allow_firewall).pack(side=tk.RIGHT, padx=8)
-        self.update_all_button = tk.Button(top, text="Update all lamps…", command=self._update_all)
-        self.update_all_button.pack(side=tk.RIGHT)
-        # Shown only when a newer Overview is on GitHub (exe only).
-        self.update_button = tk.Button(top, text="Update Overview…", command=self._update_self,
-                                       bg="#ffe08a")
-        tk.Button(top, text="Ready check", command=self._ready_check).pack(side=tk.RIGHT, padx=8)
-        self.pp_button = tk.Button(top, text="Ping-pong lock: ?", width=20,
+        self.head = tk.Label(top, text="", anchor="w", justify=tk.LEFT,
+                             font=("Segoe UI", 10, "bold"))
+        self.head.pack(fill=tk.X)
+        top.bind("<Configure>", lambda e: self.head.configure(wraplength=max(300, e.width - 16)))
+        row1 = tk.Frame(top, pady=2)
+        row1.pack(fill=tk.X)
+        row2 = tk.Frame(top, pady=2)
+        row2.pack(fill=tk.X)
+        pad = {"side": tk.LEFT, "padx": (0, 6)}
+        self.pp_button = tk.Button(row1, text="Ping-pong lock: ?", width=20,
                                    command=self._toggle_pingpong)
-        self.pp_button.pack(side=tk.RIGHT)
-        tk.Button(top, text="Test all lamps", command=self._test_lamps).pack(side=tk.RIGHT)
-        emergency = tk.Menubutton(top, text="Emergency ▾", fg="#b00020", relief=tk.RAISED,
+        self.pp_button.pack(**pad)
+        tk.Button(row1, text="Ready check", command=self._ready_check).pack(**pad)
+        tk.Button(row1, text="Test all lamps", command=self._test_lamps).pack(**pad)
+        emergency = tk.Menubutton(row1, text="Emergency ▾", fg="#b00020", relief=tk.RAISED,
                                   activeforeground="#b00020")
         menu = tk.Menu(emergency, tearoff=0)
         menu.add_command(label="Restart all lamps…", command=lambda: self._emergency("restart"))
         menu.add_command(label="Stop all lamps…", command=lambda: self._emergency("stop"))
         emergency.configure(menu=menu)
-        emergency.pack(side=tk.RIGHT, padx=8)
+        emergency.pack(**pad)
+        self.update_all_button = tk.Button(row2, text="Update all lamps…", command=self._update_all)
+        self.update_all_button.pack(**pad)
+        # Shown only when a newer Overview is on GitHub (exe only).
+        self.update_button = tk.Button(row2, text="Update Overview…", command=self._update_self,
+                                       bg="#ffe08a")
+        self._update_slot = tk.Frame(row2)  # keeps the yellow button's place in the row
+        self._update_slot.pack(side=tk.LEFT)
+        if self.web_port and sys.platform == "win32":
+            tk.Button(row2, text="Allow web page in firewall…",
+                      command=self._allow_firewall).pack(**pad)
+        self.var_top = tk.BooleanVar(value=self.cfg.get("window", "on_top", fallback="no") == "yes")
+        tk.Checkbutton(row2, text="Always on top", variable=self.var_top,
+                       command=self._on_top).pack(side=tk.LEFT)
         self._pp_sent = 0.0
         self._on_top(save=False)
 
@@ -1033,9 +1044,11 @@ class Overview:
         for cid, text, width, anchor in COLUMNS:
             self.tree.heading(cid, text=text)
             self.tree.column(cid, width=width, anchor=anchor,
-                             stretch=cid in ("tx", "last", "calls"))
+                             stretch=False)  # keeps widths: scroll sideways in a narrow window
         scroll = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
+        xscroll = ttk.Scrollbar(frame, orient=tk.HORIZONTAL, command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scroll.set, xscrollcommand=xscroll.set)
+        xscroll.pack(side=tk.BOTTOM, fill=tk.X)  # narrow window: scroll sideways
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         sframe = tk.Frame(self.book)
@@ -1088,7 +1101,7 @@ class Overview:
                              font=("Segoe UI", 9), wraplength=1200)
         self.foot.pack(fill=tk.X)
         geo = self.cfg.get("window", "geometry", fallback="")
-        self.root.geometry(geo or "1250x360")
+        self.root.geometry(geo or "900x400")
 
     def _draw_heat(self, act):
         """TX minutes per hour: one row per station, darker = more TX."""
@@ -1309,7 +1322,7 @@ class Overview:
             if not self.update_button.winfo_ismapped():
                 self.update_button.configure(
                     text="Update Overview to v{}…".format(self.self_update["version"]))
-                self.update_button.pack(side=tk.RIGHT, padx=8)
+                self.update_button.pack(side=tk.LEFT, padx=(0, 6), before=self._update_slot)
             if not self._offer_scheduled:
                 self._offer_scheduled = True  # ask once per start
                 self.root.after(0, self._offer_self_update)
