@@ -237,8 +237,6 @@ class DisplayApp(RulesMixin):
         self._last_role = ""
         self._go_time = 0.0  # when RUN's last transmission on my band ended
         self._go_band = ""
-        self._go_beeped = 0.0
-        self.var_go_sound = tk.BooleanVar(value=self.settings.get("go_sound", False))
         self._test_until = 0.0  # lamp test from the Overview runs until then
         size = self.settings.get_text("window", "size", "normal")
         self.lamp_size = size if size in LAMP_SIZES else "normal"
@@ -410,11 +408,6 @@ class DisplayApp(RulesMixin):
             label="Sound on F12 call",
             variable=self.var_sound,
             command=lambda: self.settings.set("call_sound", self.var_sound.get()),
-        )
-        menu.add_checkbutton(
-            label="Sound on GO (ping-pong: RUN has finished)",
-            variable=self.var_go_sound,
-            command=lambda: self.settings.set("go_sound", self.var_go_sound.get()),
         )
         menu.add_checkbutton(
             label="Share my N1MM with other lamps (all networks)",
@@ -1654,10 +1647,6 @@ class DisplayApp(RulesMixin):
                 # RUN has finished: the inband stations may transmit now.
                 idle = "GO"
                 self._set_bg(GO_COLOR)
-                if self._go_beeped != self._go_time:
-                    self._go_beeped = self._go_time
-                    if self.var_go_sound.get():
-                        self._click()
             elif self.alert_on:
                 idle = "F12 · {} s".format(self._my_call_left(now))
             if now - self._f12_refused <= 2.0 and self._band_busy is not None:
@@ -1813,18 +1802,6 @@ class DisplayApp(RulesMixin):
         self.settings.set_text("network", "pingpong", "yes" if on else "no")
         self._key_event("ping-pong lock {} (for all PCs)".format("ON" if on else "OFF"))
         self.hello_now.set()  # tell all lamps right away
-
-    def _click(self):
-        """Short soft click (GO), without blocking the window."""
-        def beep():
-            try:
-                import winsound
-
-                winsound.Beep(1400, 40)
-            except Exception:
-                pass
-
-        threading.Thread(target=beep, daemon=True).start()
 
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())

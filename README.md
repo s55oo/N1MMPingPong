@@ -380,8 +380,7 @@ keeps the current setting.
 - **GO:** when RUN's transmission ends and the slot is free, every inband
   lamp shows a green **GO** for 3 s – the moment to transmit. It
   disappears as soon as an inband station takes the slot (the others then
-  show `WAIT`). **Options ▾ → Sound on GO** adds a short soft click (off
-  by default).
+  show `WAIT`). GO is visual only, without sound.
 - **No RUN on the band:** an inband lamp says
   `ping-pong: no RUN on 7 MHz – lock off` (and the Overview's ready check
   shows it in red) – e.g. when the run station is in S&P by mistake.
