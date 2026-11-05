@@ -111,9 +111,9 @@ NO_LAMP_AFTER = 30.0  # s after start before "no PingPong heard" notes
 
 FIREWALL_RULE = "PingPong lamps UDP"
 
-# Ping-pong role setting: "auto" follows N1MM (Run = RUN, S&P = INB).
-ROLES = ("auto", "off", "RUN", "INB")
-SENT_ROLES = ("RUN", "INB")  # what a lamp announces to the others
+# Ping-pong role: always from N1MM (Run = RUN, S&P = INB); announced to
+# the other lamps in the hello.
+SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
 

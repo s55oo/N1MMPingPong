@@ -111,7 +111,7 @@ class UrgentTest(unittest.TestCase):
 
 class PingPongTest(unittest.TestCase):
     def setUp(self):
-        self.app = make_lamp(my_role="INB")
+        self.app = make_lamp()  # this PC in S&P -> INB
         self.me = station(self.app, MY_IP, "INB2", running=False)
         self.run = station(self.app, "10.0.0.2", "RUN1", running=True)
         self.inb1 = station(self.app, "10.0.0.3", "INB1", running=False)
@@ -164,18 +164,16 @@ class PingPongTest(unittest.TestCase):
 
 class AutoRoleTest(unittest.TestCase):
     def test_auto_follows_n1mm(self):
-        app = make_lamp(my_role="auto")
+        app = make_lamp()
         me = station(app, MY_IP, "G4", running=True)
         self.assertEqual(app._my_role_now(), "RUN")
         me.running = False
         self.assertEqual(app._my_role_now(), "INB")
         me.running = None
         self.assertEqual(app._my_role_now(), "off")
-        app.my_role = "RUN"  # fixed role wins
-        self.assertEqual(app._my_role_now(), "RUN")
 
     def test_auto_role_is_announced_and_locks(self):
-        app = make_lamp(my_role="auto")
+        app = make_lamp()
         me = station(app, MY_IP, "INB2", running=False)  # S&P -> INB
         run = station(app, "10.0.0.2", "RUN1", running=True)
         inb1 = station(app, "10.0.0.3", "INB1", running=False)
@@ -190,8 +188,8 @@ class AutoRoleTest(unittest.TestCase):
         self.assertFalse(app._pingpong_state(time.time())[0])
         self.assertEqual(app._hello_state()["role"], "RUN")
 
-    def test_peer_never_announces_auto(self):
-        self.assertNotIn("auto", m.SENT_ROLES)
+    def test_announced_roles(self):
+        self.assertEqual(m.SENT_ROLES, ("RUN", "INB"))
 
 
 class MasterTest(unittest.TestCase):

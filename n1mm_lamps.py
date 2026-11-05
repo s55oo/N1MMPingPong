@@ -232,17 +232,9 @@ class DisplayApp(RulesMixin):
         )
         self._i_am_master = False
         self._master_peer = None
-        self.my_role = self.settings.get_text("station", "role", "auto")
-        if self.settings.get_text("station", "role_auto", "") != "yes":
-            # v1.63: the role follows N1MM by default - switch every PC to
-            # "auto" once; a fixed role can still be chosen afterwards.
-            self.my_role = "auto"
-            self.settings.set_text("station", "role", "auto")
-            self.settings.set_text("station", "role_auto", "yes")
-        if self.my_role not in ROLES:
-            self.my_role = "auto"
+        # The ping-pong role always follows N1MM (Run = RUN, S&P = INB);
+        # an old fixed "role" in pingpong.ini is ignored.
         self._last_role = ""
-        self.var_role = tk.StringVar(value=self.my_role)
         self._slots = {}  # band -> [holder station ip, time of its last TX start]
         self._pp_locked = False
         self._pp_holder = None
@@ -291,9 +283,8 @@ class DisplayApp(RulesMixin):
         ).start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
-        if (
-            self.var_keys.get() or self.var_block.get() or self.my_role in ("INB", "auto")
-        ) and keys.supported():
+        if keys.supported():
+            # Always: the ping-pong lock may need it whenever N1MM is in S&P.
             self.root.after(500, self._keys_toggled)
         if upd.is_frozen():
             upd.cleanup_leftovers(upd.exe_path())
@@ -401,17 +392,11 @@ class DisplayApp(RulesMixin):
         )
         menu.add_separator()
         now_role = self._my_role_now()
-        for value, text in (
-            ("auto", "Ping-pong role: Auto – from N1MM, Run = RUN, S&P = INB  (now {})".format(
-                now_role if now_role != "off" else "unknown")),
-            ("off", "Ping-pong role: off"),
-            ("RUN", "Ping-pong role: always RUN"),
-            ("INB", "Ping-pong role: always INB"),
-        ):
-            menu.add_radiobutton(
-                label=text, variable=self.var_role, value=value,
-                command=self._role_changed,
-            )
+        menu.add_command(
+            label="Ping-pong role: {}  (from N1MM: Run = RUN, S&P = INB)".format(
+                now_role if now_role != "off" else "unknown"),
+            state=tk.DISABLED,
+        )
         menu.add_separator()
         frozen = upd.is_frozen()
         state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
@@ -1390,7 +1375,7 @@ class DisplayApp(RulesMixin):
         if role != self._last_role:
             if self._last_role:
                 self._key_event("ping-pong role now {}{}".format(
-                    role, " (from N1MM)" if self.my_role == "auto" else ""))
+                    role, " (from N1MM)"))
             self._last_role = role
             self.hello_now.set()  # the other lamps need it at once
         warn = self._master_warning(now)
@@ -1618,19 +1603,12 @@ class DisplayApp(RulesMixin):
 
     def _keys_toggled(self):
         call, block = bool(self.var_keys.get()), bool(self.var_block.get())
-        inb = self.my_role in ("INB", "auto")  # auto may become INB any time
-        if (call or block or inb) and not self._start_keys():
+        # The keyboard watcher always runs: the ping-pong lock may need it
+        # whenever N1MM is in S&P (role INB).
+        if not self._start_keys():
             self.var_keys.set(False)
             self.var_block.set(False)
             call = block = False
-            if inb:
-                self.my_role = "off"
-                self.var_role.set("off")
-                self.settings.set_text("station", "role", "off")
-                inb = False
-        if not (call or block or inb) and self.key_watcher is not None:
-            self.key_watcher.stop()
-            self.key_watcher = None
         if not call and self.alert_on:
             self.alert_on = False
             self.alert_time = time.time()
@@ -1644,14 +1622,6 @@ class DisplayApp(RulesMixin):
     def _relay_toggled(self):
         self.relay_on = bool(self.var_relay.get())
         self.settings.set("share_n1mm", self.relay_on)
-
-    def _role_changed(self):
-        role = self.var_role.get()
-        self.my_role = role if role in ROLES else "auto"
-        self.settings.set_text("station", "role", self.my_role)
-        self._key_event("ping-pong role: {}".format(self.my_role))
-        self.hello_now.set()
-        self._keys_toggled()
 
     def _key_event(self, text):
         if self.test_on:

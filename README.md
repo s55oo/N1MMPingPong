@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.63 · Made by **S55OO** with AI assistance.
+> **Version:** 1.64 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -300,7 +300,7 @@ per PC, off by default).
   on N1MM's buttons, microphone PTT, paddle or footswitch – it guards
   against accidental key presses, it is not a hardware interlock.
 
-### Ping-pong lock (Options ▾ → Ping-pong role)
+### Ping-pong lock
 
 For the "ping-pong mode" of a multi-op station: one **RUN** station and
 inband stations (**INB1**, **INB2** …) on the same band take turns – RUN
@@ -309,19 +309,13 @@ lock does in software what an interlock box does for this rule. N1MM
 still prevents two real transmissions at the same time; PingPong adds the
 alternation.
 
-**The role is automatic:** it follows N1MM on each PC – **Run = RUN,
+**The role always comes from N1MM** on each PC – **Run = RUN,
 S&P = INB** – and changes the moment the operator switches mode in N1MM.
-Nothing to set. (Default since v1.63; every PC is switched to it once.)
-
-For a special case a fixed role can be chosen per PC under **Options ▾ →
-Ping-pong role**: *Auto – from N1MM* (default, the menu also shows the
-current role), *off*, *always RUN* or *always INB* – e.g. an inband
-station that also calls CQ in RUN's gaps (in Run mode it would otherwise
-count as a RUN).
+Nothing to set; **Options ▾** only shows the current role.
 
 | Role | Behavior |
 |---|---|
-| **off** | No ping-pong lock (also when N1MM's Run/S&P is not known yet). |
+| **off** | N1MM's Run/S&P not known yet (e.g. just started): no lock. |
 | **RUN** | Never locked. Every RUN transmission opens a new period for the inband stations. |
 | **INB** | After RUN has transmitted, **the first INB that transmits takes the slot**; every other INB on that band is **locked until RUN transmits again**. The INB holding the slot may keep transmitting in it. |
 
@@ -467,7 +461,7 @@ PC, kept by updates.
 | Section | Keys |
 |---|---|
 | `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
-| `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), `role` (auto / off / RUN / INB; default auto = from N1MM), `role_auto` (set once when v1.63 switched the role to auto) |
+| `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), (an old `role` entry is ignored – the role comes from N1MM) |
 | `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call) last received from the master |
 | `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |

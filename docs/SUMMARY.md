@@ -56,7 +56,7 @@ Full manual: [README](../README.md). How it talks on the network:
 
 ### Ping-pong lock (taking turns on one band)
 - Each PC's role comes **automatically from N1MM**: Run = **RUN**,
-  S&P = **INB** (inband). A fixed role can still be chosen in Options.
+  S&P = **INB** (inband) – nothing to set.
 - After RUN transmits, the **first INB that transmits takes the slot**.
   Every other INB is locked (F1–F11, Enter and Insert) until RUN
   transmits again.

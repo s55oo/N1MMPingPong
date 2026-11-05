@@ -91,7 +91,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.63</Version>
+  <Version>1.64</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -231,9 +231,9 @@ one PC.
 
 One RUN and inband stations (INB1, INB2) on the same band take turns, like
 a doubles match: RUN transmits, and in RUN's listening gap **one** inband
-station transmits. Each PC's role is **automatic by default** – N1MM's
-`IsRunning`: Run = RUN, S&P = INB – or fixed under Options, and is sent
-in the hello (`<Role>`, at once when it changes).
+station transmits. Each PC's role always comes from its N1MM's
+`IsRunning` – Run = RUN, S&P = INB – and is sent in the hello (`<Role>`,
+at once when it changes).
 
 Every lamp sees every transmission start (N1MM's `IsTransmitting`
 changing to True on port 12060), so each INB lamp keeps the same "slot"

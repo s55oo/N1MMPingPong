@@ -23,13 +23,8 @@ from pingpong_net import *  # noqa: F401,F403
 
 class RulesMixin:
     def _my_role_now(self):
-        """This PC's ping-pong role right now: RUN, INB or off.
-
-        "auto" (the default) follows this PC's N1MM: Run = RUN, S&P = INB,
-        unknown = off. A fixed role (RUN / INB / off) can be set in Options.
-        """
-        if self.my_role != "auto":
-            return self.my_role
+        """This PC's ping-pong role right now, always from its N1MM:
+        Run = RUN, S&P = INB, not known (yet) = off."""
         mine = self._local_station()
         if mine is None:
             return "off"
@@ -180,7 +175,6 @@ class RulesMixin:
                 self.peer_name(self._master_peer) if self._master_peer else "?"
             )),
             "ping-pong role " + self._my_role_now()
-            + (" (auto)" if self.my_role == "auto" else "")
             + (" (LOCKED)" if self._pp_locked else ""),
         ])
 
