@@ -25,6 +25,7 @@ import urllib.request
 REPO = "s55oo/N1MMPingPong"
 API_URL = "https://api.github.com/repos/{}/releases".format(REPO)
 ASSET_NAME = "n1mm_lamps.exe"
+SUMS_NAME = "SHA256SUMS.txt"
 SETTINGS_FILE = "pingpong.ini"
 TIMEOUT = 20
 
@@ -66,7 +67,9 @@ def fetch_releases(asset_name=ASSET_NAME):
     asset_name: which exe of the release (n1mm_lamps.exe, or
     pingpong_overview.exe for PingPong Overview).
 
-    Each item: {"version", "tag", "url", "size", "sha256", "date"}.
+    Each item: {"version", "tag", "name", "url", "size", "sha256", "sums_url",
+    "date"}. sha256 is GitHub's own digest of the file ("" if GitHub has
+    none); sums_url is the release's SHA256SUMS.txt ("" if none).
     Raises OSError / ValueError on network or format problems.
     """
     with urllib.request.urlopen(_request(API_URL), timeout=TIMEOUT) as resp:
@@ -78,6 +81,10 @@ def fetch_releases(asset_name=ASSET_NAME):
         tag = rel.get("tag_name") or ""
         if not parse_version(tag):
             continue
+        sums_url = ""
+        for asset in rel.get("assets") or []:
+            if asset.get("name") == SUMS_NAME:
+                sums_url = asset.get("browser_download_url") or ""
         for asset in rel.get("assets") or []:
             if asset.get("name") != asset_name:
                 continue
@@ -86,7 +93,9 @@ def fetch_releases(asset_name=ASSET_NAME):
                 {
                     "version": tag.lstrip("vV"),
                     "tag": tag,
+                    "name": asset_name,
                     "url": asset.get("browser_download_url"),
+                    "sums_url": sums_url,
                     "size": asset.get("size") or 0,
                     "sha256": digest[7:].lower()
                     if digest.startswith("sha256:")
@@ -99,6 +108,33 @@ def fetch_releases(asset_name=ASSET_NAME):
     return releases
 
 
+def parse_sums(text):
+    """SHA256SUMS.txt ("<hash> *<file>" or "<hash>  <file>") -> {file: hash}."""
+    sums = {}
+    for line in (text or "").splitlines():
+        parts = line.strip().split(None, 1)
+        if len(parts) == 2 and re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+            sums[parts[1].lstrip("*").strip()] = parts[0].lower()
+    return sums
+
+
+def expected_sha256(release):
+    """The SHA-256 the download must have: GitHub's digest and/or the
+    release's SHA256SUMS.txt. If both exist they must agree."""
+    expected = release.get("sha256") or ""
+    if release.get("sums_url"):
+        try:
+            with urllib.request.urlopen(_request(release["sums_url"]), timeout=TIMEOUT) as resp:
+                listed = parse_sums(resp.read(65536).decode("utf-8", "replace")).get(
+                    release.get("name") or ASSET_NAME, "")
+        except OSError:
+            listed = ""  # GitHub's digest (if any) still protects the download
+        if listed and expected and listed != expected:
+            raise ValueError("SHA256SUMS.txt and GitHub disagree - not installed")
+        expected = expected or listed
+    return expected
+
+
 def newer_release(releases, current):
     if releases and parse_version(releases[0]["version"]) > parse_version(current):
         return releases[0]
@@ -107,6 +143,7 @@ def newer_release(releases, current):
 
 def download(release, target_exe, progress=None):
     """Download and verify; returns the path of the verified file."""
+    expected = expected_sha256(release)
     part = target_exe + ".download"
     sha = hashlib.sha256()
     done = 0
@@ -127,7 +164,7 @@ def download(release, target_exe, progress=None):
             raise ValueError(
                 "download incomplete ({} of {} bytes)".format(done, release["size"])
             )
-        if release["sha256"] and sha.hexdigest() != release["sha256"]:
+        if expected and sha.hexdigest() != expected:
             raise ValueError("checksum mismatch - download corrupted")
         with open(part, "rb") as fh:
             if fh.read(2) != b"MZ":

@@ -38,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.89`.
+  `PingPong - MASTER UDP 12062 v1.90`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -228,7 +228,9 @@ operating position.
 - **Python and Tkinter**, packed into one exe per program with
   PyInstaller. The build's starter code is compiled from source, the
   exes are not compressed, and they carry Windows version information.
-  A Defender scan must be clean before a release is published.
+  A Defender scan must be clean before a release is published. Every
+  release carries `SHA256SUMS.txt` (also in its notes); updates are only
+  installed when the download's SHA-256 matches.
 - **Network:**
   - N1MM's broadcast to the lamp on **UDP 12062**, which PingPong only reads;
   - lamp-to-lamp messages on **UDP 46070**;
@@ -249,7 +251,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 139 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 145 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

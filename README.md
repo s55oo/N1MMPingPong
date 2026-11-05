@@ -1,7 +1,7 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.89 · Made by **S55OO** with AI assistance.
-> **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed.
+> **Version:** 1.90 · Made by **S55OO** with AI assistance.
+> **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
 
@@ -260,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.89`
-  (the others just `PingPong UDP 12062 v1.89`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.90`
+  (the others just `PingPong UDP 12062 v1.90`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -433,7 +433,9 @@ keeps the current setting.
 | **Install updates automatically** | Off by default (you are asked). When on, a newer release found at startup installs without asking. |
 
 The new exe is downloaded next to the current one and checked against the
-release's SHA-256 checksum. The running exe is renamed to
+release's **SHA-256** checksum – GitHub's own record of the file and the
+release's `SHA256SUMS.txt`; if either doesn't match (or the two disagree)
+nothing is installed. The running exe is renamed to
 `n1mm_lamps.v<old version>.exe` (the backup for **Revert**; only one is
 kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
 `pingpong.ini` are kept.
@@ -613,7 +615,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.89 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.90 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -643,7 +645,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.89 ✔** when every lamp is current – then a
+lists them), **All lamps v1.90 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -890,8 +892,17 @@ released.
 yet, it creates the tag and the release, with notes from
 `releases/v<version>.md`, and attaches both freshly built EXEs
 (`n1mm_lamps.exe`, `pingpong_overview.exe`; the lamp's updater only
-uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`) plus the
-operator cheat sheet `PingPong-cheat-sheet.pdf`. To publish a
+uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`), the
+operator cheat sheet `PingPong-cheat-sheet.pdf` and **`SHA256SUMS.txt`**
+with the SHA-256 of each file. The hashes are also written at the end of
+the release notes.
+
+**Checking a download by hand** (PowerShell, in the download folder):
+
+```powershell
+Get-FileHash .\n1mm_lamps.exe        # compare with SHA256SUMS.txt / the release notes
+certutil -hashfile n1mm_lamps.exe SHA256   # the same, in cmd
+``` To publish a
 new version: bump `__version__` in `pingpong_version.py`, add
 `releases/vX.Y.md`, push to `main`.
 Existing releases are never overwritten.
