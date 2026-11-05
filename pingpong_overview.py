@@ -199,6 +199,7 @@ class Overview:
         self.slots = {}  # band -> [node_id of INB holding the slot, time]
         self.error = ""
         self.web_error = ""
+        self.fw_open = None  # web page's firewall rule: True / False / None = unknown
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
         self.operating = set()  # stats keys of PCs that transmitted since the ready check
         self.newest = ""  # newest release on GitHub ("" = unknown)
@@ -228,6 +229,7 @@ class Overview:
         threading.Thread(target=self._listen, daemon=True).start()
         if web_port:
             threading.Thread(target=self._serve_web, daemon=True).start()
+            self._check_firewall()
         threading.Thread(target=self._release_loop, daemon=True).start()
         threading.Thread(target=self._ping_loop, daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
@@ -924,6 +926,35 @@ class Overview:
         names = [socket.gethostname()] + ips
         return ["http://{}:{}".format(n, self.web_port) for n in names]
 
+    def _check_firewall(self):
+        """Look (in the background) for our inbound rule for the web page;
+        when it is there, hide the firewall button and show the address in
+        the status line."""
+        if sys.platform != "win32" or not self.web_port:
+            return
+
+        def work():
+            import subprocess
+
+            try:
+                done = subprocess.run(
+                    ["netsh", "advfirewall", "firewall", "show", "rule",
+                     "name={}".format(FIREWALL_RULE)],
+                    capture_output=True, timeout=15,
+                    creationflags=0x08000000,  # CREATE_NO_WINDOW
+                )
+                found = done.returncode == 0
+            except Exception:
+                found = None
+            self.root.after(0, lambda: self._firewall_checked(found))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _firewall_checked(self, found):
+        self.fw_open = found
+        if found:
+            self.fw_button.pack_forget()
+
     def _allow_firewall(self):
         """Let other PCs / phones open the web page (asks for admin)."""
         if sys.platform != "win32":
@@ -948,6 +979,7 @@ class Overview:
             result = 0
         if result > 32:
             messagebox.showinfo(TITLE, "Firewall rule added (TCP {}).".format(self.web_port), parent=self.root)
+            self.root.after(2000, self._check_firewall)  # hides the button
         else:
             messagebox.showwarning(TITLE, "The rule was not added (no administrator rights given).",
                                    parent=self.root)
@@ -1027,9 +1059,11 @@ class Overview:
                                        bg="#ffe08a")
         self._update_slot = tk.Frame(row2)  # keeps the yellow button's place in the row
         self._update_slot.pack(side=tk.LEFT)
+        # Hidden as soon as the firewall rule for the web page is found.
+        self.fw_button = tk.Button(row2, text="Allow web page in firewall…",
+                                   command=self._allow_firewall)
         if self.web_port and sys.platform == "win32":
-            tk.Button(row2, text="Allow web page in firewall…",
-                      command=self._allow_firewall).pack(**pad)
+            self.fw_button.pack(**pad)
         self.var_top = tk.BooleanVar(value=self.cfg.get("window", "on_top", fallback="no") == "yes")
         tk.Checkbutton(row2, text="Always on top", variable=self.var_top,
                        command=self._on_top).pack(side=tk.LEFT)
@@ -1268,6 +1302,8 @@ class Overview:
                 len(live), ", ".join(sorted(m.name() for m in masters)))
         else:
             head = "{} lamps  ·  no master heard".format(len(live))
+        if self.fw_open and self.web_port:
+            head += "  ·  web 0.0.0.0:{}".format(self.web_port)
         ready = None
         if waiting:
             bad = [r for r in rows if r["tag"] == "ready_bad"]

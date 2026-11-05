@@ -37,6 +37,8 @@ def make_overview():
     o.events_path = os.path.join(tmp, "events.csv")
     o._seen_state = {}
     o._stats_saved = time.time()
+    o.web_port = 8046
+    o.fw_open = None
     return o
 
 
@@ -176,6 +178,15 @@ class PingPongSettingTest(unittest.TestCase):
         hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1")
         self.assertIn("ping-pong lock: ON", o._make_snapshot()["head"])
         self.assertEqual(o._make_snapshot()["pingpong"], "1")
+
+    def test_head_shows_web_address_when_firewall_open(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1")
+        self.assertNotIn("0.0.0.0", o._make_snapshot()["head"])
+        o.fw_open = True
+        head = o._make_snapshot()["head"]
+        self.assertIn("web 0.0.0.0:8046", head)
+        self.assertLess(head.index("ping-pong lock"), head.index("web 0.0.0.0"))
 
     def test_head_shows_release_time(self):
         o = make_overview()

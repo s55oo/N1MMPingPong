@@ -106,6 +106,8 @@ the lamp downloads it if it is missing. One Overview per PC.
 - **Web page** at `http://<master PC>:8046`: the same table in any
   browser on the network, e.g. the captain's phone. Nothing to install
   there.
+  **Allow web page in firewall…** opens TCP 8046; once the rule exists the
+  button hides and the status line shows `web 0.0.0.0:8046`.
 - **Ready check:** before the contest every row is **green** (ready) or
   **dark red**, with the reason:
   - not heard;
@@ -207,7 +209,7 @@ the lamp downloads it if it is missing. One Overview per PC.
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 98 tests) run on every push before
+- **Automated tests** (`tests/`, 99 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.
