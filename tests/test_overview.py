@@ -180,6 +180,30 @@ class PingPongSettingTest(unittest.TestCase):
         self.assertEqual(o._make_snapshot()["pingpong"], "")
 
 
+class VersionStateTest(unittest.TestCase):
+    def test_counts_lamps_behind(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30)
+        hello(o, "B", "PC2", "INB1", ver="1.0")
+        v = o._make_snapshot()["versions"]
+        self.assertEqual((v["target"], v["old"]), (m.__version__, 1))
+
+    def test_all_current(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30)
+        self.assertEqual(o._make_snapshot()["versions"]["old"], 0)
+
+    def test_update_all_does_not_send_when_current(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30)
+        shown, sent = [], []
+        ov.messagebox.showinfo = lambda *a, **k: shown.append(a[1])
+        o._send_command = lambda payload: sent.append(payload) or 1
+        o._update_all()
+        self.assertEqual(sent, [])
+        self.assertIn("Nothing to update", shown[0])
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()

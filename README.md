@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.67 · Made by **S55OO** with AI assistance.
+> **Version:** 1.68 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe`, no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -520,6 +520,10 @@ day two). Checked for each lamp:
 **Ping-pong lock: ON / OFF** (button, green when on) switches the
 ping-pong lock for all PCs with one click – the same as the switch in the
 master lamp's Options.
+
+The button shows the version state: **Update 2 lamps…** when some lamps
+are behind, **All lamps v1.68 ✔** when every lamp runs the newest version
+– then a click only tells you so and nothing is sent.
 
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The dialog first lists

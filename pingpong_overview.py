@@ -459,13 +459,19 @@ class Overview:
             )
             manual = [n for n, v in old if version_key(v) < REMOTE_UPDATE_FROM]
             on_master = self._on_master_pc(now)
+        if not old:
+            # Nothing to do: just say which version everybody runs.
+            messagebox.showinfo(
+                TITLE + " - update all lamps",
+                "All {} lamps run v{}{}.\nNothing to update.".format(
+                    len(live), target or "?",
+                    " – the newest release" if self.newest and target == self.newest else ""),
+                parent=self.root)
+            return
         lines = []
         if self.newest:
             lines.append("Newest release on GitHub: v{}.".format(self.newest))
-        if old:
-            lines.append("Not on v{}: {}.".format(target, ", ".join("{} (v{})".format(n, v) for n, v in old)))
-        else:
-            lines.append("All lamps already run v{}.".format(target or "?"))
+        lines.append("Not on v{}: {}.".format(target, ", ".join("{} (v{})".format(n, v) for n, v in old)))
         if manual:
             lines.append("\nOlder than v1.60, update these by hand once: {}.".format(", ".join(manual)))
         if not on_master:
@@ -711,7 +717,8 @@ class Overview:
         if self.web_port and sys.platform == "win32":
             tk.Button(top, text="Allow web page in firewall…",
                       command=self._allow_firewall).pack(side=tk.RIGHT, padx=8)
-        tk.Button(top, text="Update all lamps…", command=self._update_all).pack(side=tk.RIGHT)
+        self.update_all_button = tk.Button(top, text="Update all lamps…", command=self._update_all)
+        self.update_all_button.pack(side=tk.RIGHT)
         # Shown only when a newer Overview is on GitHub (exe only).
         self.update_button = tk.Button(top, text="Update Overview…", command=self._update_self,
                                        bg="#ffe08a")
@@ -930,6 +937,9 @@ class Overview:
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
             "pingpong": pp_state,
+            "versions": {"target": target, "old": sum(
+                1 for l in live_all
+                if version_key(l.hello.get("version", "")) < version_key(target))},
             "columns": [[cid, dict((c[0], c[1]) for c in COLUMNS)[cid]] for cid in WEB_ORDER],
             "time": time.strftime("%H:%M:%S"),
         }
@@ -969,6 +979,15 @@ class Overview:
                     self.tree.move(row["id"], "", index)
             else:
                 self.tree.insert("", index, iid=row["id"], values=vals, tags=tags)
+        vers = snap.get("versions") or {}
+        if vers.get("old"):
+            text = "Update {} lamp{}…".format(vers["old"], "" if vers["old"] == 1 else "s")
+        elif vers.get("target"):
+            text = "All lamps v{} ✔".format(vers["target"])
+        else:
+            text = "Update all lamps…"
+        if self.update_all_button.cget("text") != text:
+            self.update_all_button.configure(text=text)
         pp_state = snap.get("pingpong", "")
         if time.time() - self._pp_sent > 3:  # after a click, wait for the master's answer
             text, bg = {"1": ("Ping-pong lock: ON", "#3fb950"),
