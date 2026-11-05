@@ -254,6 +254,28 @@ def _sender_socket(ip):
     sock.bind((ip, 0))
     return sock
 
+PONG_MAGIC = b"PPP1"  # lamp -> Overview: answer to a ping (round-trip time)
+
+
+def make_pong(seq, node_id, host):
+    import json
+
+    return PONG_MAGIC + json.dumps({"seq": seq, "id": node_id, "host": host}).encode("utf-8")
+
+
+def parse_pong(data):
+    """dict of a pong message, or None."""
+    if not data.startswith(PONG_MAGIC):
+        return None
+    import json
+
+    try:
+        body = json.loads(data[len(PONG_MAGIC):].decode("utf-8"))
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) and "seq" in body and body.get("id") else None
+
+
 RELAY_MAGIC = b"PPR1"  # lamp-to-lamp copy of this PC's N1MM RadioInfo
 
 DIRECT_RECENT = 15.0  # s: prefer N1MM's own broadcast over a relayed copy
@@ -384,6 +406,7 @@ def discovery_loop(
         command = parse_command(data)
         if command is not None:
             if on_command is not None:
+                command["_port"] = addr[1]  # where to answer a ping
                 guarded("command", on_command)(addr[0], command)
             continue
         relay = parse_relay(data)

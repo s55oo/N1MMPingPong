@@ -30,6 +30,19 @@ class RulesMixin:
             return "off"
         return {True: "RUN", False: "INB"}.get(mine.running, "off")
 
+    def _pong(self, src, command):
+        port = command.get("_port")
+        if not port:
+            return
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.sendto(make_pong(command.get("seq", 0), self.node_id, socket.gethostname()),
+                        (src, port))
+        except OSError:
+            pass
+        finally:
+            sock.close()
+
     @locked
     def on_command(self, src, command):
         """Discovery thread: a command from PingPong Overview.
@@ -54,6 +67,11 @@ class RulesMixin:
         if not from_master:
             self._key_event("command '{}' from {} ignored - not the master PC".format(
                 command["cmd"], src))
+            return
+        if command["cmd"] == "ping":
+            # Answer at once from this (network) thread: the Overview
+            # measures the round-trip time of the lamps' own protocol.
+            self._pong(src, command)
             return
         self._key_event("command '{}' from the master PC".format(command["cmd"]))
         if command["cmd"] == "update":

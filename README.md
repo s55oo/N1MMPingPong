@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.72 · Made by **S55OO** with AI assistance.
+> **Version:** 1.73 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -217,8 +217,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.72`
-  (the others just `PingPong v1.72`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.73`
+  (the others just `PingPong v1.73`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -479,7 +479,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.73 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.74 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -541,6 +541,7 @@ ping-pong lock ON, every lamp on the newest version (`All lamps v1.68 ✔`).*
 | Last TX | last message and how long ago |
 | Calls | `F12 S&P call` / `F12 Run call` (row yellow), `URGENT` (row flashes red) |
 | Keys | `F-keys blocked`, `ping-pong WAIT`, `holds slot` |
+| Ping | round-trip time to that lamp over PingPong's own protocol, e.g. `3.2 ms`; `lost` = no answer (see *Ping*) |
 | Seen | time since that lamp was last heard (grey after 12 s) |
 
 Above the table: number of lamps, the master, both F12 block times and
@@ -549,7 +550,7 @@ versions, who holds the ping-pong slot per band, and lamps whose N1MM data
 doesn't arrive.
 
 Buttons at the top: **Emergency ▾**, **Test all lamps**, **Ready check**, **Ping-pong lock: ON/OFF**,
-**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.72 ✔`),
+**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.73 ✔`),
 **Allow web page in firewall…**, **Always on top** – and, only when a
 newer Overview exists, the yellow **Update Overview to vX…**.
 
@@ -579,7 +580,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.72 ✔** when every lamp is current – then a
+lists them), **All lamps v1.73 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -614,9 +615,19 @@ commands they are accepted only from the master PC (lamps v1.71+).
 you see at a glance that every PC is reachable and which lamp is which –
 nothing is transmitted, nothing is blocked (lamps v1.72+).
 
+**Ping.** Every **5 minutes** – and at once with **Ping now** on the
+Activity tab – the Overview sends a ping to all lamps over PingPong's own
+protocol (UDP 46070); each lamp answers at once and the Overview measures
+the **round-trip time** in ms. It shows in the **Ping** column (one
+decimal below 10 ms), as **Ping avg / max / lost** per station on the
+Activity tab, and in the ready check: `no ping reply` or `slow network`
+(over 500 ms) turns the row red. Lost and slow pings go into the event
+log. Lamps answer only the master PC, from v1.73 on (older lamps show
+nothing, not "lost").
+
 **Activity tab.** Per station: how often it had to **wait** (ping-pong
 `WAIT`) and for how long in total, how many **F12** and **urgent calls** it
-made, its total **TX time** – and a chart of **TX minutes per hour**
+made, its total **TX time**, its **ping** (average, maximum, lost) – and a chart of **TX minutes per hour**
 (darker = more transmitting; the last 12 hours with activity). Reset and
 **Save CSV…** on the Function keys tab cover these too.
 

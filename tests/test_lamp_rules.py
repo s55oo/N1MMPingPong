@@ -435,6 +435,36 @@ class LampTestAndNightTest(unittest.TestCase):
         self.assertGreater(m.LAMP_SIZES["xlarge"], m.LAMP_SIZES["large"])
 
 
+class PingTest(unittest.TestCase):
+    def test_pong_answers_master_pc_at_once(self):
+        import socket
+        app = make_lamp(_i_am_master=True)
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.settimeout(2)
+        cmd = m.parse_command(m.make_command("ping", seq=7))
+        cmd["_port"] = listener.getsockname()[1]
+        app.on_command("127.0.0.1", cmd)
+        pong = m.parse_pong(listener.recvfrom(4096)[0])
+        listener.close()
+        self.assertEqual((pong["seq"], pong["id"]), (7, app.node_id))
+        self.assertEqual(app._ui_calls, [])  # answered from the network thread
+
+    def test_no_pong_for_other_pcs(self):
+        app = make_lamp()
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        sent = []
+        app._pong = lambda src, cmd: sent.append(src)
+        cmd = m.parse_command(m.make_command("ping", seq=1))
+        cmd["_port"] = 5000
+        app.on_command("10.0.0.5", cmd)
+        self.assertEqual(sent, [])
+
+    def test_pong_format(self):
+        self.assertIsNone(m.parse_pong(b"PPP1{bad"))
+        self.assertEqual(m.parse_pong(m.make_pong(3, "ID", "PC"))["host"], "PC")
+
+
 class FakeSettings:
     def __init__(self):
         self.values = {}

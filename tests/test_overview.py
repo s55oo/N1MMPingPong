@@ -312,6 +312,35 @@ class EventLogTest(unittest.TestCase):
         self.assertTrue(any(e.startswith("lamp not heard") for e in events))
 
 
+class PingResultsTest(unittest.TestCase):
+    def test_results_lost_and_slow(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30)
+        hello(o, "B", "PC2", "INB1", ver="1.73")  # answers pings
+        hello(o, "C", "PC3", "OLD1", ver="1.60")  # too old to answer: not "lost"
+        for l in o.lamps.values():
+            l.radio_seen = time.time()
+        o._ping_results({"A": 3.2, "B": 750.0}, time.time())
+        o._ping_results({"A": 4.8}, time.time())
+        a, b, c = o.lamps["A"], o.lamps["B"], o.lamps["C"]
+        self.assertEqual((round(a.ping_ms, 1), a.ping_lost), (4.8, False))
+        self.assertTrue(b.ping_lost)
+        self.assertFalse(c.ping_lost)
+        st = o.stats["pc:pc1"]
+        self.assertEqual((st["ping_n"], round(st["ping_max"], 1)), (2, 4.8))
+        snap = o._make_snapshot()
+        rows = {r["values"]["station"].split()[0]: r for r in snap["rows"]}
+        self.assertEqual(rows["RUN1"]["values"]["ping"], "4.8 ms")
+        self.assertIn("no ping reply", rows["INB1"]["values"]["check"])
+        events = [l.split(";")[3] for l in open(o.events_path, encoding="utf-8-sig").read().splitlines()[1:]]
+        self.assertIn("slow ping", events)
+        self.assertIn("no ping reply", events)
+        act = o._activity_table()
+        run1 = next(r for r in act["rows"] if r[0] == "RUN1")
+        self.assertEqual(run1[6], "4.0 ms")  # RUN1 average of 3.2 and 4.8
+        self.assertEqual(run1[7], "4.8 ms")  # max
+
+
 class SnapshotTest(unittest.TestCase):
     def test_web_snapshot_shape(self):
         o = make_overview()

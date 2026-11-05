@@ -115,6 +115,8 @@ Full manual: [README](../README.md). How it talks on the network:
 
   Each row switches to normal colors when that station starts operating.
 - **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
+- **Ping:** every 5 minutes (or **Ping now**) the round-trip time to every
+  lamp in ms; no answer or over 500 ms turns the row red.
 - **Test all lamps:** every lamp flashes its own name and role for 3 s.
 - **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,
   lamps lost or restarted, setting changes, commands).
@@ -195,7 +197,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 90 tests) run on every push before
+- **Automated tests** (`tests/`, 96 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

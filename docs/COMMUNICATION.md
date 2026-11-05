@@ -45,6 +45,9 @@ traffic:
    `{"cmd": "update"}` – **Update all lamps** (lamps v1.60+);
    `{"cmd": "pingpong", "value": "1"/"0"}` – ping-pong lock on/off, applied
    by the master lamp, which passes it on in its hello (`<PingPong>`);
+   `{"cmd": "ping", "seq": n}` – every 5 min: each lamp (v1.73+) answers at
+   once with `PPP1` + JSON `{"seq", "id", "host"}` straight back to the
+   Overview's sending port – the round-trip time in ms;
    `{"cmd": "test"}` – **Test all lamps**: each lamp (v1.72+) flashes its
    name and role for 3 s;
    `{"cmd": "restart"}` / `{"cmd": "stop"}` – **Emergency**: every lamp
@@ -69,7 +72,7 @@ all PCs on the LAN, Wi-Fi or VPN receive them.
 | Port | Direction | Sent by | Content |
 |---|---|---|---|
 | **UDP 12060** | N1MM → everyone | N1MM (External Broadcast) | XML: `RadioInfo`, `contactinfo`, `spot`, `dynamicresults` … |
-| **UDP 46070** | lamp ↔ lamp | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, lamp test, emergency restart/stop) |
+| **UDP 46070** | lamp ↔ lamp, Overview → lamps | PingPong | XML: `PingPongHello`; `PPR1` + lamp id + N1MM `RadioInfo` (relay); `PPC1` + JSON command from the Overview (update, ping-pong lock on/off, lamp test, ping, emergency restart/stop); `PPP1` + JSON ping answer (lamp → Overview, unicast) |
 | HTTPS 443 | lamp / Overview → `api.github.com`, `github.com` | PingPong | release list, exe download |
 | TCP 8046 | browser → master PC | PingPong Overview | web page with the live table (`/`, `/data.json`) |
 
@@ -99,7 +102,7 @@ from.
 <PingPongHello>
   <Id>3F2A9C01B7E4</Id>            <!-- random per lamp start -->
   <Host>OO840G4</Host>             <!-- Windows computer name -->
-  <Version>1.72</Version>
+  <Version>1.73</Version>
   <Ips>192.168.178.55,192.168.56.1</Ips>
   <LocalN1MM>true</LocalN1MM>      <!-- this PC's N1MM heard in the last 10 s -->
   <Color>gold</Color>              <!-- My color, empty = automatic -->
@@ -409,6 +412,7 @@ Defender and publishes release `v<version>` with notes from
 | Station drops off the status line | 60 s without packets |
 | Keyboard watcher re-installed | every 10 s (Windows drops slow hooks silently) |
 | Update check | lamp: once, 3 s after start; Overview: 3 s after start, then every 30 min |
+| Ping (Overview → lamps) | every 5 min (first 10 s after start) and on **Ping now**; answers later than 2 s count as lost; over 500 ms = slow |
 
 ---
 

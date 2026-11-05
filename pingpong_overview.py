@@ -66,11 +66,12 @@ COLUMNS = [
     ("calls", "Calls", 150, "w"),
     ("keys", "Keys", 110, "w"),
     ("ver", "Version", 60, "center"),
+    ("ping", "Ping", 60, "e"),
     ("seen", "Seen", 55, "e"),
 ]
 # Web page order: what matters during the contest first (phones scroll).
 WEB_ORDER = ["station", "check", "band", "mode", "run", "role", "tx", "calls", "keys",
-             "freq", "last", "pc", "ver", "seen"]
+             "freq", "last", "pc", "ver", "ping", "seen"]
 ROW_STYLE = {  # tag -> (background, text); "tx" uses the station color
     "gone": ("", "#999999"),
     "urgent": ("#ff3030", "#ffffff"),
@@ -79,7 +80,11 @@ ROW_STYLE = {  # tag -> (background, text); "tx" uses the station color
     "ready_bad": ("#8b1a1a", "#ffffff"),  # darker than the "red" station color
 }
 OVERVIEW_ASSET = "pingpong_overview.exe"
-REMOTE_UPDATE_FROM = (1, 60)  # lamps from this version accept "update"
+REMOTE_UPDATE_FROM = (1, 60)
+PING_FROM = (1, 73)  # lamps from this version answer pings
+PING_EVERY = 300.0  # s: automatic ping round every 5 minutes
+PING_WAIT = 2.0  # s: answers later than this count as lost
+PING_SLOW = 500.0  # ms: slower than this is a problem in the ready check  # lamps from this version accept "update"
 RELEASE_CHECK = 1800.0  # s: how often to look for the newest release
 
 
@@ -115,6 +120,11 @@ def tx_minutes(seconds):
     return max(0.1, round(seconds / 60.0, 1))
 
 
+def fmt_ms(ms):
+    """Round-trip time: one decimal below 10 ms (fast LAN), else whole ms."""
+    return "{:.1f} ms".format(ms) if ms < 10 else "{:.0f} ms".format(ms)
+
+
 def band_sort(band):
     try:
         return float(band)
@@ -148,6 +158,8 @@ class Lamp:
         self.locked_since = 0.0  # ping-pong WAIT started (activity statistics)
         self.last_alert = 0.0  # last F12 call counted (its AlertTime)
         self.last_urgent = 0.0  # last urgent call counted (its UrgentTime)
+        self.ping_ms = None  # last round-trip time to this lamp, ms
+        self.ping_lost = False  # no answer to the last ping
 
     def stats_key(self):
         """Stats belong to the PC (the lamp id changes at every restart)."""
@@ -190,6 +202,8 @@ class Overview:
         self.snapshot = {"head": "starting…", "rows": [], "notes": []}
         self.operating = set()  # stats keys of PCs that transmitted since the ready check
         self.newest = ""  # newest release on GitHub ("" = unknown)
+        self._ping_now = threading.Event()
+        self._ping_seq = 0
         self.self_update = None  # newer pingpong_overview.exe release, if any
         self._asked_update = False
         self._offer_scheduled = False
@@ -215,6 +229,7 @@ class Overview:
         if web_port:
             threading.Thread(target=self._serve_web, daemon=True).start()
         threading.Thread(target=self._release_loop, daemon=True).start()
+        threading.Thread(target=self._ping_loop, daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         self.root.after(REFRESH_MS, self._refresh)
 
@@ -421,6 +436,10 @@ class Overview:
         )
         if needs_keys and "keyboard watcher off" in status:
             out.append("keyboard watcher not running")
+        if lamp.ping_lost:
+            out.append("no ping reply")
+        elif lamp.ping_ms is not None and lamp.ping_ms > PING_SLOW:
+            out.append("slow network ({:.0f} ms)".format(lamp.ping_ms))
         for problem in h.get("problems") or []:  # reported by the lamp itself (v1.69+)
             if problem not in out:
                 out.append(problem)
@@ -430,6 +449,79 @@ class Overview:
         """Start the ready check again: every row green/red until it transmits."""
         with self.lock:
             self.operating.clear()
+
+    # ------------------------------------------------------------ ping
+
+    def _ping_loop(self):
+        """Every 5 min (and on 'Ping now'): round-trip time to every lamp."""
+        self.stop.wait(10.0)
+        while not self.stop.is_set():
+            try:
+                self._ping_round()
+            except Exception:
+                pp.log_error("ping")
+            self._ping_now.wait(PING_EVERY)
+            self._ping_now.clear()
+
+    def _ping_round(self):
+        import select
+
+        if not self._on_master_pc(time.time()):
+            return  # lamps answer only the master PC
+        self._ping_seq += 1
+        seq = self._ping_seq
+        payload = pp.make_command("ping", seq=seq)
+        socks = []
+        for ip, bcast in pp.local_networks():
+            try:
+                sock = pp._sender_socket(ip)
+            except OSError:
+                continue
+            for target in (bcast, "255.255.255.255"):
+                try:
+                    sock.sendto(payload, (target, self.port))
+                except OSError:
+                    pass
+            socks.append(sock)
+        sent = time.time()
+        replies = {}
+        try:
+            while socks:
+                left = sent + PING_WAIT - time.time()
+                if left <= 0:
+                    break
+                ready, _, _ = select.select(socks, [], [], left)
+                for sock in ready:
+                    try:
+                        data, _addr = sock.recvfrom(4096)
+                    except OSError:
+                        continue
+                    pong = pp.parse_pong(data)
+                    if pong and pong["seq"] == seq and pong["id"] not in replies:
+                        replies[pong["id"]] = (time.time() - sent) * 1000.0
+        finally:
+            for sock in socks:
+                sock.close()
+        self._ping_results(replies, time.time())
+
+    def _ping_results(self, replies, now):
+        with self.lock:
+            for lamp in list(self.lamps.values()):
+                if now - lamp.hello_seen > GONE_AFTER:
+                    continue
+                st = self._stat(lamp)
+                if lamp.id in replies:
+                    ms = replies[lamp.id]
+                    lamp.ping_ms, lamp.ping_lost = ms, False
+                    st["ping_sum"] = st.get("ping_sum", 0.0) + ms
+                    st["ping_n"] = st.get("ping_n", 0) + 1
+                    st["ping_max"] = max(st.get("ping_max", 0.0), ms)
+                    if ms > PING_SLOW:
+                        self._event(lamp.name(), "slow ping", "{:.0f} ms".format(ms))
+                elif version_key(lamp.hello.get("version", "")) >= PING_FROM:
+                    lamp.ping_ms, lamp.ping_lost = None, True
+                    st["ping_lost"] = st.get("ping_lost", 0) + 1
+                    self._event(lamp.name(), "no ping reply")
 
     def _send_command(self, payload):
         sent = 0
@@ -645,7 +737,8 @@ class Overview:
 
     def _activity_table(self):
         """Activity per station + TX minutes per hour (window, web, CSV)."""
-        cols = ["Station", "Locked (WAIT)", "Locked time", "F12 calls", "Urgent calls", "TX time"]
+        cols = ["Station", "Locked (WAIT)", "Locked time", "F12 calls", "Urgent calls", "TX time",
+                "Ping avg", "Ping max", "Ping lost"]
         rows, heat = [], []
         with self.lock:
             items = sorted(self.stats.values(), key=lambda s: s["name"].lower())
@@ -655,13 +748,17 @@ class Overview:
                 vals = [st.get("locked", 0), st.get("locked_time", 0.0), st.get("f12", 0),
                         st.get("urgent", 0), st.get("tx_time", 0.0)]
                 tot = [a + b for a, b in zip(tot, vals)]
+                n = st.get("ping_n", 0)
                 rows.append([st["name"], vals[0] or "", ago_long(vals[1]) if vals[1] else "",
-                             vals[2] or "", vals[3] or "", ago_long(vals[4])])
+                             vals[2] or "", vals[3] or "", ago_long(vals[4]),
+                             fmt_ms(st["ping_sum"] / n) if n else "",
+                             fmt_ms(st.get("ping_max", 0)) if n else "",
+                             st.get("ping_lost", 0) or ""])
                 heat.append([st["name"], [tx_minutes((st.get("hours") or {}).get(h, 0.0))
                                           for h in hours]])
         if len(rows) > 1:
             rows.append(["All", tot[0] or "", ago_long(tot[1]) if tot[1] else "",
-                         tot[2] or "", tot[3] or "", ago_long(tot[4])])
+                         tot[2] or "", tot[3] or "", ago_long(tot[4]), "", "", ""])
         labels = [h[-2:] + ":00" for h in hours]
         return {"columns": cols, "rows": rows, "hours": labels, "heat": heat}
 
@@ -965,10 +1062,12 @@ class Overview:
         tk.Label(abar, text="Ping-pong waiting, calls and TX time per station (same Reset / "
                  "Save CSV as Function keys)", anchor="w").pack(side=tk.LEFT)
         tk.Button(abar, text="Open event log", command=self._open_events).pack(side=tk.RIGHT)
-        acols = ["station", "locked", "ltime", "f12", "urgent", "tx"]
+        tk.Button(abar, text="Ping now", command=self._ping_now.set).pack(side=tk.RIGHT, padx=6)
+        acols = ["station", "locked", "ltime", "f12", "urgent", "tx", "pavg", "pmax", "plost"]
         self.atree = ttk.Treeview(aframe, columns=acols, show="headings", selectmode="none", height=5)
         for cid, text, w in zip(acols, ["Station", "Locked (WAIT)", "Locked time", "F12 calls",
-                                         "Urgent calls", "TX time"], (140, 100, 90, 80, 90, 80)):
+                                         "Urgent calls", "TX time", "Ping avg", "Ping max", "Ping lost"],
+                                (140, 100, 90, 80, 90, 80, 75, 75, 70)):
             self.atree.heading(cid, text=text)
             self.atree.column(cid, width=w, anchor="w" if cid == "station" else "center",
                               stretch=cid == "station")
@@ -1087,6 +1186,8 @@ class Overview:
             "calls": ", ".join(calls),
             "keys": ", ".join(keys),
             "ver": h.get("version", "") or "?",
+            "ping": ("lost" if lamp.ping_lost else
+                     fmt_ms(lamp.ping_ms) if lamp.ping_ms is not None else ""),
             "seen": ago(live),
         }
         bg, fg = "", ""
