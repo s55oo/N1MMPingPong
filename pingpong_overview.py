@@ -43,6 +43,7 @@ FORGET_AFTER = 120.0  # s: lamp removed from the table
 PP_LIMIT = pp.PP_LIMIT  # s: ping-pong slot frees itself
 REFRESH_MS = 250
 FIREWALL_RULE = "PingPong Overview web page"
+EVENTS_FILE = "pingpong_events.csv"  # contest timeline, ";"-separated (Excel)
 STATS_FILE = "pingpong_stats.json"  # function key counts, kept over restarts
 STATS_SAVE = 30.0  # s
 FKEYS = ["F{}".format(n) for n in range(1, 13)]
@@ -193,6 +194,8 @@ class Overview:
         self._asked_update = False
         self._offer_scheduled = False
         self.stats_path = os.path.join(app_dir(), STATS_FILE)
+        self.events_path = os.path.join(app_dir(), EVENTS_FILE)
+        self._seen_state = {}  # what the event log last saw (master, lock, ...)
         self.stats = {}  # stats key -> {"name", "keys": {F1: n}, "other", "tx_time"}
         self.stats_since = time.time()
         self._load_stats()
@@ -283,11 +286,19 @@ class Overview:
         info = pp.parse_hello(data)
         if info:
             with self.lock:
+                is_new = info["id"] not in self.lamps
                 lamp = self._lamp(info["id"])
                 lamp.hello = info
                 lamp.hello_seen = now
                 lamp.src = src
-                self._replace_old(lamp)
+                replaced = self._replace_old(lamp)
+                if replaced:
+                    self._event(lamp.name(), "lamp restarted", "v" + info.get("version", "?"))
+                elif is_new:
+                    self._event(lamp.name(), "lamp on", "v" + info.get("version", "?"))
+                if getattr(lamp, "gone", False):
+                    lamp.gone = False
+                    self._event(lamp.name(), "lamp heard again")
                 self._track_activity(lamp, info, now)
 
     def _replace_old(self, lamp):
@@ -295,7 +306,8 @@ class Overview:
         id - drop the old entry of the same PC, keep its last transmission."""
         host = (lamp.hello.get("host") or "").lower()
         if not host:
-            return
+            return False
+        replaced = False
         for old_id, old in list(self.lamps.items()):
             if old is lamp or (old.hello.get("host") or "").lower() != host:
                 continue
@@ -308,6 +320,8 @@ class Overview:
                 if slot[0] == old_id:
                     slot[0] = lamp.id
             del self.lamps[old_id]
+            replaced = True
+        return replaced
 
     # ------------------------------------------------------------ ready check / update
 
@@ -465,10 +479,21 @@ class Overview:
         if (typed or "").strip() != "YES":
             messagebox.showinfo(TITLE, "Cancelled – nothing was sent.", parent=self.root)
             return
+        self._event("-", title + " (sent)")
         if not self._send_command(pp.make_command(action)):
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
             return
         messagebox.showinfo(TITLE, "{}: sent to all lamps.".format(title), parent=self.root)
+
+    def _test_lamps(self):
+        """Every lamp flashes its own name and role for 3 s."""
+        if not self._on_master_pc(time.time()):
+            messagebox.showwarning(TITLE, "This PC is not the master PC – the lamps take this "
+                                   "only from the master PC.", parent=self.root)
+            return
+        self._event("-", "lamp test (sent)")
+        if not self._send_command(pp.make_command("test")):
+            messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
 
     def _toggle_pingpong(self):
         """Ping-pong lock ON <-> OFF: asks the master lamp, which passes the
@@ -485,6 +510,7 @@ class Overview:
                                 parent=self.root)
             return
         value = "0" if current == "1" else "1"
+        self._event("-", "ping-pong lock " + ("ON" if value == "1" else "OFF") + " requested")
         if not self._send_command(pp.make_command("pingpong", value=value)):
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
             return
@@ -532,6 +558,7 @@ class Overview:
                      "Each lamp downloads it and restarts (a few seconds).")
         if not messagebox.askyesno(TITLE + " - update all lamps", "\n".join(lines), parent=self.root):
             return
+        self._event("-", "update all lamps (sent)")
         sent = self._send_command(pp.make_command("update"))
         if not sent:
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
@@ -556,15 +583,65 @@ class Overview:
         if locked and not lamp.locked_since:
             lamp.locked_since = now
             st["locked"] += 1
+            self._event(lamp.name(), "ping-pong WAIT")
         elif not locked and lamp.locked_since:
             st["locked_time"] += now - lamp.locked_since
+            self._event(lamp.name(), "ping-pong free", "waited {:.0f} s".format(now - lamp.locked_since))
             lamp.locked_since = 0.0
         if info.get("alert") and info.get("alert_time") and info["alert_time"] != lamp.last_alert:
             lamp.last_alert = info["alert_time"]
             st["f12"] += 1
+            self._event(lamp.name(), "F12 call", "{} call, {} MHz".format(
+                "Run" if info.get("alert_run") else "S&P", info.get("alert_band", "?")))
         if info.get("urgent") and info.get("urgent_time") and info["urgent_time"] != lamp.last_urgent:
             lamp.last_urgent = info["urgent_time"]
             st["urgent"] += 1
+            self._event(lamp.name(), "urgent call", "{} {}".format(
+                info.get("urgent_band", "?"), info.get("urgent_mode", "")))
+
+    # ------------------------------------------------------------ event log
+
+    def _event(self, station, what, detail=""):
+        """One line in pingpong_events.csv: date;time;station;event;details."""
+        new = not os.path.exists(self.events_path)
+        try:
+            with open(self.events_path, "a", encoding="utf-8-sig" if new else "utf-8",
+                      newline="") as fh:
+                if new:
+                    fh.write("date;time;station;event;details\r\n")
+                fh.write("{};{};{};{};{}\r\n".format(
+                    time.strftime("%Y-%m-%d"), time.strftime("%H:%M:%S"),
+                    station.replace(";", ","), what, str(detail).replace(";", ",")))
+        except OSError:
+            pass
+
+    def _log_changes(self, snap, lamps, now):
+        """Event log: master, ping-pong settings and lost lamps (UI thread)."""
+        seen = self._seen_state
+        for key, value, text in (
+            ("master", snap.get("master_name", ""), "master is now"),
+            ("pingpong", snap.get("pingpong", ""), "ping-pong lock"),
+            ("pp_limit", snap.get("pp_limit", ""), "ping-pong release time"),
+        ):
+            if value and seen.get(key) != value:
+                if key in seen:  # not at start: only real changes
+                    shown = {"1": "ON", "0": "OFF"}.get(value, value) if key == "pingpong" else value
+                    self._event("-", text, shown + (" s" if key == "pp_limit" else ""))
+                seen[key] = value
+        for lamp in lamps:
+            if now - lamp.hello_seen > GONE_AFTER and lamp.hello_seen and not getattr(lamp, "gone", False):
+                lamp.gone = True
+                self._event(lamp.name(), "lamp not heard", "for {:.0f} s".format(now - lamp.hello_seen))
+
+    def _open_events(self):
+        if not os.path.exists(self.events_path):
+            messagebox.showinfo(TITLE, "No events yet.", parent=self.root)
+            return
+        try:
+            os.startfile(self.events_path)  # Windows: opens in Excel / the editor
+        except (AttributeError, OSError) as exc:
+            messagebox.showinfo(TITLE, "Event log: {}\n({})".format(self.events_path, exc),
+                                parent=self.root)
 
     def _activity_table(self):
         """Activity per station + TX minutes per hour (window, web, CSV)."""
@@ -836,6 +913,7 @@ class Overview:
         self.pp_button = tk.Button(top, text="Ping-pong lock: ?", width=20,
                                    command=self._toggle_pingpong)
         self.pp_button.pack(side=tk.RIGHT)
+        tk.Button(top, text="Test all lamps", command=self._test_lamps).pack(side=tk.RIGHT)
         emergency = tk.Menubutton(top, text="Emergency ▾", fg="#b00020", relief=tk.RAISED,
                                   activeforeground="#b00020")
         menu = tk.Menu(emergency, tearoff=0)
@@ -882,8 +960,11 @@ class Overview:
 
         aframe = tk.Frame(self.book)
         self.book.add(aframe, text="Activity")
-        tk.Label(aframe, text="Ping-pong waiting, calls and TX time per station (same Reset / "
-                 "Save CSV as Function keys)", anchor="w", pady=4).pack(fill=tk.X)
+        abar = tk.Frame(aframe, pady=4)
+        abar.pack(fill=tk.X)
+        tk.Label(abar, text="Ping-pong waiting, calls and TX time per station (same Reset / "
+                 "Save CSV as Function keys)", anchor="w").pack(side=tk.LEFT)
+        tk.Button(abar, text="Open event log", command=self._open_events).pack(side=tk.RIGHT)
         acols = ["station", "locked", "ltime", "f12", "urgent", "tx"]
         self.atree = ttk.Treeview(aframe, columns=acols, show="headings", selectmode="none", height=5)
         for cid, text, w in zip(acols, ["Station", "Locked (WAIT)", "Locked time", "F12 calls",
@@ -1106,6 +1187,8 @@ class Overview:
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
             "pingpong": pp_state,
+            "master_name": masters[0].name() if len(masters) == 1 else "",
+            "pp_limit": "{:g}".format(self._pp_limit()) if pp_state else "",
             "versions": {"target": target, "old": sum(
                 1 for l in live_all
                 if version_key(l.hello.get("version", "")) < version_key(target))},
@@ -1131,6 +1214,9 @@ class Overview:
                 self.root.after(0, self._offer_self_update)
         snap = self._make_snapshot()
         self.snapshot = snap  # served to the web page as it is
+        with self.lock:
+            lamps = list(self.lamps.values())
+        self._log_changes(snap, lamps, time.time())
         wanted = [r["id"] for r in snap["rows"]]
         for item in self.tree.get_children():
             if item not in wanted:

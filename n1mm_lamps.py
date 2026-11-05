@@ -239,6 +239,14 @@ class DisplayApp(RulesMixin):
         self._go_band = ""
         self._go_beeped = 0.0
         self.var_go_sound = tk.BooleanVar(value=self.settings.get("go_sound", False))
+        self._test_until = 0.0  # lamp test from the Overview runs until then
+        size = self.settings.get_text("window", "size", "normal")
+        self.lamp_size = size if size in LAMP_SIZES else "normal"
+        self.scale = LAMP_SIZES[self.lamp_size]
+        self.var_size = tk.StringVar(value=self.lamp_size)
+        self.night = self.settings.get_text("window", "night", "no") == "yes"
+        self.var_night = tk.BooleanVar(value=self.night)
+        self._shades = {}
         # Ping-pong lock on/off: set on the master, used by every lamp.
         self.pp_enabled = self.settings.get_text("network", "pingpong", "yes") != "no"
         self.pp_limit = clamp_pp(self.settings.get_text("network", "pp_limit", "{:g}".format(PP_LIMIT)))
@@ -256,6 +264,8 @@ class DisplayApp(RulesMixin):
         self._status = ""
         self._save_job = None
         self._build()
+        if self.scale != 1.0:
+            self._apply_size()
         self._restore_window()
         self.root.bind("<Configure>", self._on_root_configure, add="+")
         self.stop = threading.Event()
@@ -349,6 +359,15 @@ class DisplayApp(RulesMixin):
             command=lambda: self.root.after(
                 50, lambda: self._set_compact(bool(self.var_compact.get()))
             ),
+        )
+        for value, text in (("normal", "Lamp size: normal"), ("large", "Lamp size: large"),
+                            ("xlarge", "Lamp size: extra large")):
+            menu.add_radiobutton(label=text, variable=self.var_size, value=value,
+                                 command=self._size_changed)
+        menu.add_checkbutton(
+            label="Night mode (dim lamp colors)",
+            variable=self.var_night,
+            command=self._night_changed,
         )
         menu.add_separator()
         menu.add_command(
@@ -1073,8 +1092,7 @@ class DisplayApp(RulesMixin):
         lit = int(now / URGENT_HALF) % 2 == 0
         self._set_bg(color if lit else "white")
         want = "white" if lit else color
-        if self.canvas.cget("highlightbackground") != want:
-            self.canvas.configure(highlightbackground=want, highlightcolor=want)
+        self._set_border(want)
         # Caller's alias + the F2/F4 message caption it is sending right now
         # (N1MM's FunctionKeyCaption); "MSG" until the caption arrives.
         msg = ""
@@ -1281,10 +1299,70 @@ class DisplayApp(RulesMixin):
         self._who_text = text
 
     def _set_bg(self, bg):
-        """Lamp background + matching text color."""
+        """Lamp background + matching text color (dimmed in night mode)."""
+        bg = self._shade(bg)
         if self.canvas.cget("bg") != bg:
             self.canvas.configure(bg=bg)
             self.canvas.itemconfigure(self.text_id, fill=self.text_on(bg))
+
+    def _set_border(self, color):
+        """The wide call border (dimmed in night mode; window color = none)."""
+        if color != self._window_bg:
+            color = self._shade(color)
+        if self.canvas.cget("highlightbackground") != color:
+            self.canvas.configure(highlightbackground=color, highlightcolor=color)
+
+    def _shade(self, color):
+        """Night mode: the same color, darker - no dazzling lamp at night."""
+        if not getattr(self, "night", False):
+            return color
+        if color not in self._shades:
+            rgb = self._rgb(color)
+            self._shades[color] = color if rgb is None else "#{:02x}{:02x}{:02x}".format(
+                *(int(v * NIGHT_LEVEL) for v in rgb))
+        return self._shades[color]
+
+    def _apply_size(self):
+        """Lamp size option: scale the lamp, its texts and the status line."""
+        s = self.scale
+        self.canvas.configure(width=int(330 * s), height=int(88 * s))
+        self.info.configure(wraplength=int(340 * s), font=("Segoe UI", max(8, int(8 * s))))
+        self.canvas.itemconfigure(self.c_who, font=("Segoe UI", int(8 * s), "bold"))
+        self.canvas.itemconfigure(self.c_freq, font=("Segoe UI", int(8 * s), "bold"))
+        self.canvas.itemconfigure(self.c_info, font=("Segoe UI", int(7 * s)))
+        text = self.canvas.itemcget(self.text_id, "text")
+        self.canvas.itemconfigure(self.text_id, font=self._font_for(text))
+
+    def _size_changed(self):
+        self.lamp_size = self.var_size.get()
+        self.scale = LAMP_SIZES.get(self.lamp_size, 1.0)
+        self.settings.set_text("window", "size", self.lamp_size)
+        self._apply_size()
+
+    def _night_changed(self):
+        self.night = bool(self.var_night.get())
+        self.settings.set_text("window", "night", "yes" if self.night else "no")
+        self.canvas.configure(bg=COLOR_IDLE)  # repainted on the next tick
+
+    def _lamp_test(self):
+        """'Test all lamps' from the Overview: flash this lamp's name and role."""
+        self._key_event("lamp test from the master PC")
+        self._test_until = time.time() + TEST_TIME
+
+    def _show_test(self, now):
+        name = self.my_alias or socket.gethostname()
+        role = self._my_role_now()
+        shown = "{} · {}".format(name, role) if role != "off" else name
+        lit = int(now / 0.25) % 2 == 0
+        self._set_bg(TEST_COLOR if lit else "white")
+        self._set_border("white" if lit else TEST_COLOR)
+        if self.canvas.itemcget(self.text_id, "text") != shown:
+            self.canvas.itemconfigure(self.text_id, text=shown)
+            self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
+        self._set_who("TEST")
+        self._freq_text = ""
+        self.info.configure(text="Lamp test from the master PC – this is {} ({}), role {}".format(
+            name, socket.gethostname(), role))
 
     def _too_similar(self, color, owners):
         """Host of another PC whose chosen color looks like `color`."""
@@ -1433,10 +1511,11 @@ class DisplayApp(RulesMixin):
 
     def _font_for(self, text):
         length = len(text)
+        scale = getattr(self, "scale", 1.0)
         for limit, size in FONT_SIZES:
             if length <= limit:
-                return ("Segoe UI", size, "bold")
-        return ("Segoe UI", 16, "bold")
+                return ("Segoe UI", int(size * scale), "bold")
+        return ("Segoe UI", int(16 * scale), "bold")
 
     def _update(self):
         """Display loop: one error is logged, the loop always goes on."""
@@ -1514,6 +1593,10 @@ class DisplayApp(RulesMixin):
         calls = all_calls if active is None else []
         self._show_border(owners, now, all_calls)
 
+        if now < self._test_until:
+            self._show_test(now)
+            self._update_tail()
+            return
         urgent = self._incoming_urgent(now)
         if urgent:
             self._show_urgent(urgent[-1], owners, now)
@@ -1854,8 +1937,7 @@ class DisplayApp(RulesMixin):
                 want = COLOR_IDLE if lit else want  # opposite of the lamp
         else:
             want = self._window_bg
-        if self.canvas.cget("highlightbackground") != want:
-            self.canvas.configure(highlightbackground=want, highlightcolor=want)
+        self._set_border(want)
 
     def on_close(self):
         try:

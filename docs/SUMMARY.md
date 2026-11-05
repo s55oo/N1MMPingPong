@@ -37,6 +37,8 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
+- **Lamp size** normal / large / extra large, and **night mode** with
+  dimmed colors.
 
 ### Warn other operators without transmitting
 - **F12 call:** "hold off, please".
@@ -113,6 +115,9 @@ Full manual: [README](../README.md). How it talks on the network:
 
   Each row switches to normal colors when that station starts operating.
 - **Ping-pong lock ON/OFF:** one button switches the lock for all PCs.
+- **Test all lamps:** every lamp flashes its own name and role for 3 s.
+- **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,
+  lamps lost or restarted, setting changes, commands).
 - **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
   typing `YES` + Enter).
 - **Update all lamps:** one button. It shows how many lamps are behind
@@ -190,7 +195,7 @@ Full manual: [README](../README.md). How it talks on the network:
   - `pingpong_update.py`: updates;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 75 tests) run on every push before
+- **Automated tests** (`tests/`, 90 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.

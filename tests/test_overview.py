@@ -32,7 +32,10 @@ def make_overview():
     o.newest = ""
     o.stats = {}
     o.stats_since = time.time()
-    o.stats_path = os.path.join(tempfile.mkdtemp(), "stats.json")
+    tmp = tempfile.mkdtemp()
+    o.stats_path = os.path.join(tmp, "stats.json")
+    o.events_path = os.path.join(tmp, "events.csv")
+    o._seen_state = {}
     o._stats_saved = time.time()
     return o
 
@@ -277,6 +280,36 @@ class EmergencyTest(unittest.TestCase):
 
     def test_not_from_other_pc(self):
         self.assertEqual(self.run_emergency(True, "YES", master_pc=False), [])
+
+
+class EventLogTest(unittest.TestCase):
+    def read(self, o):
+        with open(o.events_path, encoding="utf-8-sig") as fh:
+            return fh.read().splitlines()
+
+    def test_contest_timeline(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1")
+        hello(o, "B", "PC2", "INB1", "INB", "N1MM 7 CW from x, S&P; ping-pong role INB (LOCKED)")
+        hello(o, "B", "PC2", "INB1", "INB", "N1MM 7 CW from x, S&P")
+        hello(o, "B", "PC2", "INB1", alert=True, alert_band="7", alert_time=5.0)
+        hello(o, "C", "PC2", "INB1")  # same PC, new lamp id: restarted
+        lines = self.read(o)
+        self.assertEqual(lines[0], "date;time;station;event;details")
+        events = [l.split(";")[3] for l in lines[1:]]
+        self.assertEqual(events, ["lamp on", "lamp on", "ping-pong WAIT", "ping-pong free",
+                                  "F12 call", "lamp restarted"])
+
+    def test_changes_and_lost_lamps(self):
+        o = make_overview()
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="1")
+        lamps = list(o.lamps.values())
+        o._log_changes(o._make_snapshot(), lamps, time.time())  # first look: no events
+        hello(o, "A", "PC1", "RUN1", block_time=30, pingpong="0")
+        o._log_changes(o._make_snapshot(), lamps, time.time() + 30)  # lamp silent 30 s
+        events = [l.split(";")[3] + ";" + l.split(";")[4] for l in self.read(o)[1:]]
+        self.assertIn("ping-pong lock;OFF", events)
+        self.assertTrue(any(e.startswith("lamp not heard") for e in events))
 
 
 class SnapshotTest(unittest.TestCase):

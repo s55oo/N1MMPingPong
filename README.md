@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ UDP 12060 Lamps
 
-> **Version:** 1.71 · Made by **S55OO** with AI assistance.
+> **Version:** 1.72 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC) and `pingpong_overview.exe` (master PC), no Python needed.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 
@@ -154,6 +154,15 @@ frequency are on the lamp anyway), so no information is lost.
   comes back where it was, compact or not. If that place is no longer on
   a screen (e.g. a monitor was unplugged), it opens at the default place.
 
+### Lamp size and night mode (Options ▾)
+
+- **Lamp size: normal / large / extra large** – the lamp, its texts and
+  the line under it grow (×1.4 / ×1.8), e.g. for an operator sitting
+  further from the screen. Saved per PC.
+- **Night mode (dim lamp colors)** – every lamp color at about half
+  brightness, so a blinking or flashing lamp doesn't dazzle at night.
+  Saved per PC.
+
 ### Band + mode group
 
 A lamp shows **only transmissions on the same band and mode as its own
@@ -208,8 +217,8 @@ stations, and every other lamp uses its list.
   first** is master.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
-- The **title bar** of the master's lamp says `PingPong - MASTER v1.71`
-  (the others just `PingPong v1.71`), and the line under the lamp marks
+- The **title bar** of the master's lamp says `PingPong - MASTER v1.72`
+  (the others just `PingPong v1.72`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -470,7 +479,7 @@ n1mm_lamps.exe [--port 12060] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: N1MM not reaching here` | N1MM runs on RUN2 but its data doesn't reach this PC – check that **Share my N1MM with other lamps** is on on RUN2 and RUN2's lamp is up to date, or check RUN2's **Broadcast Address** |
   | `RUN2: no N1MM` | PingPong runs on RUN2, but its N1MM isn't broadcasting |
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
-  | `RUN2: v1.72 – update this PC` | RUN2 is newer than this lamp – update this PC |
+  | `RUN2: v1.73 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
   | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
 
@@ -503,7 +512,7 @@ PC, kept by updates.
 | `[update]` | `check_at_startup`, `install_automatically`, `f12_call`, `block_keys`, `call_sound`, `share_n1mm` |
 | `[station]` | `alias` (My name), `color`, `color_time` (when the color was chosen – the earliest choice wins a conflict), (an old `role` entry is ignored – the role comes from N1MM) |
 | `[network]` | `block_time`, `block_time_run` – F12 block times (S&P call, Run call); `pingpong` – ping-pong lock yes/no; `pp_limit` – ping-pong release time (0–40 s); all last received from the master |
-| `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode |
+| `[window]` | `x`, `y`, `compact` – where the lamp was and whether it was in compact mode; `size` (normal / large / xlarge), `night` (yes/no) |
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 
 ---
@@ -539,8 +548,8 @@ Above the table: number of lamps, the master, both F12 block times and
 versions, who holds the ping-pong slot per band, and lamps whose N1MM data
 doesn't arrive.
 
-Buttons at the top: **Emergency ▾**, **Ready check**, **Ping-pong lock: ON/OFF**,
-**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.71 ✔`),
+Buttons at the top: **Emergency ▾**, **Test all lamps**, **Ready check**, **Ping-pong lock: ON/OFF**,
+**Update all lamps…** (shows `Update 2 lamps…` / `All lamps v1.72 ✔`),
 **Allow web page in firewall…**, **Always on top** – and, only when a
 newer Overview exists, the yellow **Update Overview to vX…**.
 
@@ -570,7 +579,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.71 ✔** when every lamp is current – then a
+lists them), **All lamps v1.72 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -600,11 +609,34 @@ Both ask twice: first **Yes / No**, then you must **type `YES`** and press
 **Enter** – anything else cancels and nothing is sent. Like the other
 commands they are accepted only from the master PC (lamps v1.71+).
 
+**Test all lamps** – every lamp flashes its **own name and role** for 3 s
+(purple/white, `TEST` in the corner), e.g. `INB2 · INB`. Before the start
+you see at a glance that every PC is reachable and which lamp is which –
+nothing is transmitted, nothing is blocked (lamps v1.72+).
+
 **Activity tab.** Per station: how often it had to **wait** (ping-pong
 `WAIT`) and for how long in total, how many **F12** and **urgent calls** it
 made, its total **TX time** – and a chart of **TX minutes per hour**
 (darker = more transmitting; the last 12 hours with activity). Reset and
 **Save CSV…** on the Function keys tab cover these too.
+
+**Event log.** The Overview writes the contest timeline to
+`pingpong_events.csv` next to the exe (`;`-separated – opens in Excel):
+`date;time;station;event;details`, e.g.
+
+```
+2026-11-28;03:12:40;INB2;ping-pong WAIT;
+2026-11-28;03:12:52;INB2;ping-pong free;waited 12 s
+2026-11-28;03:14:05;RUN1;F12 call;Run call, 7 MHz
+2026-11-28;03:20:11;INB1;lamp not heard;for 13 s
+2026-11-28;03:20:30;INB1;lamp restarted;v1.72
+```
+
+Logged: lamps on / restarted / not heard / heard again, F12 and urgent
+calls, ping-pong WAIT and free, master changes, ping-pong lock and
+release time changes, and the commands sent from the Overview (update,
+test, ping-pong, emergency). **Open event log** on the Activity tab
+opens it. Delete the file any time; it starts again with a header.
 
 **Web page.** The same tables are served at `http://<master PC>:8046` –
 open it in any browser on the network, also on a **phone or tablet**
@@ -757,4 +789,5 @@ n1mm_lamps.vX.exe   – backup kept by the updater for "Revert"
 pingpong_overview.exe / .ini – Overview program and its window settings (master PC)
 pingpong_overview.vX.exe – backup kept when the Overview updated itself
 pingpong_stats.json – Overview's statistics (function keys, activity)
+pingpong_events.csv – Overview's contest event log
 ```

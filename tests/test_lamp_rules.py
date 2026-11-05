@@ -414,6 +414,27 @@ class EmergencyCommandTest(unittest.TestCase):
         self.assertEqual(closed, [1])
 
 
+class LampTestAndNightTest(unittest.TestCase):
+    def test_test_command_from_master_pc(self):
+        app = make_lamp()
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        app.on_command("10.0.0.9", m.parse_command(m.make_command("test")))
+        self.assertEqual([f.__name__ for f in app._ui_calls], ["_lamp_test"])
+        app._ui_calls[0]()
+        self.assertGreater(app._test_until, time.time() + 2)
+
+    def test_night_mode_dims_colors(self):
+        app = make_lamp(night=True)
+        app._rgb = lambda c: (255, 200, 100)
+        self.assertEqual(app._shade("orange"), "#725a2d")
+        app.night = False
+        self.assertEqual(app._shade("orange"), "orange")
+
+    def test_lamp_sizes(self):
+        self.assertEqual(m.LAMP_SIZES["normal"], 1.0)
+        self.assertGreater(m.LAMP_SIZES["xlarge"], m.LAMP_SIZES["large"])
+
+
 class FakeSettings:
     def __init__(self):
         self.values = {}

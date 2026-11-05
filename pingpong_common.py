@@ -138,6 +138,10 @@ SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
 GO_COLOR = "#2ea043"  # green GO for inband stations
+TEST_COLOR = "#8957e5"  # lamp test from the Overview
+TEST_TIME = 3.0  # s
+LAMP_SIZES = {"normal": 1.0, "large": 1.4, "xlarge": 1.8}  # lamp size option
+NIGHT_LEVEL = 0.45  # night mode: lamp colors at 45 % brightness
 
 COLOR_PALETTE = [
     "red",
