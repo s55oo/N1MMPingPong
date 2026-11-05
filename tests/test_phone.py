@@ -114,5 +114,41 @@ class ServerTest(unittest.TestCase):
             first.server_close()
 
 
+class QrTest(unittest.TestCase):
+    def test_sizes_and_finder_patterns(self):
+        import pingpong_qr as qr
+
+        for text, size in (("hi", 21), ("http://10.147.17.61:8047/", 25),
+                           ("http://192.168.178.123:8047/", 29), ("w" * 100, 41)):
+            m = qr.qr_matrix(text)
+            self.assertEqual(len(m), size)
+            self.assertTrue(all(len(row) == size for row in m))
+            # 7x7 finder: dark ring, light ring, dark 3x3 centre (all three corners)
+            for r0, c0 in ((0, 0), (0, size - 7), (size - 7, 0)):
+                self.assertTrue(all(m[r0][c0 + i] for i in range(7)))
+                self.assertFalse(m[r0 + 1][c0 + 1])
+                self.assertTrue(m[r0 + 3][c0 + 3])
+
+    def test_too_long(self):
+        import pingpong_qr as qr
+
+        with self.assertRaises(ValueError):
+            qr.qr_matrix("x" * 200)
+
+    def test_known_format_bits(self):
+        import pingpong_qr as qr
+
+        # level M, mask 0 = 101010000010010 (QR spec table)
+        self.assertEqual(qr._format_bits(0), 0b101010000010010)
+
+    def test_phone_urls(self):
+        app = phone_lamp()
+        app._phone_addrs = {"lan": "192.168.1.20", "zt": "10.147.17.61"}
+        self.assertEqual(app._phone_urls(), [("LAN", "http://192.168.1.20:8047/"),
+                                             ("ZeroTier", "http://10.147.17.61:8047/")])
+        app._phone_addrs = {"lan": "192.168.1.20", "zt": ""}
+        self.assertEqual(len(app._phone_urls()), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

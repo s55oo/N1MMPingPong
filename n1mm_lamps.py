@@ -52,6 +52,7 @@ from tkinter import colorchooser, messagebox, simpledialog
 
 import pingpong_keys as keys
 import pingpong_phone as phone
+import pingpong_qr as qr
 import pingpong_update as upd
 from pingpong_common import *  # noqa: F401,F403
 from pingpong_common import _float, guarded, log_error  # noqa: F401
@@ -452,6 +453,14 @@ class DisplayApp(RulesMixin):
             state=tk.DISABLED,
         )
         menu.add_separator()
+        menu.add_command(
+            label="Phone lamp QR code…  ({})".format(
+                phone.address_text(self._phone_addrs, self.phone_port) or "no address yet")
+            if self.phone_port and not self._phone_error
+            else "Phone lamp QR code  ({})".format(self._phone_error or "off"),
+            command=self._show_phone_qr,
+            state=tk.NORMAL if self.phone_port and not self._phone_error else tk.DISABLED,
+        )
         if self._i_am_master:
             menu.add_command(
                 label="Open PingPong Overview…",
@@ -1771,6 +1780,57 @@ class DisplayApp(RulesMixin):
                 label.configure(text=text, fg="#c00000" if self._phone_error else "#555555")
         if self.phone_port and time.time() - self._phone_req < 10.0:
             self._phone_state = self._phone_snapshot(time.time())
+
+    def _phone_urls(self):
+        """[(label, url)] of the phone lamp: LAN, plus ZeroTier if present."""
+        addrs = self._phone_addrs or {}
+        return [
+            (label, "http://{}:{}/".format(addrs[key], self.phone_port))
+            for key, label in (("lan", "LAN"), ("zt", "ZeroTier")) if addrs.get(key)
+        ]
+
+    def _show_phone_qr(self):
+        """A window with a QR code per address: scan it with the phone."""
+        urls = self._phone_urls()
+        if not urls:
+            messagebox.showinfo("PingPong", "No network address found yet – try again in a minute.",
+                                parent=self.root)
+            return
+        old = getattr(self, "_qr_window", None)
+        if old is not None:
+            try:
+                old.destroy()
+            except tk.TclError:
+                pass
+        win = tk.Toplevel(self.root, bg="white")
+        self._qr_window = win
+        win.title("PingPong – phone lamp")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        tk.Label(win, text="Scan with the phone's camera to open this lamp",
+                 bg="white", font=("Segoe UI", 10, "bold")).pack(padx=12, pady=(10, 4))
+        row = tk.Frame(win, bg="white")
+        row.pack(padx=8)
+        for label, url in urls:
+            cell = tk.Frame(row, bg="white")
+            cell.pack(side=tk.LEFT, padx=8, pady=4)
+            matrix = qr.qr_matrix(url)
+            box, quiet = 6, 4
+            side = (len(matrix) + 2 * quiet) * box
+            canvas = tk.Canvas(cell, width=side, height=side, bg="white", highlightthickness=0)
+            canvas.pack()
+            for r, line in enumerate(matrix):
+                for c, dark in enumerate(line):
+                    if dark:
+                        x, y = (c + quiet) * box, (r + quiet) * box
+                        canvas.create_rectangle(x, y, x + box, y + box, fill="black", width=0)
+            tk.Label(cell, text="{}\n{}".format(label, url[7:].rstrip("/")), bg="white",
+                     font=("Segoe UI", 9)).pack()
+        tk.Label(win, text="The phone must be on the same network (or ZeroTier).\n"
+                           "Other devices need: Options ▾ → Allow PingPong in Windows Firewall…",
+                 bg="white", fg="#555555", font=("Segoe UI", 8), justify=tk.CENTER).pack(pady=(2, 4))
+        tk.Button(win, text="Close", command=win.destroy).pack(pady=(0, 10))
+        win.bind("<Escape>", lambda e: win.destroy())
 
     def _open_phone_page(self):
         addrs = self._phone_addrs or {}

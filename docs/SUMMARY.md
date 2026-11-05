@@ -37,7 +37,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.82`.
+  `PingPong - MASTER UDP 12062 v1.83`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -45,7 +45,8 @@ Full manual: [README](../README.md). How it talks on the network:
   big lamp on a phone or tablet, plus a tile per band showing who
   transmits. The top line of the lamp shows the address to open, e.g.
   `192.168.1.20:8047 · 10.147.17.3:8047` (LAN, plus ZeroTier if the PC
-  is on it).
+  is on it). **Options ▾ → Phone lamp QR code…** shows it as a QR code to
+  scan with the phone.
 
   ![Phone lamp – RUN1 on an iPhone over ZeroTier](phone-lamp.png)
 
@@ -225,9 +226,10 @@ the lamp downloads it if it is missing. One Overview per PC.
   - `pingpong_keys.py`: the keyboard watcher;
   - `pingpong_update.py`: updates;
   - `pingpong_phone.py`: the phone lamp page;
+  - `pingpong_qr.py`: QR codes for the phone lamp address;
   - `pingpong_overview.py`: the Overview;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 116 tests) run on every push before
+- **Automated tests** (`tests/`, 120 tests) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
   when the version number changes.
