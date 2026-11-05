@@ -38,7 +38,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.92`.
+  `PingPong - MASTER UDP 12062 v1.93`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -68,6 +68,10 @@ Full manual: [README](../README.md). How it talks on the network:
   usual. At the same time, every station on the **same band and mode**
   flashes fast with your name and the message, e.g. `RUN1 · QRL?`.
   The flashing lasts exactly as long as the message is transmitted.
+- **Priority call: Ctrl+F2 / Ctrl+F4.** Your message goes out **alone**:
+  every station on the same band and mode that is transmitting gets an
+  Esc (its message stops), their send keys are held, and half a second
+  later your lamp sends F2/F4 in N1MM. Flashes like the urgent call.
 
 ### Ping-pong lock (taking turns on one band)
 - Each PC's role comes **automatically from N1MM**: Run = **RUN**,
@@ -203,7 +207,8 @@ the lamp downloads it if it is missing. One Overview per PC.
    - Lamps show who is on the air.
    - F12 asks S&P stations to hold off. F12 from Run stops everyone for
      a few seconds.
-   - Shift+F2 / Shift+F4 sends an urgent message to everyone on the band.
+   - Shift+F2 / Shift+F4 sends an urgent message to everyone on the band;
+     Ctrl+F2 / Ctrl+F4 first stops the others' transmissions.
    - The ping-pong lock keeps RUN and the inband stations taking turns.
    - The captain watches the Overview, also on a phone.
 4. **After the contest:** **Contest report…** on the Activity tab (and
@@ -256,7 +261,7 @@ operating position.
   - `pingpong_overview.py`: the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 163 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 174 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions

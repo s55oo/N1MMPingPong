@@ -225,6 +225,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.alert_run = False  # my call was started in Run (blocks every station)
         self.urgent_on = False  # my urgent call (Shift+F2 / Shift+F4)
         self.urgent_fkey = "F4"  # which key started it
+        self.urgent_priority = False  # my urgent call is a priority call (Ctrl+F2/F4)
+        self._priority_block = False  # another PC's priority call holds my send keys
         self.urgent_time = 0.0
         self.urgent_key = ("", "")  # (band, mode) of my urgent call
         self._urgent_tx_seen = False  # my F2/F4 transmission has started
@@ -529,13 +531,17 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         if self.canvas.itemcget(self.text_id, "text") != shown:
             self.canvas.itemconfigure(self.text_id, text=shown)
             self.canvas.itemconfigure(self.text_id, font=self._font_for(shown))
-        self._set_who("URGENT: " + self.peer_name(peer))
+        prio = getattr(peer, "urgent_priority", False)
+        self._set_who(("PRIORITY: " if prio else "URGENT: ") + self.peer_name(peer))
         self._freq_text = freq_khz(station.freq) if station is not None else ""
-        self.info.configure(
-            text="URGENT call from {}  ·  {} {}  ·  while it transmits  ·  click = silence".format(
-                self.peer_name(peer), peer.urgent_band, peer.urgent_mode,
-            )
-        )
+        if prio:
+            text = ("PRIORITY call from {}  ·  {} {}  ·  your transmission was stopped – "
+                    "keys held until it is sent".format(
+                        self.peer_name(peer), peer.urgent_band, peer.urgent_mode))
+        else:
+            text = "URGENT call from {}  ·  {} {}  ·  while it transmits  ·  click = silence".format(
+                self.peer_name(peer), peer.urgent_band, peer.urgent_mode)
+        self.info.configure(text=text)
 
     def _band_mode(self, st):
         return group_label(st.key) or (
@@ -992,6 +998,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             self._show_test(now)
             self._update_tail()
             return
+        self._priority_block = self._priority_active(now)
         urgent = self._incoming_urgent(now)
         if urgent:
             self._show_urgent(urgent[-1], owners, now)
@@ -1044,7 +1051,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                     )
                 )
             elif self.urgent_on:
-                idle = "URGENT"
+                idle = "PRIORITY" if self.urgent_priority else "URGENT"
             elif self._go_active(now):
                 # RUN has finished: the inband stations may transmit now.
                 idle = "GO"
@@ -1064,7 +1071,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                     self._my_call_left(now),
                 ) + header
             if self.urgent_on:
-                header = "URGENT call ON ({} {}) – until {} has been sent  ·  ".format(
+                header = "{} call ON ({} {}) – until {} has been sent  ·  ".format(
+                    "PRIORITY" if self.urgent_priority else "URGENT",
                     self.urgent_key[0] or "?", self.urgent_key[1], self.urgent_fkey
                 ) + header
             note = self._my_color_note(owners)
@@ -1159,6 +1167,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             on_blocked=self._key_blocked,
             on_event=self._key_event,
             on_urgent=self._urgent_pressed,
+            on_priority=self._priority_pressed,
         )
         if not watcher.start():
             messagebox.showerror(

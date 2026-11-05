@@ -74,6 +74,7 @@ def make_lamp(**over):
         _port_users={}, _f12_refused=0.0, key_watcher=None,
         alert_on=False, alert_run=False, alert_time=0.0,
         urgent_on=False, urgent_fkey="F4", urgent_time=0.0, urgent_key=("", ""),
+        urgent_priority=False, _priority_block=False,
         _urgent_tx_seen=False, _shown_urgent=None, silenced=set(), _shown_call=None,
         hello_now=Event(), _share={"targets": [], "port": 46070}, relay_on=True,
         test_on=False, my_alias="", started=now - 3600, n1mm_master=None,

@@ -147,6 +147,7 @@ from.
   <UrgentBand>14</UrgentBand>      <!-- band and mode of the urgent call -->
   <UrgentMode>CW</UrgentMode>
   <UrgentTime>1793127941.120</UrgentTime>
+  <UrgentPriority>0</UrgentPriority>  <!-- 1 = Ctrl+F2/F4: stations on that band/mode get Esc and wait -->
 </PingPongHello>
 ```
 

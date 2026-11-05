@@ -19,6 +19,9 @@ VK_F4 = 0x73
 VK_F2 = 0x71
 URGENT_KEYS = {VK_F2: "F2", VK_F4: "F4"}  # Shift+ these = urgent call
 VK_SHIFT = 0x10
+VK_CONTROL = 0x11
+VK_ESCAPE = 0x1B
+LLKHF_INJECTED = 0x10  # key sent by a program (e.g. PingPong itself), not typed
 N1MM_EXE = "n1mmlogger.net.exe"
 
 # Keys blocked during an incoming call: only N1MM's function keys F1-F11
@@ -83,6 +86,51 @@ def shift_down():
     return bool(_winapi()[2].GetAsyncKeyState(VK_SHIFT) & 0x8000)
 
 
+def ctrl_down():
+    """Is a Ctrl key held right now?"""
+    return bool(_winapi()[2].GetAsyncKeyState(VK_CONTROL) & 0x8000)
+
+
+def press_key(vk, release_ctrl=False):
+    """Type one key into the active window (SendInput): down + up.
+    release_ctrl: first let go of Ctrl (so N1MM sees F4, not Ctrl+F4)."""
+    if not supported():
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    class KEYBDINPUT(ctypes.Structure):
+        _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
+                    ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+
+    class MOUSEINPUT(ctypes.Structure):  # only for the union's size
+        _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD),
+                    ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                    ("dwExtraInfo", ctypes.c_size_t)]
+
+    class _U(ctypes.Union):
+        _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT)]
+
+    class INPUT(ctypes.Structure):
+        _fields_ = [("type", wintypes.DWORD), ("u", _U)]
+
+    KEYUP = 0x0002
+    events = []
+    if release_ctrl:
+        events.append((VK_CONTROL, KEYUP))
+    events += [(vk, 0), (vk, KEYUP)]
+    arr = (INPUT * len(events))()
+    for i, (code, flags) in enumerate(events):
+        arr[i].type = 1  # INPUT_KEYBOARD
+        arr[i].u.ki = KEYBDINPUT(code, 0, flags, 0, 0)
+    sent = ctypes.WinDLL("user32").SendInput(len(events), arr, ctypes.sizeof(INPUT))
+    return sent == len(events)
+
+
+def n1mm_active():
+    return foreground_exe() == N1MM_EXE
+
+
 def foreground_exe():
     """Lower-case file name of the program owning the active window."""
     ctypes, wintypes, user32, kernel32, cache = _winapi()
@@ -121,13 +169,16 @@ class KeyWatcher:
     def __init__(
         self, on_press, vk=VK_F12, only_exe=N1MM_EXE,
         should_block=None, on_blocked=None, on_event=None, on_urgent=None,
+        on_priority=None,
     ):
         self.on_press = on_press
         self.on_event = on_event or (lambda text: None)
         self.should_block = should_block
         self.on_blocked = on_blocked
         self.on_urgent = on_urgent  # Shift+F2 / Shift+F4: urgent call(key name)
+        self.on_priority = on_priority  # Ctrl+F2 / Ctrl+F4: priority call(key name)
         self._u_down = set()
+        self._p_down = set()  # Ctrl+F2/F4 held (its key-up is swallowed too)
         self.vk = vk
         self.only_exe = only_exe
         self.error = None
@@ -155,7 +206,7 @@ class KeyWatcher:
             ctypes.WinDLL("user32").PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
             self._thread_id = 0
 
-    def decide(self, vk, flags, wparam, foreground=None, shift=None):
+    def decide(self, vk, flags, wparam, foreground=None, shift=None, ctrl=None):
         """What to do with one key event: "block", "press" or None.
 
         Called for every key; must be quick. foreground() is only asked
@@ -163,6 +214,21 @@ class KeyWatcher:
         """
         fg = foreground or foreground_exe
         down = wparam in (WM_KEYDOWN, WM_SYSKEYDOWN)
+        if flags & LLKHF_INJECTED:
+            return None  # PingPong's own F2/F4 / Esc: never blocked or counted
+        if vk in URGENT_KEYS and self.on_priority is not None and not (flags & LLKHF_ALTDOWN):
+            # Ctrl+F2 / Ctrl+F4: priority call. N1MM does not get Ctrl+F4;
+            # the lamp sends a plain F4 itself once the others have stopped.
+            if (vk in self._p_down or (down and (ctrl or ctrl_down)())) and \
+                    (not self.only_exe or fg() == self.only_exe):
+                if down:
+                    if vk not in self._p_down:
+                        self._p_down.add(vk)  # ignore auto-repeat
+                        self.on_priority(URGENT_KEYS[vk])
+                    return "block"
+                if wparam in (WM_KEYUP, WM_SYSKEYUP):
+                    self._p_down.discard(vk)
+                    return "block"
         if vk in URGENT_KEYS and self.on_urgent is not None and not (flags & LLKHF_ALTDOWN):
             # Shift+F2 / Shift+F4 start PingPong's urgent call. The key is
             # only watched: N1MM still gets it and fires F2/F4 at the same

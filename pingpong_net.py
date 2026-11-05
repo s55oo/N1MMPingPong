@@ -269,7 +269,7 @@ def make_hello(
     alert=False, alert_band="", alert_time=0.0, status="", alias="", role="",
     n1mm_master="", started=0.0, colors="", block_time=0.0,
     alert_run=False, block_time_run=0.0, pingpong="", problems="", pp_limit="",
-    urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0,
+    urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0, urgent_priority=False,
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -299,6 +299,7 @@ def make_hello(
         ("UrgentBand", urgent_band or ""),
         ("UrgentMode", urgent_mode or ""),
         ("UrgentTime", "{:.3f}".format(urgent_time or 0.0)),
+        ("UrgentPriority", "1" if urgent_priority else "0"),
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -344,6 +345,7 @@ def parse_hello(data):
         "urgent_band": get("UrgentBand"),
         "urgent_mode": get("UrgentMode"),
         "urgent_time": _float(get("UrgentTime")),
+        "urgent_priority": get("UrgentPriority") == "1",
     }
 
 def format_colors(mapping):

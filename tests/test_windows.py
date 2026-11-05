@@ -54,6 +54,17 @@ class FirewallTest(unittest.TestCase):
         self.assertIs(net.firewall_rule_exists("PingPong test " + uuid.uuid4().hex), False)
 
 
+@unittest.skipUnless(WINDOWS, "Windows only")
+class SendKeyTest(unittest.TestCase):
+    def test_press_key_structures(self):
+        import pingpong_keys as keys
+
+        # F24 - a key nothing uses; checks the SendInput structures load and
+        # run (on a runner without a desktop Windows may refuse: False).
+        self.assertIn(keys.press_key(0x87), (True, False))
+        self.assertIn(keys.ctrl_down(), (True, False))
+
+
 class NotWindowsTest(unittest.TestCase):
     @unittest.skipIf(WINDOWS, "not on Windows")
     def test_safe_answers_elsewhere(self):

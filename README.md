@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.92 · Made by **S55OO** with AI assistance.
+> **Version:** 1.93 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -260,8 +260,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.92`
-  (the others just `PingPong UDP 12062 v1.92`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.93`
+  (the others just `PingPong UDP 12062 v1.93`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -333,6 +333,31 @@ For when everybody on the band must look **now**.
 - It does **not** block any keys. While your own F-keys are blocked (F12
   call or ping-pong lock), the urgent call still goes out, but N1MM
   doesn't get F2/F4.
+
+### Priority call (Ctrl+F2 / Ctrl+F4)
+
+The strongest call: **your F2/F4 goes out alone** on your band and mode.
+
+- Press **Ctrl+F2** or **Ctrl+F4** in N1MM. N1MM does not get the Ctrl key
+  combination – PingPong takes it.
+- Every station on the **same band and mode** that is **transmitting**
+  gets an **Esc** in N1MM from its own lamp: its CW, voice or RTTY
+  message stops at once. Their **F1–F11, Enter and Insert are held**
+  until your message has been sent (Esc and F12 always work).
+- About half a second later (once you let go of Ctrl) your lamp presses
+  **F2 / F4** in N1MM for you, and it is sent.
+- All those lamps **flash exactly like an urgent call** – your color /
+  white, your name and the message (`RUN1 · QRL?`), with
+  `PRIORITY: RUN1` in the corner and `PRIORITY call from RUN1 – your
+  transmission was stopped – keys held until it is sent` under it. Your
+  own lamp shows `PRIORITY`.
+- It ends when your F2/F4 message has been sent; the keys are free again
+  (at the latest after 30 s).
+- Like Shift+F2/F4 it needs **F12 call** switched on (Options ▾), and it
+  works only while N1MM is the active window. Other bands and modes are
+  never touched. Logged in the Overview as `priority call`.
+- The Esc reaches only PCs with lamps v1.93 or newer; older lamps just
+  flash.
 
 ### Block my F-keys (Options ▾ → Block my F-keys while another station calls (F12))
 
@@ -657,7 +682,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.92 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.93 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -687,7 +712,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.92 ✔** when every lamp is current – then a
+lists them), **All lamps v1.93 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.

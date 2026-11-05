@@ -45,7 +45,7 @@
   <tr><td><span class="lamp wait">WAIT · INB1 · 32 s</span></td><td>Another inband holds the slot. Your <kbd>F1</kbd>–<kbd>F11</kbd>, <kbd>Enter</kbd>, <kbd>Insert</kbd> are blocked.</td><td>Wait for RUN to transmit; frees itself after the release time.</td></tr>
   <tr><td><span class="lamp wait">BLOCKED · F1</span></td><td>You pressed a blocked key – nothing was sent.</td><td>Wait, then press again.</td></tr>
   <tr><td><span class="lamp call">F12 · RUN1 · 25 s</span></td><td>F12 call: the border blinks in the caller's color – "hold off, please". Your F-keys may be blocked meanwhile.</td><td>Stop transmitting. Left click on the lamp stops the blinking.</td></tr>
-  <tr><td><span class="lamp urgent">RUN1 · QRL? ⚡</span></td><td>Urgent call (Shift+F2/F4) from a station on your band and mode – flashes fast (color ↔ white) as long as its message is sent.</td><td>Stop and listen – at once.</td></tr>
+  <tr><td><span class="lamp urgent">RUN1 · QRL? ⚡</span></td><td>Urgent call (Shift+F2/F4) from a station on your band and mode – flashes fast (color ↔ white) as long as its message is sent. <code>PRIORITY</code> in the corner (Ctrl+F2/F4): your transmission was stopped, keys held.</td><td>Stop and listen – at once.</td></tr>
   <tr><td><span class="lamp test">INB2 · INB</span></td><td>Lamp test from the master PC: purple ↔ white for 3 s, <code>TEST</code> in the corner.</td><td>Nothing – it shows your own name.</td></tr>
 </table>
 
@@ -56,6 +56,7 @@
   <tr><td style="width:96px"><kbd>F12</kbd> in S&amp;P</td><td>The S&amp;P stations on your band blink in your color and hold off (call time, default 30 s). <kbd>F12</kbd> again = end the call.</td></tr>
   <tr><td><kbd>F12</kbd> in Run</td><td><b>All</b> stations on your band hold off for a few seconds (default 5 s).</td></tr>
   <tr><td><kbd>Shift</kbd>+<kbd>F2</kbd> / <kbd>F4</kbd></td><td>N1MM sends F2/F4 as usual, and every lamp on your band and mode flashes your name and the message while it is sent.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>F2</kbd> / <kbd>F4</kbd></td><td><b>Priority:</b> stations on your band and mode that transmit are stopped (Esc) and held; then your F2/F4 goes out – same flashing.</td></tr>
   <tr><td>Run / S&amp;P</td><td>Your role follows N1MM: Run = <b>RUN</b>, S&amp;P = <b>INB</b> – nothing to set.</td></tr>
   <tr><td>Mouse</td><td>Left click on lamp = stop blinking · right click = Options · <kbd>Shift</kbd>+<kbd>F</kbd> = compact lamp.</td></tr>
 </table>

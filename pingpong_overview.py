@@ -879,8 +879,8 @@ class Overview:
         if info.get("urgent") and info.get("urgent_time") and info["urgent_time"] != lamp.last_urgent:
             lamp.last_urgent = info["urgent_time"]
             st["urgent"] += 1
-            self._event(lamp.name(), "urgent call", "{} {}".format(
-                info.get("urgent_band", "?"), info.get("urgent_mode", "")))
+            self._event(lamp.name(), "priority call" if info.get("urgent_priority") else "urgent call",
+                        "{} {}".format(info.get("urgent_band", "?"), info.get("urgent_mode", "")))
 
     # ------------------------------------------------------------ event log
 
@@ -1653,7 +1653,8 @@ class Overview:
             last = "{}  · {} ago".format(lamp.last_caption, ago(now - lamp.last_tx_end))
         calls = []
         if h.get("urgent"):
-            calls.append("URGENT ({} {})".format(h.get("urgent_band", ""), h.get("urgent_mode", "")))
+            calls.append("{} ({} {})".format("PRIORITY" if h.get("urgent_priority") else "URGENT",
+                                             h.get("urgent_band", ""), h.get("urgent_mode", "")))
         if h.get("alert"):
             calls.append("F12 {} call ({} MHz)".format(
                 "Run" if h.get("alert_run") else "S&P", h.get("alert_band", "?")))

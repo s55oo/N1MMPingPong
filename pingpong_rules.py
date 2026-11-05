@@ -12,6 +12,7 @@ touch the station and lamp lists.
 """
 
 import socket
+import threading
 import time
 
 import pingpong_keys as keys
@@ -189,6 +190,7 @@ class RulesMixin:
         peer.urgent_band = info.get("urgent_band", "")
         peer.urgent_mode = info.get("urgent_mode", "")
         peer.urgent_time = info.get("urgent_time", 0.0)
+        peer.urgent_priority = info.get("urgent_priority", False)
         peer.version = info["version"]
         peer.ips = set(info["ips"]) | {src}
         # Same PC only if the hello came from one of our own addresses or
@@ -214,6 +216,7 @@ class RulesMixin:
                     )
                 )
         peer.last_seen = time.time()
+        self._priority_heard(peer, time.time())
 
     def _status_text(self):
         """Short state report sent to the other lamps (for diagnosis)."""
@@ -276,6 +279,7 @@ class RulesMixin:
             "urgent_band": self.urgent_key[0],
             "urgent_mode": self.urgent_key[1],
             "urgent_time": self.urgent_time,
+            "urgent_priority": self.urgent_on and self.urgent_priority,
         }
 
     def _fresh_peers(self, now):
@@ -494,6 +498,80 @@ class RulesMixin:
                 "ON ({} {})".format(*self.urgent_key) if self.urgent_on else "OFF",
             ))
 
+    def _priority_pressed(self, fkey="F4"):
+        """Keyboard thread: Ctrl+F2 / Ctrl+F4 - priority call. Stations on my
+        band and mode that are transmitting get Esc (their message stops) and
+        their send keys are held; then this lamp sends F2/F4 in N1MM (the
+        Ctrl+F4 itself never reaches N1MM). Flashes like Shift+F2/F4."""
+        if not self.f12_on:
+            return
+        mine = self._local_station()
+        if mine is None or not mine.key:
+            self._key_event("Ctrl+{} ignored - this PC's band/mode unknown".format(fkey))
+            return
+        self.urgent_on = True
+        self.urgent_priority = True
+        self.urgent_fkey = fkey
+        self.urgent_key = (mine.key[0], mine.key[1])
+        self._urgent_tx_seen = False
+        self.urgent_time = time.time()
+        self.hello_now.set()  # the others stop at once
+        self._key_event("Ctrl+{} priority call ({} {})".format(fkey, *self.urgent_key))
+        threading.Thread(target=self._send_priority_key, args=(fkey, self.urgent_time),
+                         daemon=True).start()
+
+    def _send_priority_key(self, fkey, started):
+        """After PRIORITY_DELAY (and once Ctrl is let go): F2/F4 into N1MM."""
+        vk = {"F2": keys.VK_F2, "F4": keys.VK_F4}[fkey]
+        deadline = started + 1.5
+        time.sleep(PRIORITY_DELAY)
+        while keys.ctrl_down() and time.time() < deadline:
+            time.sleep(0.05)
+        if not keys.n1mm_active():
+            self._key_event("priority call: N1MM is not the active window - {} not sent".format(fkey))
+            return
+        keys.press_key(vk, release_ctrl=keys.ctrl_down())
+        self._key_event("priority call: {} sent to N1MM".format(fkey))
+
+    def _priority_heard(self, peer, now):
+        """A priority call from another PC on my band and mode: if I am
+        transmitting, Esc stops it (once per call); my send keys are held."""
+        if not getattr(peer, "urgent_priority", False) or not peer.urgent \
+                or getattr(peer, "same_pc", False):
+            return
+        mine = self._local_station()
+        if mine is None or not mine.key or (peer.urgent_band, peer.urgent_mode) != tuple(mine.key[:2]):
+            return
+        done = self.__dict__.setdefault("_priority_done", set())
+        call = (peer.id, peer.urgent_time)
+        if call in done:
+            return
+        done.add(call)
+        self._priority_block = True
+        if mine.tx:
+            if keys.n1mm_active():
+                keys.press_key(keys.VK_ESCAPE)
+                self._key_event("priority call from {}: Esc - my transmission stopped".format(
+                    self.peer_name(peer)))
+            else:
+                self._key_event("priority call from {}: N1MM not active - Esc not sent".format(
+                    self.peer_name(peer)))
+        else:
+            self._key_event("priority call from {}: keys held".format(self.peer_name(peer)))
+
+    def _priority_active(self, now):
+        """Another PC's priority call on my band and mode is still on."""
+        mine = self._local_station()
+        if mine is None or not mine.key:
+            return False
+        return any(
+            getattr(p, "urgent_priority", False) and p.urgent
+            and (p.urgent_band, p.urgent_mode) == tuple(mine.key[:2])
+            and not getattr(p, "same_pc", False)
+            and now - self._call_seen.get(("urgent", p.id, p.urgent_time), now) < PRIORITY_HOLD
+            for p in self._fresh_peers(now)
+        )
+
     def _urgent_check(self, now):
         """End my urgent call when my F2/F4 transmission ends."""
         if not self.urgent_on:
@@ -510,6 +588,7 @@ class RulesMixin:
         else:
             return
         self.urgent_on = False
+        self.urgent_priority = False
         self.urgent_time = now
         self._key_event("urgent call ended: " + why)
         self.hello_now.set()  # receivers stop flashing right away
@@ -675,6 +754,8 @@ class RulesMixin:
 
     def _keys_to_block(self):
         """Keyboard thread: which keys to swallow right now."""
+        if getattr(self, "_priority_block", False):
+            return keys.PINGPONG_KEYS  # another PC's priority call (Ctrl+F2/F4)
         if self._pp_locked:
             return keys.PINGPONG_KEYS
         if self._block_active:

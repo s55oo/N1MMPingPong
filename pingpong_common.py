@@ -92,6 +92,8 @@ SIMILAR_COLOR = 60  # RGB distance below which two chosen colors count as "the s
 CALL_BORDER = 13  # px: width of the F12 call border around the lamp
 
 URGENT_WAIT = 3.0  # s: urgent call ends if N1MM starts no transmission by then
+PRIORITY_DELAY = 0.6  # s: Ctrl+F2/F4 - the others get Esc first, then my F2/F4 is sent
+PRIORITY_HOLD = 30.0  # s: longest the others' keys stay held for one priority call
 
 URGENT_HALF = 0.15  # s: fast flash of an urgent call
 
