@@ -54,6 +54,7 @@ class AuthTest(unittest.TestCase):
 
     def test_unsigned_rejected_when_password_set(self):
         net.set_network_key(self.key)
+        net.unseal(net.seal(m.make_hello("B", "PC2", [], True)), "10.0.0.5")  # others still sign
         _, status = net.unseal(m.make_command("stop"), "10.0.0.66")
         self.assertEqual(status, "none")
         self.assertFalse(net.accepted(status))
@@ -200,9 +201,70 @@ class JoinTest(unittest.TestCase):
 
     def test_names_in_warnings(self):
         net.set_network_key(net.derive_key("other"))
+        net.unseal(net.seal(m.make_hello("C", "PC3", [], True)), "10.0.0.7")  # others still sign
         net.unseal(m.make_hello("B", "PC2", ["10.0.0.5"], True, alias="INB2"), "10.0.0.5")
         texts = net.auth_problems(time.time())
         self.assertIn("INB2 (10.0.0.5): no network password – ignored", texts)
+
+
+class RemovedTest(unittest.TestCase):
+    """The master dropped the password: lamps that still have it offer to remove it."""
+
+    def setUp(self):
+        net.AUTH_SEEN.clear()
+        net.AUTH_NAMES.clear()
+        net.set_network_key(net.derive_key("cqww"))
+        self.unsigned = m.make_hello("M", "PC1", ["10.0.0.9"], True, alias="RUN1")
+
+    def tearDown(self):
+        net.set_network_key(b"")
+        net.AUTH_SEEN.clear()
+
+    def test_removed_when_only_unsigned_heard(self):
+        net.unseal(self.unsigned, "10.0.0.9")
+        self.assertEqual(net.password_removed(time.time()), (True, "RUN1"))
+        self.assertEqual(net.auth_problems(time.time()), [])  # shown as "removed" instead
+
+    def test_not_removed_while_others_still_sign(self):
+        net.unseal(self.unsigned, "10.0.0.9")
+        net.unseal(net.seal(m.make_hello("B", "PC2", [], True, alias="INB1")), "10.0.0.5")
+        self.assertFalse(net.password_removed(time.time())[0])
+        self.assertIn("no network password", net.auth_problems(time.time())[0])
+
+    def test_own_signed_echo_does_not_count(self):
+        net.unseal(self.unsigned, "10.0.0.9")
+        net.unseal(net.seal(m.make_hello("ME", "PCX", [], True)), "10.0.0.1")
+        self.assertTrue(net.password_removed(time.time(), local={"10.0.0.1"})[0])
+
+    def lamp(self, answer):
+        import pingpong_lamp_menu as menu
+
+        class Settings:
+            values = {}
+
+            def set_text(self, sec, key, value):
+                self.values[(sec, key)] = value
+
+        saved = menu.messagebox.askyesno
+        menu.messagebox.askyesno = lambda *a, **k: answer
+        self.addCleanup(setattr, menu.messagebox, "askyesno", saved)
+        return make_lamp(settings=Settings(), started=time.time())
+
+    def test_yes_removes(self):
+        net.unseal(self.unsigned, "10.0.0.9")
+        app = self.lamp(True)
+        lines = app._password_warnings(time.time())
+        self.assertIn("no longer uses a password", lines[0])
+        self.assertEqual(len(app.root.scheduled), 1)  # asked once, right after start
+        app._offer_password_removal()
+        self.assertEqual(net.AUTH["key"], b"")
+        self.assertEqual(app.settings.values[("network", "auth_key")], "")
+
+    def test_no_keeps_it(self):
+        net.unseal(self.unsigned, "10.0.0.9")
+        app = self.lamp(False)
+        app._offer_password_removal()
+        self.assertNotEqual(net.AUTH["key"], b"")
 
 
 if __name__ == "__main__":

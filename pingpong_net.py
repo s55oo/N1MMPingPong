@@ -446,6 +446,8 @@ def unseal(data, src="", now=None, key=None):
         AUTH_SEEN[(status, src)] = now
     elif src and status == "none" and key:
         AUTH_SEEN[("none", src)] = now
+    elif src and status == "ok":
+        AUTH_SEEN[("ok", src)] = now  # to tell "password removed" from "one stray PC"
     if src and status not in ("ok",) and not (status == "none" and not key):
         _remember(src, payload, data if status in ("foreign", "bad") else None, now)
     return payload, status
@@ -473,6 +475,21 @@ def password_matches(password, now=None, within=600.0):
         return None
     key = derive_key(password)
     return any(unseal(data, key=key, now=now)[1] in ("ok", "old") for data in recent)
+
+
+def password_removed(now, local=(), within=30.0):
+    """(True, who) when this PC has a password but the others have dropped
+    it: unsigned messages arrive and no signed one from another PC."""
+    if not AUTH["key"]:
+        return False, ""
+    recent = {(st, src) for (st, src), when in AUTH_SEEN.items()
+              if now - when <= within and src not in local}
+    if any(st == "ok" for st, _ in recent):
+        return False, ""  # someone still signs: not removed
+    srcs = sorted({src for st, src in recent if st == "none"})
+    if not srcs:
+        return False, ""
+    return True, ", ".join(sorted({AUTH_NAMES.get(s, s) for s in srcs}))
 
 
 def password_needed(now, within=30.0):
@@ -506,6 +523,8 @@ def auth_problems(now, local=(), within=30.0, where="Options ▾ → Network pas
             continue
         if status == "foreign":
             continue
+        if status == "none" and password_removed(now, local, within)[0]:
+            continue  # shown as "password removed" instead
         if status in labels and AUTH["key"]:
             name = AUTH_NAMES.get(src)
             out.append("{}: {} – ignored".format(

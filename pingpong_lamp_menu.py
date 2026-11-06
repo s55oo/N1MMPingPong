@@ -301,7 +301,15 @@ class OptionsMixin:
     # ----- joining a protected PingPong network
 
     def _password_warnings(self, now):
-        """Red line texts: a request for the password, or what is ignored."""
+        """Red line texts: a request for the password, an offer to remove it,
+        or what is ignored."""
+        removed, who = password_removed(now, self.local)
+        if removed:
+            if not getattr(self, "_pw_asked", False) and now - self.started < 60:
+                self._pw_asked = True  # once, right after the start - never mid-contest
+                self.root.after(500, lambda: self._offer_password_removal(auto=True))
+            return ["🔓 the PingPong network no longer uses a password ({}) – click here to "
+                    "remove it here too".format(who)]
         needed, who = password_needed(now)
         if needed:
             if not getattr(self, "_pw_asked", False) and now - self.started < 60:
@@ -313,8 +321,36 @@ class OptionsMixin:
         return auth_problems(now, self.local)
 
     def _password_click(self):
-        if password_needed(time.time())[0]:
+        if password_removed(time.time(), self.local)[0]:
+            self._offer_password_removal(auto=False)
+        elif password_needed(time.time())[0]:
             self._ask_network_password(auto=False)
+
+    def _offer_password_removal(self, auto=False):
+        """The other lamps send without a password now: remove it here too
+        (asked first - only when the captain really switched it off)."""
+        if getattr(self, "_pw_dialog_open", False):
+            return
+        removed, who = password_removed(time.time(), self.local)
+        if not removed:
+            return
+        self._pw_dialog_open = True
+        try:
+            if not messagebox.askyesno(
+                "PingPong - network password",
+                "The other lamps ({}) send without a network password now, and none with "
+                "one.\n\nRemove the password on this PC too?\n\n(Only if the captain "
+                "switched it off. No = keep it; the red line stays.)".format(who),
+                parent=self.root,
+            ):
+                return
+            set_network_key(b"")
+            self.settings.set_text("network", "auth_key", "")
+            AUTH_SEEN.clear()
+            self._key_event("network password removed (the others have none)")
+            self.hello_now.set()
+        finally:
+            self._pw_dialog_open = False
 
     def _ask_network_password(self, auto=False):
         """Ask for the password of the PingPong network heard here and check

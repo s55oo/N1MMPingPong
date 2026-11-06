@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.96 · Made by **S55OO** with AI assistance.
+> **Version:** 1.97 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -261,8 +261,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.96`
-  (the others just `PingPong UDP 12062 v1.96`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.97`
+  (the others just `PingPong UDP 12062 v1.97`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -509,6 +509,14 @@ the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
   then only the red line. The same happens when the password is changed
   on the master. The password itself never goes over the network – each
   PC has it typed in once.
+- **Switching it off again:** remove it on the master's lamp (Options ▾ →
+  Network password…, leave it empty). The other lamps notice that the
+  others now send without a password and none with one, and show
+  `🔓 the PingPong network no longer uses a password (RUN1) – click here
+  to remove it here too`. Click → **Yes** removes it on that PC (after a
+  restart this is asked by itself). As long as any other lamp still
+  signs, nothing is offered – a single PC without the password just shows
+  `… no network password – ignored`.
 - Every hello, relay, command and ping answer then carries a time stamp
   and an **HMAC-SHA256** signature. Messages without it, with a different
   password, changed on the way, or **older than 5 minutes** (a recorded
@@ -683,7 +691,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.96 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
+  `All lamps v1.97 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
   newer Overview exists), **Allow web page in firewall…** (hidden once the
   rule exists), **Always on top**.
 
@@ -713,7 +721,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.96 ✔** when every lamp is current – then a
+lists them), **All lamps v1.97 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -994,7 +1002,11 @@ pingpong_qr.py      – small QR code maker (phone lamp address)
 pingpong_keys.py    – keyboard watcher: F12, F-key block, Shift+F2/F4
 pingpong_update.py  – self-update / switch-version logic (lamp and Overview)
 pingpong_version.py – the version number (one place)
-pingpong_overview.py – Overview: window + web page
+pingpong_overview.py – Overview: window, table, alarm (start here)
+pingpong_overview_common.py – Overview: constants, helpers, the Lamp record
+pingpong_overview_admin.py  – Overview: commands to the lamps, setup, password, ping, self-update
+pingpong_overview_stats.py  – Overview: statistics, Activity, event log, report, planned reset
+pingpong_overview_web.py    – Overview: web page (TCP 8046) and its firewall rule
 pingpong_report.py  – Overview: after-contest report (HTML)
 tests/              – automated tests (run on every push; test_windows.py
                       checks the Windows-only parts on the Windows build runner)

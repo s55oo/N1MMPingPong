@@ -39,7 +39,7 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.96`.
+  `PingPong - MASTER UDP 12062 v1.97`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
@@ -97,7 +97,8 @@ Full manual: [README](../README.md). How it talks on the network:
   ZeroTier.
 - **Network password (optional):** set once on the master; every other
   lamp notices it and asks for it (red line – click, type, checked at
-  once). Every lamp message is then signed (HMAC-SHA256 with a time
+  once; removing it on the master is offered to the others the same
+  way). Every lamp message is then signed (HMAC-SHA256 with a time
   stamp) and messages from anyone without it are ignored – nobody else on
   the LAN or ZeroTier can fake calls or stop the lamps.
 - **Warnings on the lamp:**
@@ -259,10 +260,11 @@ operating position.
   - `pingpong_update.py`: updates;
   - `pingpong_phone.py`: the phone lamp page;
   - `pingpong_qr.py`: QR codes for the phone lamp address;
-  - `pingpong_overview.py`: the Overview;
+  - `pingpong_overview.py` (+ `_common`, `_admin`, `_stats`, `_web`):
+    the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 177 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 182 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
