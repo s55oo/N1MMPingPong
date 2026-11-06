@@ -612,6 +612,25 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
 
   The last two notes appear only 30 s after the lamp started.
 
+> **Note – which VPN for remote PCs.** PingPong finds the other lamps by
+> **UDP broadcast**, so a VPN must pass broadcasts:
+>
+> - **ZeroTier** – works (virtual Ethernet).
+> - **OpenVPN in TAP mode** – works. Server: `dev tap` and
+>   `client-to-client`; best **bridged to the station LAN**
+>   (`server-bridge`), otherwise (separate subnet, `server … ` with
+>   `dev tap`) **every** PingPong PC must join the VPN. Clients: `dev tap`,
+>   the OpenVPN **community client** (OpenVPN GUI 2.6) with the
+>   **TAP-Windows6** driver – OpenVPN Connect and the DCO driver are TUN
+>   only.
+> - **OpenVPN in TUN mode, WireGuard, Tailscale** – **don't work**: they
+>   carry no broadcasts, so lamps across the VPN don't see each other.
+>
+> Whichever VPN: set its network adapter to **Private** in Windows, or the
+> PingPong firewall rules (Private and Domain only) don't apply. Check it
+> in the Overview: the remote PCs appear and their **Ping** column shows
+> times.
+
 ### lamps.cfg (optional)
 
 Not needed – stations are detected automatically. To give stations fixed
