@@ -709,7 +709,9 @@ master PC anyway.)
 
 *Ready check before the start: RUN1 (master ★, in Run) and the inband
 stations INB1 and INB2 (in S&P) on 7 MHz CW – all green, `✔ READY`,
-ping-pong lock ON, every lamp on the newest version (`All lamps v1.68 ✔`).*
+ping-pong lock ON, every lamp on the newest version. (Screenshot from
+v1.68 – the buttons in the second row are now **Update all lamps…**,
+**Settings ▾** and **Statistics ▾**.)*
 
 | Column | Shows |
 |---|---|
@@ -720,7 +722,7 @@ ping-pong lock ON, every lamp on the newest version (`All lamps v1.68 ✔`).*
 | Role | ping-pong role (RUN / INB / –) |
 | Now | `TX <message> (time)` while it transmits – the row is in the station's color |
 | Last TX | last message and how long ago |
-| Calls | `F12 S&P call` / `F12 Run call` (row yellow), `URGENT` (row flashes red) |
+| Calls | `F12 S&P call` / `F12 Run call` (row yellow), `URGENT` or `PRIORITY` (row flashes red) |
 | Keys | `F-keys blocked`, `ping-pong WAIT`, `holds slot` |
 | Ping | round-trip time to that lamp over PingPong's own protocol, e.g. `3.2 ms`; `lost` = no answer (see *Ping*) |
 | Seen | time since that lamp was last heard (grey after 12 s) |
@@ -920,8 +922,9 @@ the Overview finds that rule, the button disappears and the status text
 (row 1, after the ping-pong lock) shows `web 0.0.0.0:8046` – the web page
 is open to the network.
 
-- It **listens** to the lamps (UDP 46070) and sends them only the two
-  commands above (update, ping-pong lock on/off). It never opens N1MM's
+- It **listens** to the lamps (UDP 46070) and sends them only its own
+  commands (update, ping-pong lock, test, ping, restore setup, emergency
+  restart / stop) – from the master PC only. It never opens N1MM's
   ports (12060, 12062), so it can run next to the master's lamp without taking
   N1MM's packets away.
 - It shows stations whose PC runs a PingPong lamp with **Share my N1MM

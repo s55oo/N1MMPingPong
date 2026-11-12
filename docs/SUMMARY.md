@@ -107,8 +107,10 @@ Full manual: [README](../README.md). How it talks on the network:
   - other PCs on a different version;
   - two masters;
   - a firewall blocking the lamps (with a one-click firewall rule);
-  - no data from its own N1MM, or another program on its port.
-- **Updates** from GitHub: by itself, from the Options menu, or for all
+  - no data from its own N1MM, or another program on its port;
+  - network password needed, different, or removed by the master
+    (`🔒` / `🔓` – click the line).
+- **Updates** from GitHub: by itself, from **Options ▾ → Updates**, or for all
   PCs at once from the Overview. It can switch back to the previous
   version.
 - Errors go to `pingpong_error.log`; the lamp never stops because of
@@ -123,11 +125,14 @@ the lamp downloads it if it is missing. One Overview per PC.
 
 ![PingPong Overview – ready check, all green](overview.png)
 
+*(Screenshot from v1.68; the second button row is now **Update all
+lamps…**, **Settings ▾** and **Statistics ▾**.)*
+
 - **One live table** of every station:
   - name (★ = master), PC and version;
   - band, mode, frequency, Run/S&P and role;
   - what it is transmitting right now, and its last message;
-  - F12 and urgent calls;
+  - F12, urgent and priority calls;
   - blocked keys, and who holds the ping-pong slot.
 - **Web page** at `http://<master PC>:8046`: the same table in any
   browser on the network, e.g. the captain's phone. Nothing to install
@@ -156,18 +161,21 @@ the lamp downloads it if it is missing. One Overview per PC.
 - **Right click → Remove from the list:** a station that is no longer heard
   (PC off or disconnected) leaves the table and stops the alarm; it comes
   back by itself when its lamp is heard again.
-- **Settings ▾:** **save** every PC's name and color (by Windows computer
-  name) plus the master's F12 times and ping-pong settings to a file, and
-  **restore** them to all lamps before the next contest.
+- **Settings ▾:**
+  - **save** every PC's name and color (by Windows computer name) plus the
+    master's F12 times and ping-pong settings to a file, and **restore**
+    them to all lamps before the next contest;
+  - the **network password**, the **web page in Windows Firewall** and
+    **Always on top**.
 - **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,
   lamps lost or restarted, setting changes, commands).
-- **Contest report…:** after the contest, one page (HTML, printable) with
+- **Contest report…** (Activity tab or Statistics ▾): after the contest, one page (HTML, printable) with
   TX time and share per station, function keys, waits, calls, ping, alarms,
   TX minutes per hour and the notable events.
 - **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
   typing `YES` + Enter).
 - **Update all lamps:** one button. It shows how many lamps are behind
-  (`Update 2 lamps…` / `All lamps v1.68 ✔`). Every lamp that needs it
+  (`Update 2 lamps…` / `All lamps v1.98 ✔`). Every lamp that needs it
   downloads the newest release and restarts, and no one has to touch the
   other PCs. Lamps accept commands only from the master PC.
 - **Statistics ▾:** reset the counters now, or **planned at the contest
@@ -179,9 +187,10 @@ the lamp downloads it if it is missing. One Overview per PC.
 
   ![PingPong Overview – function keys](overview-function-keys.png)
 - **Updates itself** when a new release is out (asks first).
-- It listens to the lamps and sends them only those two commands; it
-  never touches N1MM's port, so it is safe to run next to the master's
-  lamp.
+- It listens to the lamps and sends them only its own commands (update,
+  ping-pong lock, test, ping, restore setup, emergency) – from the master
+  PC only. It never touches N1MM's port, so it is safe to run next to the
+  master's lamp.
 
 ---
 
