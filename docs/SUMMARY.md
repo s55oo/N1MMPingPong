@@ -39,8 +39,10 @@ Full manual: [README](../README.md). How it talks on the network:
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.97`.
+  `PingPong - MASTER UDP 12062 v1.98`.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
+- **Options ▾** is grouped: name and color at the top, then Display, Calls
+  and keys, Ping-pong and F12 times, Network and Updates.
 - **Lamp size** normal / large / extra large, and **night mode** with
   dimmed colors.
 - **Phone lamp:** every lamp is also a web page on **TCP 8047** – the same
@@ -130,8 +132,8 @@ the lamp downloads it if it is missing. One Overview per PC.
 - **Web page** at `http://<master PC>:8046`: the same table in any
   browser on the network, e.g. the captain's phone. Nothing to install
   there.
-  **Allow web page in firewall…** opens TCP 8046; once the rule exists the
-  button hides and the status line shows `web 0.0.0.0:8046`.
+  **Settings ▾ → Allow web page in Windows Firewall…** opens TCP 8046;
+  once the rule exists the status line shows `web 0.0.0.0:8046`.
 - **Ready check:** before the contest every row is **green** (ready) or
   **dark red**, with the reason:
   - not heard;
@@ -154,7 +156,7 @@ the lamp downloads it if it is missing. One Overview per PC.
 - **Right click → Remove from the list:** a station that is no longer heard
   (PC off or disconnected) leaves the table and stops the alarm; it comes
   back by itself when its lamp is heard again.
-- **Setup ▾:** **save** every PC's name and color (by Windows computer
+- **Settings ▾:** **save** every PC's name and color (by Windows computer
   name) plus the master's F12 times and ping-pong settings to a file, and
   **restore** them to all lamps before the next contest.
 - **Event log:** a contest timeline in `pingpong_events.csv` (calls, waits,

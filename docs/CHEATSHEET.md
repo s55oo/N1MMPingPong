@@ -47,7 +47,7 @@ One page for every operating position. **Printable PDF:**
 |---|---|
 | `no data from this PC's N1MM on UDP 12062` | In N1MM: Config → Configure Ports… → **Broadcast Data**. Tick **Radio**, set its line to `127.0.0.1:12060 127.0.0.1:12062`, then click OK. |
 | red `⚠ UDP 12062 also used by …` | Another program on this PC is taking N1MM's data. Tell the captain. |
-| `no PingPong heard – firewall?` | Options ▾ → **Allow PingPong in Windows Firewall…** (it asks for administrator rights). |
+| `no PingPong heard – firewall?` | Options ▾ → Network → **Allow PingPong in Windows Firewall…** (it asks for administrator rights). |
 | `⚠ TWO MASTERS`, or different versions | Tell the captain (Overview: **Update all lamps…**). |
 | `🔒 this PingPong network has a password – click here…` | Click the line and type the network password (ask the captain). It is checked at once. |
 | Lamp gone or closed | Start `n1mm_lamps.exe` again; only one lamp runs per PC. The Overview raises an alarm when an operating lamp is silent for 30 s. |

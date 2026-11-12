@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.97 · Made by **S55OO** with AI assistance.
+> **Version:** 1.98 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -147,13 +147,39 @@ What N1MM reports – and therefore what PingPong can show:
   name (shown when it differs from the name).
 - The window is always on top. **Only one lamp per PC** can run; starting
   a second one just says PingPong is already running.
-- **Options ▾** (top-right) holds all settings; the **help icon** next to
+- **Options ▾** (top-right) holds all settings, grouped (see **The Options
+  menu** below); the **help icon** next to
   it opens this page.
 - **Right-click the lamp** also opens the Options menu.
 
+### The Options menu
+
+**Options ▾** (top right, or right-click the lamp) – the things you use
+most at the top, the rest in five groups:
+
+```
+INB1 · role INB · UDP 12062 · v1.98        (who and what this lamp is)
+My name…  /  My color…
+Display ▸              Compact mode (Shift+F) · lamp size · night mode
+Calls and keys ▸       F12 call on (also Shift/Ctrl+F2/F4) · block my F-keys · sound
+Ping-pong and F12 times ▸
+                       on the master: ping-pong lock, release time,
+                       F12 call time S&P / Run (for all PCs);
+                       elsewhere: the master's values, greyed · my role
+Phone lamp QR code…
+Open PingPong Overview…                    (master only)
+Network ▸              share my N1MM · Windows Firewall · network password
+Updates ▸              check now · switch version · revert ·
+                       check at startup · install automatically
+Diagnostics (log to file)
+```
+
+The group names show a warning when needed, e.g. `Network ⚠ firewall`
+when the firewall rule is missing, or `Network (password ON)`.
+
 ### Compact mode (Shift+F)
 
-Click the lamp and press **Shift+F** – or tick **Options ▾ → Compact
+Click the lamp and press **Shift+F** – or tick **Options ▾ → Display → Compact
 mode** – and the title bar, the top row and the
 gray margins disappear – only the lamp is left, same size and place. The
 status line moves onto the lamp's bottom edge (the sender's name and the
@@ -168,7 +194,7 @@ frequency are on the lamp anyway), so no information is lost.
   comes back where it was, compact or not. If that place is no longer on
   a screen (e.g. a monitor was unplugged), it opens at the default place.
 
-### Lamp size and night mode (Options ▾)
+### Lamp size and night mode (Options ▾ → Display)
 
 - **Lamp size: normal / large / extra large** – the lamp, its texts and
   the line under it grow (×1.4 / ×1.8), e.g. for an operator sitting
@@ -202,7 +228,7 @@ off or its port is busy.
 
 ![Phone lamp QR code (example addresses)](docs/phone-qr.png) Click it to open
 the page in this PC's browser. Other devices need the firewall rule:
-**Options ▾ → Allow PingPong in Windows Firewall…** (adds TCP 8047). If
+**Options ▾ → Network → Allow PingPong in Windows Firewall…** (adds TCP 8047). If
 another program already uses 8047, the line says `phone lamp: TCP 8047
 busy`; start the lamp with `--phone-port <n>` (or `0` = off).
 
@@ -261,8 +287,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.97`
-  (the others just `PingPong UDP 12062 v1.97`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.98`
+  (the others just `PingPong UDP 12062 v1.98`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -273,7 +299,7 @@ stations, and every other lamp uses its list.
   | `⚠ TWO MASTERS: RUN1, RUN2 – …` | two lamps both act as master: they don't hear each other (one-way firewall – **Allow PingPong in Windows Firewall…** on both), or one runs an old version. Colors and block times can differ until it's fixed. |
   | `⚠ N1MM master on RUN1 and RUN2 – …` | two N1MMs say they are network master. PingPong still picks one, but check N1MM's **Network Status** window. |
 
-### F12 call (Options ▾ → F12 call – blink stations on my band (Shift+F2/F4 = urgent))
+### F12 call (Options ▾ → Calls and keys → F12 call on)
 
 Warn the other operators on your band without transmitting.
 
@@ -296,7 +322,7 @@ Warn the other operators on your band without transmitting.
   your lamp closes; on a receiving PC it ends when that PC changes band,
   or (for an S&P call) goes to Run.
 - The receiving PC also gives a short **double beep** when the call starts
-  (once per call; **Options ▾ → Sound on F12 call**, on by default).
+  (once per call; **Options ▾ → Calls and keys → Sound on F12 call**, on by default).
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
 - **S&P stations can't answer a call with their own.** While another PC's
@@ -354,13 +380,13 @@ The strongest call: **your F2/F4 goes out alone** on your band and mode.
   own lamp shows `PRIORITY`.
 - It ends when your F2/F4 message has been sent; the keys are free again
   (at the latest after 30 s).
-- Like Shift+F2/F4 it needs **F12 call** switched on (Options ▾), and it
+- Like Shift+F2/F4 it needs **F12 call** switched on (Options ▾ → Calls and keys), and it
   works only while N1MM is the active window. Other bands and modes are
   never touched. Logged in the Overview as `priority call`.
 - The Esc reaches only PCs with lamps v1.93 or newer; older lamps just
   flash.
 
-### Block my F-keys (Options ▾ → Block my F-keys while another station calls (F12))
+### Block my F-keys (Options ▾ → Calls and keys → Block my F-keys…)
 
 Turn this on on the PCs that should be **stopped** during a call (saved
 per PC, off by default).
@@ -378,8 +404,8 @@ per PC, off by default).
   F12 block time**: then the whole call ends (blinking stops on all PCs,
   and the calling PC's call switches itself off).
 - **Two F12 block times**, set **on the master only** (**1–30 s** each):
-  **Options ▾ → F12 block time, S&P call…** (default **30 s**) and
-  **Options ▾ → F12 block time, Run call…** (default **5 s**). The values
+  **Options ▾ → Ping-pong and F12 times → F12 call time, S&P…** (default
+  **30 s**) and **… → F12 call time, Run…** (default **5 s**). The values
   go to all lamps at once; on other PCs the menu shows them greyed out,
   e.g. `F12 block time: S&P call 30 s, Run call 5 s (set on master RUN1)`.
   A new master keeps the current values.
@@ -398,9 +424,9 @@ alternation.
 
 **The role always comes from N1MM** on each PC – **Run = RUN,
 S&P = INB** – and changes the moment the operator switches mode in N1MM.
-Nothing to set; **Options ▾** only shows the current role.
+Nothing to set; **Options ▾ → Ping-pong and F12 times** only shows the current role.
 
-**On or off for everybody – on the master:** **Options ▾ → Ping-pong lock
+**On or off for everybody – on the master:** **Options ▾ → Ping-pong and F12 times → Ping-pong lock
 (RUN first, inband stations take turns) – for all PCs** (on by default).
 Untick it on the master and **nobody is locked** – every station may
 transmit without priority; the value reaches all lamps at once. Other
@@ -428,7 +454,7 @@ keeps the current setting.
 - The lock applies only on the **same band**, only when a station in
   **Run** (role RUN) is on that band, and only while the lock is **ON** on
   the master. It releases itself if RUN stays silent for the **release
-  time** – set on the master: **Options ▾ → Ping-pong release time…**,
+  time** – set on the master: **Options ▾ → Ping-pong and F12 times → Ping-pong release time…**,
   **0–40 s** (default **40 s**; **0** = never by time, only a RUN
   transmission frees the slot). The value reaches all lamps at once;
   other PCs show it greyed out, the Overview in its top line
@@ -448,7 +474,7 @@ keeps the current setting.
   clicks, PTT or paddle).
 - How it works step by step: [docs/COMMUNICATION.md](docs/COMMUNICATION.md#5-ping-pong-lock).
 
-### Updates and switching back (Options ▾)
+### Updates and switching back (Options ▾ → Updates)
 
 | Item | What it does |
 |---|---|
@@ -477,7 +503,7 @@ kept), the new one takes its place and the lamp restarts. `lamps.cfg` and
   run it without installing.
 - Without internet access the check is silently skipped.
 
-### Windows Firewall (Options ▾ → Allow PingPong in Windows Firewall…)
+### Windows Firewall (Options ▾ → Network → Allow PingPong in Windows Firewall…)
 
 Adds an inbound rule `PingPong lamps UDP` for UDP **12062** (N1MM data) and **46070**,
 and `PingPong phone lamp TCP` for TCP **8047** (phone lamp), on private and
@@ -489,16 +515,16 @@ PingPong allowed ✔** (click it to add the rules again, e.g. after a port
 change), and a PC that is not heard is reported as
 `no PingPong heard – check that PC's lamp and firewall` instead.
 
-### Network password (Options ▾ → Network password…)
+### Network password (Options ▾ → Network → Network password…)
 
 By default every PingPong PC trusts any message on UDP 46070, so any
 device on the same LAN or ZeroTier network could pretend to be a lamp or
 the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
 **network password** that can't happen:
 
-- Set it **once on the master's lamp** (Options ▾ → **Network
+- Set it **once on the master's lamp** (Options ▾ → Network → **Network
   password…**, typed twice). The Overview on the master PC takes it from
-  the lamp by itself (or set it there: **Setup ▾ → Network password…**).
+  the lamp by itself (or set it there: **Settings ▾ → Network password…**).
 - **The other lamps ask for it themselves:** a lamp that hears protected
   messages it can't read shows a red line
   `🔒 this PingPong network has a password – click here to enter it (RUN1)`.
@@ -510,7 +536,7 @@ the master (fake F12 calls, ping-pong lock off, **stop all lamps**). With a
   on the master. The password itself never goes over the network – each
   PC has it typed in once.
 - **Switching it off again:** remove it on the master's lamp (Options ▾ →
-  Network password…, leave it empty). The other lamps notice that the
+  Network → Network password…, leave it empty). The other lamps notice that the
   others now send without a password and none with one, and show
   `🔓 the PingPong network no longer uses a password (RUN1) – click here
   to remove it here too`. Click → **Yes** removes it on that PC (after a
@@ -596,7 +622,7 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
   station is seen even if its N1MM only sends to `127.0.0.1`, or to a LAN
   the other PC isn't on (e.g. over ZeroTier). If N1MM's own broadcast also
   arrives, the lamp uses that and ignores the forwarded copy; every PC
-  appears once. **Options ▾ → Share my N1MM with other lamps** (on by
+  appears once. **Options ▾ → Network → Share my N1MM with other lamps** (on by
   default).
 - A PC running PingPong whose N1MM traffic doesn't arrive is listed under
   the lamp:
@@ -608,7 +634,7 @@ n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
   | `RUN2: v1.67 – update it` | RUN2 runs an older PingPong – update it (Overview: **Update all lamps…**) |
   | `RUN2: v1.77 – update this PC` | RUN2 is newer than this lamp – update this PC |
   | `PC5: no PingPong lamp there` | N1MM on PC5 is heard, but no lamp runs there (other lamps are heard fine) |
-  | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Allow PingPong in Windows Firewall…** |
+  | `PC5: no PingPong heard – firewall?` | N1MM data arrives, but **no** other lamp is heard at all – this PC's firewall probably blocks UDP 46070. Use **Options ▾ → Network → Allow PingPong in Windows Firewall…** |
 
   The last two notes appear only 30 s after the lamp started.
 
@@ -710,9 +736,10 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.97 ✔`), **Setup ▾**, **Statistics ▾**, the yellow **Update Overview to vX…** (only when a
-  newer Overview exists), **Allow web page in firewall…** (hidden once the
-  rule exists), **Always on top**.
+  `All lamps v1.98 ✔`), **Settings ▾** (save / restore setup, network
+  password, web page in Windows Firewall, always on top), **Statistics ▾**,
+  and the yellow **Update Overview to vX…** (only when a newer Overview
+  exists).
 
 **Ready check.** When the Overview starts, every station's row is
 **green** (ready) or **dark red** (a problem, shown in **Check**), until
@@ -740,7 +767,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.97 ✔** when every lamp is current – then a
+lists them), **All lamps v1.98 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.
@@ -813,7 +840,7 @@ statistics stay. If its lamp is heard again, the station simply comes
 back (first in the ready check, until it transmits). A station that is
 heard can't be removed. Logged as `removed from the list`.
 
-**Setup ▾ – save and restore the station setup** (e.g. from one CQ WW to
+**Settings ▾ – save and restore the station setup** (e.g. from one CQ WW to
 the next):
 
 - **Save setup…** writes `pingpong_setup.json`: every PC heard now, by its
@@ -887,7 +914,7 @@ time since the last **Reset** of the statistics:
 open it in any browser on the network, also on a **phone or tablet**
 (nothing to install; it updates every second). The addresses are shown at
 the bottom of the window. Other devices can open it once Windows allows
-it: click **Allow web page in firewall…** in the window (asks for
+it: **Settings ▾ → Allow web page in Windows Firewall…** (asks for
 administrator rights; rule `PingPong Overview web page`, TCP 8046). When
 the Overview finds that rule, the button disappears and the status text
 (row 1, after the ping-pong lock) shows `web 0.0.0.0:8046` – the web page
@@ -922,8 +949,8 @@ is open to the network.
 | Other PCs don't blink on F12 | All PCs on the same version; same **band**; an F12 from S&P reaches only **S&P** stations (from Run: all); **F12 call** option on, F12 pressed while N1MM is active; **Diagnostics** on the calling PC shows what the other PCs report. |
 | Ping-pong lock never locks | **Ping-pong lock: ON** (Overview / master's Options); a station in **Run** on the same band; the inband stations in **S&P** – check the **Role** column in the Overview. |
 | An INB stays locked although RUN transmits | RUN's messages must be N1MM-started (F-keys, Enter) – paddle/PTT are not reported; the lock releases itself after the release time (master's Options, 0–40 s; 0 = never by time). **Diagnostics** on the locked PC shows the slot events. |
-| One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12062 and 46070: **Options ▾ → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12062,46070 profile=private,domain` |
-| Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all: **Update all lamps…** in the Overview (or **Options ▾ → Check for updates** on each PC). |
+| One PC never receives the other lamps | Windows Firewall on that PC must allow UDP 12062 and 46070: **Options ▾ → Network → Allow PingPong in Windows Firewall…**, or as administrator: `netsh advfirewall firewall add rule name="PingPong lamps UDP" dir=in action=allow protocol=UDP localport=12062,46070 profile=private,domain` |
+| Line under the lamp says `v… – update` | PCs run different PingPong versions – update them all: **Update all lamps…** in the Overview (or **Options ▾ → Updates → Check for updates now** on each PC). |
 | F12 does nothing at all | If N1MM runs **as administrator**, run PingPong as administrator too. |
 | N1MM shows `IndexOutOfRangeException` in `MultiOpManager` | A very old lamp (it used port 12070, N1MM's multi-computer port) is still running somewhere – update it. |
 | Colors or F12 block time differ between PCs | All PCs on the same version; the master's title bar says `MASTER` – only one PC should. A red `⚠ TWO MASTERS` line under the lamp says which. |

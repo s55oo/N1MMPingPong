@@ -92,7 +92,7 @@ class PhoneMixin:
             tk.Label(cell, text="{}\n{}".format(label, url[7:].rstrip("/")), bg="white",
                      font=("Segoe UI", 9)).pack()
         tk.Label(win, text="The phone must be on the same network (or ZeroTier).\n"
-                           "Other devices need: Options ▾ → Allow PingPong in Windows Firewall…",
+                           "Other devices need: Options ▾ → Network → Allow PingPong in Windows Firewall…",
                  bg="white", fg="#555555", font=("Segoe UI", 8), justify=tk.CENTER).pack(pady=(2, 4))
         tk.Button(win, text="Close", command=win.destroy).pack(pady=(0, 10))
         win.bind("<Escape>", lambda e: win.destroy())

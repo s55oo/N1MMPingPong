@@ -1,11 +1,13 @@
 """PingPong lamp - the Options menu and its dialogs.
 
-OptionsMixin (used by DisplayApp in n1mm_lamps.py): the Options ▾ menu,
+OptionsMixin (used by DisplayApp in n1mm_lamps.py): the Options ▾ menu (top
+level + Display, Calls and keys, Ping-pong and F12 times, Network, Updates),
 My name / My color, the master's F12 block times and ping-pong settings,
 the Windows Firewall rule and opening PingPong Overview on the master.
 """
 
 import os
+import socket
 import sys
 import threading
 import time
@@ -21,97 +23,95 @@ from pingpong_version import __version__
 
 class OptionsMixin:
     def _show_options(self, event):
+        """Options ▾ - short top level, the rest grouped in submenus."""
         menu = tk.Menu(self.root, tearoff=0)
-        menu.add_checkbutton(
-            label="Compact mode",
-            accelerator="Shift+F",
-            variable=self.var_compact,
-            command=lambda: self.root.after(
-                50, lambda: self._set_compact(bool(self.var_compact.get()))
-            ),
-        )
-        for value, text in (("normal", "Lamp size: normal"), ("large", "Lamp size: large"),
-                            ("xlarge", "Lamp size: extra large")):
-            menu.add_radiobutton(label=text, variable=self.var_size, value=value,
-                                 command=self._size_changed)
-        menu.add_checkbutton(
-            label="Night mode (dim lamp colors)",
-            variable=self.var_night,
-            command=self._night_changed,
-        )
-        menu.add_separator()
+        frozen = upd.is_frozen()
+        master = self.peer_name(self._master_peer) if self._master_peer else "?"
+
+        # Who am I: name, role, port, version (information only).
+        role = self._my_role_now()
         menu.add_command(
-            label="My name…  ({})".format(self.my_alias or "PC name"),
-            command=self._choose_alias,
-        )
-        menu.add_command(
-            label="My color…  ({})".format(self.my_color or "automatic"),
-            command=self._choose_color,
-        )
-        if self._i_am_master:
-            menu.add_command(
-                label="F12 block time, S&P call…  ({:g} s, blocks S&P)".format(self.block_limit),
-                command=lambda: self._choose_block_time(run=False),
-            )
-            menu.add_command(
-                label="F12 block time, Run call…  ({:g} s, blocks all)".format(
-                    self.block_limit_run),
-                command=lambda: self._choose_block_time(run=True),
-            )
-        else:
-            master = self.peer_name(self._master_peer) if self._master_peer else "?"
-            menu.add_command(
-                label="F12 block time: S&P call {:g} s, Run call {:g} s  (set on master {})".format(
-                    self.block_limit, self.block_limit_run, master,
-                ),
-                state=tk.DISABLED,
-            )
-        menu.add_checkbutton(
-            label="F12 call – blink stations on my band (Shift+F2/F4 = urgent)",
-            variable=self.var_keys,
-            command=self._keys_toggled,
-        )
-        menu.add_checkbutton(
-            label="Block my F-keys while another station calls (F12)",
-            variable=self.var_block,
-            command=self._keys_toggled,
-        )
-        menu.add_checkbutton(
-            label="Sound on F12 call",
-            variable=self.var_sound,
-            command=lambda: self.settings.set("call_sound", self.var_sound.get()),
-        )
-        menu.add_checkbutton(
-            label="Share my N1MM with other lamps (all networks)",
-            variable=self.var_relay,
-            command=self._relay_toggled,
-        )
-        menu.add_separator()
-        if self._i_am_master:
-            var = tk.BooleanVar(value=self.pp_enabled)
-            menu.add_checkbutton(
-                label="Ping-pong lock (RUN first, inband stations take turns) – for all PCs",
-                variable=var, command=lambda: self._set_pingpong(bool(var.get())),
-            )
-            menu.add_command(
-                label="Ping-pong release time…  ({})".format(self._pp_limit_text()),
-                command=self._choose_pp_limit,
-            )
-        else:
-            master = self.peer_name(self._master_peer) if self._master_peer else "?"
-            menu.add_command(
-                label="Ping-pong lock: {}, release time {}  (set on master {})".format(
-                    "ON" if self.pp_enabled else "OFF – everybody may transmit",
-                    self._pp_limit_text(), master),
-                state=tk.DISABLED,
-            )
-        now_role = self._my_role_now()
-        menu.add_command(
-            label="Ping-pong role: {}  (from N1MM: Run = RUN, S&P = INB)".format(
-                now_role if now_role != "off" else "unknown"),
+            label="{}  ·  {}  ·  UDP {}  ·  v{}{}".format(
+                self.my_alias or socket.gethostname(),
+                "MASTER" if self._i_am_master else "role " + (role if role != "off" else "?"),
+                self.port, __version__, "" if frozen else " (source)"),
             state=tk.DISABLED,
         )
         menu.add_separator()
+        menu.add_command(label="My name…  ({})".format(self.my_alias or "PC name"),
+                         command=self._choose_alias)
+        menu.add_command(label="My color…  ({})".format(self.my_color or "automatic"),
+                         command=self._choose_color)
+        menu.add_separator()
+
+        # Display
+        display = tk.Menu(menu, tearoff=0)
+        display.add_checkbutton(
+            label="Compact mode", accelerator="Shift+F", variable=self.var_compact,
+            command=lambda: self.root.after(
+                50, lambda: self._set_compact(bool(self.var_compact.get()))),
+        )
+        display.add_separator()
+        for value, text in (("normal", "Lamp size: normal"), ("large", "Lamp size: large"),
+                            ("xlarge", "Lamp size: extra large")):
+            display.add_radiobutton(label=text, variable=self.var_size, value=value,
+                                    command=self._size_changed)
+        display.add_separator()
+        display.add_checkbutton(label="Night mode (dim lamp colors)", variable=self.var_night,
+                                command=self._night_changed)
+        menu.add_cascade(label="Display", menu=display)
+
+        # Calls and keys
+        calls = tk.Menu(menu, tearoff=0)
+        calls.add_checkbutton(
+            label="F12 call on  (also Shift+F2/F4 urgent, Ctrl+F2/F4 priority)",
+            variable=self.var_keys, command=self._keys_toggled,
+        )
+        calls.add_checkbutton(label="Block my F-keys while another station calls (F12)",
+                              variable=self.var_block, command=self._keys_toggled)
+        calls.add_checkbutton(label="Sound on F12 call", variable=self.var_sound,
+                              command=lambda: self.settings.set("call_sound", self.var_sound.get()))
+        menu.add_cascade(label="Calls and keys", menu=calls)
+
+        # Ping-pong lock and F12 call times: set on the master, shown elsewhere.
+        pp_menu = tk.Menu(menu, tearoff=0)
+        if self._i_am_master:
+            var = tk.BooleanVar(value=self.pp_enabled)
+            pp_menu.add_checkbutton(
+                label="Ping-pong lock (RUN first, inband stations take turns) – for all PCs",
+                variable=var, command=lambda: self._set_pingpong(bool(var.get())),
+            )
+            pp_menu.add_command(label="Ping-pong release time…  ({})".format(self._pp_limit_text()),
+                                command=self._choose_pp_limit)
+            pp_menu.add_separator()
+            pp_menu.add_command(
+                label="F12 call time, S&P…  ({:g} s, holds S&P stations)".format(self.block_limit),
+                command=lambda: self._choose_block_time(run=False))
+            pp_menu.add_command(
+                label="F12 call time, Run…  ({:g} s, holds all stations)".format(
+                    self.block_limit_run),
+                command=lambda: self._choose_block_time(run=True))
+            label = "Ping-pong and F12 times  (for all PCs)"
+        else:
+            for text in (
+                "Ping-pong lock: {}".format("ON" if self.pp_enabled
+                                            else "OFF – everybody may transmit"),
+                "Ping-pong release time: {}".format(self._pp_limit_text()),
+                "F12 call time: S&P {:g} s, Run {:g} s".format(self.block_limit,
+                                                               self.block_limit_run),
+                "(set on the master, {})".format(master),
+            ):
+                pp_menu.add_command(label=text, state=tk.DISABLED)
+            label = "Ping-pong and F12 times  (from master {})".format(master)
+        pp_menu.add_separator()
+        pp_menu.add_command(
+            label="My ping-pong role: {}  (from N1MM: Run = RUN, S&P = INB)".format(
+                role if role != "off" else "unknown"),
+            state=tk.DISABLED)
+        menu.add_cascade(label=label, menu=pp_menu)
+        menu.add_separator()
+
+        # Phone lamp and (on the master) the Overview
         menu.add_command(
             label="Phone lamp QR code…  ({})".format(
                 phone.address_text(self._phone_addrs, self.phone_port) or "no address yet")
@@ -121,73 +121,52 @@ class OptionsMixin:
             state=tk.NORMAL if self.phone_port and not self._phone_error else tk.DISABLED,
         )
         if self._i_am_master:
-            menu.add_command(
-                label="Open PingPong Overview…",
-                command=self._open_overview,
-                state=tk.DISABLED if self._busy else tk.NORMAL,
-            )
-        else:
-            master = self.peer_name(self._master_peer) if self._master_peer else "?"
-            menu.add_command(
-                label="Open PingPong Overview  (only on master {})".format(master),
-                state=tk.DISABLED,
-            )
+            menu.add_command(label="Open PingPong Overview…", command=self._open_overview,
+                             state=tk.DISABLED if self._busy else tk.NORMAL)
         menu.add_separator()
-        frozen = upd.is_frozen()
-        state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
-        menu.add_command(
-            label="Check for updates",
-            state=state,
-            command=lambda: self._check_updates(manual=True),
-        )
-        menu.add_command(
-            label="Switch version…", state=state, command=self._switch_version
-        )
-        backup = upd.find_backup(upd.exe_path()) if frozen else None
-        menu.add_command(
-            label="Revert to previous version"
-            + (" (v{})".format(backup[0]) if backup else ""),
-            state=state if backup else tk.DISABLED,
-            command=self._revert,
-        )
-        menu.add_separator()
-        menu.add_checkbutton(
-            label="Check for updates at startup",
-            variable=self.var_check,
-            command=lambda: self.settings.set(
-                "check_at_startup", self.var_check.get()
-            ),
-        )
-        menu.add_checkbutton(
-            label="Install updates automatically",
-            variable=self.var_auto,
-            command=lambda: self.settings.set(
-                "install_automatically", self.var_auto.get()
-            ),
-        )
-        menu.add_separator()
-        menu.add_command(
+
+        # Network
+        net_menu = tk.Menu(menu, tearoff=0)
+        net_menu.add_checkbutton(label="Share my N1MM with other lamps (all networks)",
+                                 variable=self.var_relay, command=self._relay_toggled)
+        net_menu.add_command(
             label="Windows Firewall: PingPong allowed ✔  (add the rule again…)"
             if self._fw_ok else "Allow PingPong in Windows Firewall…",
             state=tk.NORMAL if sys.platform == "win32" else tk.DISABLED,
             command=self._allow_firewall,
         )
-        menu.add_command(
+        net_menu.add_command(
             label="Network password…  ({})".format("ON ✔" if AUTH["key"] else "off"),
             command=self._choose_network_password,
         )
-        menu.add_checkbutton(
-            label="Diagnostics (log to file)",
-            variable=self.var_test,
-            command=self._test_toggled,
-        )
-        menu.add_separator()
-        menu.add_command(
-            label="PingPong  UDP {}  v{}{}".format(
-                self.port, __version__, "" if frozen else "  (source - updates only in exe)"
-            ),
-            state=tk.DISABLED,
-        )
+        fw = "" if self._fw_ok or sys.platform != "win32" else "  ⚠ firewall"
+        menu.add_cascade(label="Network{}{}".format(
+            "  (password ON)" if AUTH["key"] else "", fw), menu=net_menu)
+
+        # Updates
+        updates = tk.Menu(menu, tearoff=0)
+        state = tk.NORMAL if frozen and not self._busy else tk.DISABLED
+        updates.add_command(label="Check for updates now", state=state,
+                            command=lambda: self._check_updates(manual=True))
+        updates.add_command(label="Switch version…", state=state, command=self._switch_version)
+        backup = upd.find_backup(upd.exe_path()) if frozen else None
+        updates.add_command(
+            label="Revert to previous version" + (" (v{})".format(backup[0]) if backup else ""),
+            state=state if backup else tk.DISABLED, command=self._revert)
+        updates.add_separator()
+        updates.add_checkbutton(
+            label="Check for updates at startup", variable=self.var_check,
+            command=lambda: self.settings.set("check_at_startup", self.var_check.get()))
+        updates.add_checkbutton(
+            label="Install updates automatically", variable=self.var_auto,
+            command=lambda: self.settings.set("install_automatically", self.var_auto.get()))
+        if not frozen:
+            updates.add_separator()
+            updates.add_command(label="(running from source – updates only in the exe)",
+                                state=tk.DISABLED)
+        menu.add_cascade(label="Updates", menu=updates)
+        menu.add_checkbutton(label="Diagnostics (log to file)", variable=self.var_test,
+                             command=self._test_toggled)
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:

@@ -227,7 +227,7 @@ class AdminMixin:
 
     def _choose_network_password(self):
         text = simpledialog.askstring(
-            TITLE, "Network password – the same as on the lamps (Options ▾ → Network password…).\n"
+            TITLE, "Network password – the same as on the lamps (Options ▾ → Network → Network password…).\n"
             "Empty = off (currently: {}).".format("ON" if pp.AUTH["key"] else "off"),
             show="*", parent=self.root)
         if text is None:

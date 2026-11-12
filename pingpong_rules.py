@@ -454,8 +454,8 @@ class RulesMixin:
                             "firewall".format(st.label))
             else:
                 rows.append(
-                    "{}: no PingPong heard – firewall? Options ▾ → Allow PingPong in "
-                    "Windows Firewall".format(st.label)
+                    "{}: no PingPong heard – firewall? Options ▾ → Network → Allow "
+                    "PingPong in Windows Firewall".format(st.label)
                 )
         return rows
 

@@ -75,9 +75,7 @@ class WebMixin:
         threading.Thread(target=work, daemon=True).start()
 
     def _firewall_checked(self, found):
-        self.fw_open = found
-        if found:
-            self.fw_button.pack_forget()
+        self.fw_open = found  # Settings ▾ and the bottom line show it
 
     def _allow_firewall(self):
         """Let other PCs / phones open the web page (asks for admin)."""

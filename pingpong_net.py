@@ -510,7 +510,7 @@ def accepted(status):
     return status in ("none", "foreign")
 
 
-def auth_problems(now, local=(), within=30.0, where="Options ▾ → Network password…"):
+def auth_problems(now, local=(), within=30.0, where="Options ▾ → Network → Network password…"):
     """Short texts about rejected messages in the last `within` seconds."""
     out = []
     labels = {

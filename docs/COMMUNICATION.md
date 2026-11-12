@@ -445,7 +445,7 @@ Defender and publishes release `v<version>` with notes from
 | Lamp never lights | N1MM → lamp (12062) | N1MM *Broadcast Data* → *Radio* ticked, its line must include `127.0.0.1:12062`; band/mode supported |
 | Red `⚠ UDP 12062 also used by …` | N1MM → lamp (12062) | another program on the PC listens on the lamp's port and gets N1MM's `127.0.0.1` packets instead – give one of them another port (`--port`) and add it to N1MM's Broadcast Data → Radio line |
 | `RUN2: N1MM not reaching here` | N1MM RUN2 → this lamp | the Broadcast Data → Radio line in RUN2's N1MM |
-| Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
+| Other lamps never react to F12 | lamp ↔ lamp (46070) | firewall on the receiving PC (**Options ▾ → Network → Allow PingPong in Windows Firewall…**), same version on all PCs; **Diagnostics** shows what each lamp reports |
 | `PC5: no PingPong heard – firewall?` | lamp ↔ lamp (46070) | N1MM data arrives but no other lamp does: this PC's firewall blocks 46070 |
 | `RUN2: v1.67 – update it` | – | every lamp compares `<Version>` from the hellos with its own; Overview: **Update all lamps…** |
 | F12 does nothing locally | keyboard → lamp | N1MM must be the active window; if N1MM runs as administrator, run PingPong as administrator too |

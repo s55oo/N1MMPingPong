@@ -490,15 +490,13 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         emergency.pack(**pad)
         self.update_all_button = tk.Button(row2, text="Update all lamps…", command=self._update_all)
         self.update_all_button.pack(**pad)
-        setup = tk.Menubutton(row2, text="Setup ▾", relief=tk.RAISED)
-        setup_menu = tk.Menu(setup, tearoff=0)
-        setup_menu.add_command(label="Save setup… (names, colors, master settings)",
-                               command=self._save_setup)
-        setup_menu.add_command(label="Restore setup…", command=self._restore_setup)
-        setup_menu.add_separator()
-        setup_menu.add_command(label="Network password…", command=self._choose_network_password)
-        setup.configure(menu=setup_menu)
-        setup.pack(**pad)
+        # Settings: station setup, network password, web page firewall, window.
+        self.var_top = tk.BooleanVar(value=self.cfg.get("window", "on_top", fallback="no") == "yes")
+        self.settings_button = tk.Menubutton(row2, text="Settings ▾", relief=tk.RAISED)
+        self.settings_menu = tk.Menu(self.settings_button, tearoff=0,
+                                     postcommand=self._fill_settings_menu)
+        self.settings_button.configure(menu=self.settings_menu)
+        self.settings_button.pack(**pad)
         # Statistics: reset now, or at the contest start (planned, shown on the button).
         self.stats_button = tk.Menubutton(row2, text="Statistics ▾", relief=tk.RAISED)
         self.stats_menu = tk.Menu(self.stats_button, tearoff=0, postcommand=self._fill_stats_menu)
@@ -510,14 +508,6 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                                        bg="#ffe08a")
         self._update_slot = tk.Frame(row2)  # keeps the yellow button's place in the row
         self._update_slot.pack(side=tk.LEFT)
-        # Hidden as soon as the firewall rule for the web page is found.
-        self.fw_button = tk.Button(row2, text="Allow web page in firewall…",
-                                   command=self._allow_firewall)
-        if self.web_port and sys.platform == "win32":
-            self.fw_button.pack(**pad)
-        self.var_top = tk.BooleanVar(value=self.cfg.get("window", "on_top", fallback="no") == "yes")
-        tk.Checkbutton(row2, text="Always on top", variable=self.var_top,
-                       command=self._on_top).pack(side=tk.LEFT)
         self._pp_sent = 0.0
         self._on_top(save=False)
 
@@ -632,6 +622,25 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     c.create_text(x + cw / 2, y + ch / 2, text="{:g}'".format(v),
                                   font=("Segoe UI", 8), fill="white" if share > 0.5 else "#222")
         c.configure(height=max(60, top + len(act["heat"]) * ch + 6))
+
+    def _fill_settings_menu(self):
+        """Settings ▾, built when opened so it shows the current state."""
+        m = self.settings_menu
+        m.delete(0, tk.END)
+        m.add_command(label="Save setup…  (names, colors, master settings)",
+                      command=self._save_setup)
+        m.add_command(label="Restore setup…", command=self._restore_setup)
+        m.add_separator()
+        m.add_command(label="Network password…  ({})".format("ON ✔" if pp.AUTH["key"] else "off"),
+                      command=self._choose_network_password)
+        if self.web_port and sys.platform == "win32":
+            m.add_command(
+                label="Web page in Windows Firewall: allowed ✔  (add the rule again…)"
+                if self.fw_open else "Allow web page in Windows Firewall…  (TCP {})".format(
+                    self.web_port),
+                command=self._allow_firewall)
+        m.add_separator()
+        m.add_checkbutton(label="Always on top", variable=self.var_top, command=self._on_top)
 
     def _on_top(self, save=True):
         self.root.attributes("-topmost", bool(self.var_top.get()))
@@ -800,7 +809,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         for band, slot in sorted(slots.items(), key=lambda s: band_sort(s[0])):
             if not pp.pp_expired(slot[1], now, self._pp_limit()) and slot[0] in self.lamps:
                 notes.append("ping-pong {} MHz: slot held by {}".format(band, self.lamps[slot[0]].name()))
-        for text in pp.auth_problems(now, where="Setup ▾ → Network password…"):
+        for text in pp.auth_problems(now, where="Settings ▾ → Network password…"):
             warn = True
             notes.insert(0, "⚠ " + text)
         no_relay = [l.name() for l in live if now - l.radio_seen > 30]
@@ -900,6 +909,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         if time.time() - self._stats_saved > STATS_SAVE:
             self._save_stats()
         notes = list(snap["notes"])
+        if self.fw_open is False and self.web_port:
+            notes.append("web page: other devices need Settings ▾ → Allow web page in Windows Firewall")
         if self.reset_at:
             notes.insert(0, "statistics reset planned: {} (in {})".format(
                 fmt_when(self.reset_at), ago(max(0, self.reset_at - time.time()))))
