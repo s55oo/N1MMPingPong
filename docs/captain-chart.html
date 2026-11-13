@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PingPong – captain's quick chart</title>
+<style>
+  @page { size: A4; margin: 9mm 11mm 8mm; }
+  * { box-sizing: border-box; }
+  body { font: 9pt/1.27 "Segoe UI", "Inter", Arial, sans-serif; color: #1d2330; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: baseline;
+           border-bottom: 2px solid #1d2330; padding-bottom: 4px; margin-bottom: 7px; }
+  h1 { font-size: 17pt; margin: 0; letter-spacing: -0.2px; }
+  header span { color: #555; font-size: 9pt; }
+  h2 { font-size: 10.6pt; margin: 7px 0 4px; padding-left: 6px; border-left: 4px solid #3b82f6; }
+  .phase h2 { border-left-color: var(--c); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border-bottom: 1px solid #e3e6eb; padding: 2px 5px; vertical-align: top; text-align: left; }
+  th { font-size: 8.2pt; color: #555; font-weight: 600; border-bottom: 1px solid #c9ced6; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 2px; }
+  .phase { border: 1px solid #dde1e7; border-radius: 6px; padding: 4px 7px 6px; }
+  .phase h2 { margin-top: 2px; }
+  ol { margin: 0; padding-left: 15px; } li { margin: 2px 0; }
+  kbd { font: 600 8.4pt "Segoe UI", Arial, sans-serif; border: 1px solid #b8bec8; border-bottom-width: 2px;
+        border-radius: 3px; padding: 0 4px; background: #f6f7f9; white-space: nowrap; }
+  code { font: 8.4pt Consolas, monospace; background: #f3f5f8; padding: 0 3px; border-radius: 3px; }
+  .btn { display: inline-block; border: 1px solid #9aa3ae; border-radius: 3px; padding: 0 5px;
+         background: #f3f5f8; font-weight: 600; font-size: 8.4pt; white-space: nowrap; }
+  .row { display: inline-block; min-width: 92px; padding: 2px 6px; border-radius: 3px;
+         font-weight: 700; font-size: 8.4pt; text-align: center; white-space: nowrap; }
+  .note { color: #555; font-size: 8.3pt; }
+  footer { margin-top: 7px; border-top: 1px solid #c9ced6; padding-top: 4px; color: #555; font-size: 8pt;
+           display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header><h1>PingPong – captain's quick chart</h1><span>master PC + Overview · N1MM Logger+ multi-op · S55OO</span></header>
+
+<div class="steps">
+  <div class="phase" style="--c:#8957e5">
+    <h2>1 · Once, every PC</h2>
+    <ol>
+      <li>N1MM: Config → Configure Ports… → <b>Broadcast Data</b> → <b>Radio</b> ticked, line <code>127.0.0.1:12060 127.0.0.1:12062</code>.</li>
+      <li>Start <code>n1mm_lamps.exe</code>.</li>
+      <li>Options ▾ → <b>My name…</b> (RUN1, INB1 …).</li>
+      <li>Options ▾ → Network → <b>Allow PingPong in Windows Firewall…</b></li>
+      <li>VPN / ZeroTier adapter set to <b>Private</b> in Windows.</li>
+    </ol>
+  </div>
+  <div class="phase" style="--c:#3b82f6">
+    <h2>2 · Before the start</h2>
+    <ol>
+      <li>Master lamp: Options ▾ → <b>Open PingPong Overview…</b></li>
+      <li><span class="btn">Update all lamps…</span> until <code>All lamps v… ✔</code>.</li>
+      <li>Optional: network password on the master lamp – others click the red <code>🔒</code> line.</li>
+      <li><span class="btn">Ready check</span> → every row <b>green</b>.</li>
+      <li><span class="btn">Test all lamps</span> – each flashes its own name.</li>
+      <li><span class="btn">Statistics ▾</span> → <b>Reset at contest start…</b> (Sat 01:00).</li>
+    </ol>
+  </div>
+  <div class="phase" style="--c:#2ea043">
+    <h2>3 · During</h2>
+    <ol>
+      <li>Watch the table (colors below) – or the web page on a phone: <code>http://&lt;master&gt;:8046</code>.</li>
+      <li>Alarm <code>🔔 NOT HEARD</code> → check that PC → <span class="btn">Silence alarm</span>.</li>
+      <li>PC gone for good → right-click its row → <b>Remove from the list</b>.</li>
+      <li><span class="btn">Ping-pong lock: ON/OFF</span> for all PCs.</li>
+      <li>Lamps stuck → <span class="btn" style="color:#b00020">Emergency ▾</span> → restart all (asks twice).</li>
+    </ol>
+  </div>
+  <div class="phase" style="--c:#d29922">
+    <h2>4 · After</h2>
+    <ol>
+      <li>Activity tab → <span class="btn">Contest report…</span> (opens in the browser – print or save as PDF).</li>
+      <li><span class="btn">Statistics ▾</span> → <b>Save CSV…</b> for the raw numbers.</li>
+      <li><span class="btn">Settings ▾</span> → <b>Save setup…</b> – names, colors, master settings for next time.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="cols">
+<div>
+<h2>Overview – what the rows mean</h2>
+<table>
+  <tr><td style="width:112px"><span class="row" style="background:#3fb950;color:#fff">✔ READY</span></td><td>Before operating: ready.</td></tr>
+  <tr><td><span class="row" style="background:#8b1a1a;color:#fff">problem</span></td><td>Before operating: not ready – reason in <b>Check</b>.</td></tr>
+  <tr><td><span class="row" style="background:#1f6feb;color:#fff">TX CQ</span></td><td>Transmitting – row in the station's color.</td></tr>
+  <tr><td><span class="row" style="background:#ffe08a;color:#000">F12 call</span></td><td>An F12 call is on.</td></tr>
+  <tr><td><span class="row" style="background:#ff3030;color:#fff">URGENT</span></td><td>Shift/Ctrl+F2/F4 (URGENT / PRIORITY) – flashes.</td></tr>
+  <tr><td><span class="row" style="background:#c00000;color:#fff">🔔 not heard</span></td><td>Operating station silent 30 s – alarm + beep.</td></tr>
+  <tr><td><span class="row" style="color:#999;border:1px solid #ddd">grey</span></td><td>Not heard (12 s +) – not operating yet.</td></tr>
+</table>
+<p class="note" style="margin:3px 0 0">★ = master · <b>Ping</b> column: ms to each lamp every 5 min (red = lost or over 500 ms).</p>
+
+<h2>Buttons</h2>
+<table>
+  <tr><td style="width:112px"><b>Row 1</b></td><td>Ping-pong lock · Ready check · Test all lamps · Emergency ▾ (restart / stop all)</td></tr>
+  <tr><td><b>Row 2</b></td><td>Update all lamps… · <b>Settings ▾</b> (save/restore setup, network password, web page firewall, always on top) · <b>Statistics ▾</b> (reset now / at contest start, contest report, CSV)</td></tr>
+  <tr><td><b>Tabs</b></td><td>Stations · Function keys · Activity (waits, calls, ping, TX per hour, event log)</td></tr>
+</table>
+</div>
+<div>
+<h2>Keys (operators)</h2>
+<table>
+  <tr><td style="width:112px"><kbd>F12</kbd></td><td>Hold-off call: S&amp;P → S&amp;P stations (30 s); Run → all (5 s)</td></tr>
+  <tr><td><kbd>Shift</kbd>+<kbd>F2</kbd>/<kbd>F4</kbd></td><td>Urgent: sends F2/F4, flashes on the band</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>F2</kbd>/<kbd>F4</kbd></td><td>Priority: others stopped (Esc) and held, then F2/F4</td></tr>
+</table>
+<p class="note" style="margin:3px 0 0">Times and the ping-pong lock are set on the master lamp: Options ▾ → Ping-pong and F12 times.</p>
+
+<h2>Quick fixes</h2>
+<table>
+  <tr><td style="width:44%"><code>no data from this PC's N1MM</code></td><td>Broadcast Data → Radio line incl. <code>127.0.0.1:12062</code></td></tr>
+  <tr><td><code>no PingPong heard – firewall?</code></td><td>Firewall rule; VPN adapter <b>Private</b></td></tr>
+  <tr><td><code>⚠ TWO MASTERS</code> / versions</td><td>Update all lamps…; check the network</td></tr>
+  <tr><td><code>🔒</code> / <code>🔓</code> red line</td><td>Click it: enter / remove the network password</td></tr>
+  <tr><td>Remote PCs missing</td><td>ZeroTier or OpenVPN <b>TAP</b> only (no TUN / WireGuard / Tailscale)</td></tr>
+</table>
+
+<h2>Ports</h2>
+<table>
+  <tr><td style="width:112px">UDP <b>12062</b></td><td>N1MM → lamp (same PC)</td></tr>
+  <tr><td>UDP <b>46070</b></td><td>lamps ↔ lamps ↔ Overview</td></tr>
+  <tr><td>TCP <b>8046</b> / <b>8047</b></td><td>Overview web page / phone lamp (read only)</td></tr>
+</table>
+</div>
+</div>
+
+<footer><span>PingPong · github.com/s55oo/N1MMPingPong · operator sheet: PingPong-cheat-sheet.pdf</span><span>Not a hardware interlock – N1MM's own interlock still applies.</span></footer>
+</body>
+</html>

@@ -2,7 +2,8 @@
 
 One page for every operating position. **Printable PDF:**
 [PingPong-cheat-sheet.pdf](PingPong-cheat-sheet.pdf) (A4). Full manual:
-[README](../README.md).
+[README](../README.md). For the captain (master PC): the
+[captain's quick chart](PingPong-captain-chart.pdf).
 
 ## 1. What the lamp shows
 

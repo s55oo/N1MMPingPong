@@ -20,7 +20,8 @@ themselves on the LAN, over Wi-Fi or over a VPN such as ZeroTier.
 Download: [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest).
 Full manual: [README](../README.md). How it talks on the network:
 [COMMUNICATION](COMMUNICATION.md). For the operators: a one-page
-[cheat sheet](CHEATSHEET.md) ([PDF to print](PingPong-cheat-sheet.pdf)).
+[cheat sheet](CHEATSHEET.md) ([PDF to print](PingPong-cheat-sheet.pdf)); for the
+captain a one-page [quick chart](PingPong-captain-chart.pdf).
 
 ---
 

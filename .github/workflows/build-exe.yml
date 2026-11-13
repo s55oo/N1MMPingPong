@@ -65,9 +65,11 @@ jobs:
       # a download by hand. The updaters also verify every download.
       - name: SHA-256
         run: |
-          if (Test-Path docs/PingPong-cheat-sheet.pdf) { Copy-Item docs/PingPong-cheat-sheet.pdf dist/ }
+          foreach ($pdf in "PingPong-cheat-sheet.pdf", "PingPong-captain-chart.pdf") {
+            if (Test-Path "docs/$pdf") { Copy-Item "docs/$pdf" dist/ }
+          }
           $lines = @()
-          foreach ($f in "n1mm_lamps.exe", "pingpong_overview.exe", "PingPong-cheat-sheet.pdf") {
+          foreach ($f in "n1mm_lamps.exe", "pingpong_overview.exe", "PingPong-cheat-sheet.pdf", "PingPong-captain-chart.pdf") {
             if (-not (Test-Path "dist\$f")) { continue }
             $h = (Get-FileHash "dist\$f" -Algorithm SHA256).Hash.ToLower()
             $lines += "$h *$f"
@@ -134,9 +136,11 @@ jobs:
           }
           gh release upload $tag dist/n1mm_lamps.exe dist/pingpong_overview.exe dist/SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          # The operator cheat sheet (one A4 page) goes with every release too.
-          if (Test-Path dist/PingPong-cheat-sheet.pdf) {
-            gh release upload $tag dist/PingPong-cheat-sheet.pdf --repo $env:GITHUB_REPOSITORY --clobber
-            if ($LASTEXITCODE -ne 0) { exit 1 }
+          # The one-page sheets (operators, captain) go with every release too.
+          foreach ($pdf in "PingPong-cheat-sheet.pdf", "PingPong-captain-chart.pdf") {
+            if (Test-Path "dist/$pdf") {
+              gh release upload $tag "dist/$pdf" --repo $env:GITHUB_REPOSITORY --clobber
+              if ($LASTEXITCODE -ne 0) { exit 1 }
+            }
           }
           "Released $tag" >> $env:GITHUB_STEP_SUMMARY

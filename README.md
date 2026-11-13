@@ -4,6 +4,7 @@
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
+> **For the captain (master PC):** one-page quick chart – setup, before / during / after the contest, Overview colors and buttons, quick fixes – [printable PDF](docs/PingPong-captain-chart.pdf).
 
 PingPong shows which computer/station on the network is currently
 **transmitting**. It listens to the N1MM Logger+ external UDP broadcast
@@ -1020,7 +1021,8 @@ yet, it creates the tag and the release, with notes from
 `releases/v<version>.md`, and attaches both freshly built EXEs
 (`n1mm_lamps.exe`, `pingpong_overview.exe`; the lamp's updater only
 uses `n1mm_lamps.exe`, the Overview's `pingpong_overview.exe`), the
-operator cheat sheet `PingPong-cheat-sheet.pdf` and **`SHA256SUMS.txt`**
+operator cheat sheet `PingPong-cheat-sheet.pdf`, the captain's quick chart
+`PingPong-captain-chart.pdf` and **`SHA256SUMS.txt`**
 with the SHA-256 of each file. The hashes are also written at the end of
 the release notes.
 
@@ -1060,7 +1062,7 @@ pingpong_report.py  – Overview: after-contest report (HTML)
 tests/              – automated tests (run on every push; test_windows.py
                       checks the Windows-only parts on the Windows build runner)
 tools/make_version_info.py – Windows version info for the exes
-tools/make_cheatsheet_pdf.py – docs/cheatsheet.html → PingPong-cheat-sheet.pdf
+tools/make_cheatsheet_pdf.py – the one-page sheets in docs/ → PDF (cheat sheet, captain's chart)
 n1mm_watch.py       – traffic watcher (source)
 PingPong.bat        – watcher launcher
 build_exe.bat       – local one-click EXE build
@@ -1077,6 +1079,7 @@ lamps.example.cfg   – example for lamps.cfg
 releases/vX.Y.md    – release notes, one file per version
 docs/SUMMARY.md     – what PingPong does, on one page
 docs/CHEATSHEET.md  – operator cheat sheet (and PingPong-cheat-sheet.pdf, from cheatsheet.html)
+docs/captain-chart.html – captain's quick chart (→ PingPong-captain-chart.pdf)
 docs/contest-report.png – example contest report
 docs/COMMUNICATION.md – how it communicates (diagrams)
 docs/communication.svg – overview diagram
