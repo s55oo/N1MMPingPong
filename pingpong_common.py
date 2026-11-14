@@ -282,6 +282,56 @@ def packet_info(data):
     return True, caption, station, is_tx, freq, mode
 
 
+SHARED_TAIL = 1.75  # s: PTT tail (~200 ms) + break-in delay of a shared radio
+
+
+class SharedTx:
+    """Several PCs whose N1MMs share ONE radio (e.g. a virtual radio) all
+    report IsTransmitting=True on the same frequency while only one of them
+    keys. This tracker gives the transmission to one PC and ignores the
+    others' TX flag, per frequency:
+
+    - the first PC to report TX owns the frequency (a PC whose packet has a
+      message caption wins over an owner without one);
+    - the others' TX is ignored while the owner transmits and for SHARED_TAIL
+      seconds after its last TX;
+    - TX on different frequencies is never touched, so separate radios on the
+      same band are not affected.
+    """
+
+    def __init__(self, tail=SHARED_TAIL):
+        self.tail = tail
+        self.owners = {}  # tx frequency text -> state of its owner
+
+    def _active(self, o, now, stale):
+        if o["on"]:
+            return now - o["seen"] <= stale
+        return now - o["end"] <= self.tail
+
+    def filter(self, who, tx, freq, caption, now, stale=DEFAULT_STALE):
+        """Effective TX flag for one packet of `who` (any hashable)."""
+        if not freq:
+            return tx
+        o = self.owners.get(freq)
+        if o is not None and o["who"] != who and not self._active(o, now, stale):
+            o = None
+        if o is None:
+            if tx:
+                self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0, "msg": caption}
+            return tx
+        if o["who"] == who:
+            if tx:
+                o["on"], o["seen"] = True, now
+                o["msg"] = caption or o["msg"]
+            elif o["on"]:
+                o["on"], o["end"] = False, now
+            return tx
+        if tx and caption and not o["msg"]:  # the one that really sent a message
+            self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0, "msg": caption}
+            return True
+        return False
+
+
 class RadioState:
     """One radio's state. PC identity/color stay on the containing Station."""
 
@@ -308,7 +358,8 @@ class RadioSet:
         self.radios = {}
         self.active_nr = self.focus_nr = None
 
-    def update(self, data, now, stale=DEFAULT_STALE):
+    def update(self, data, now, stale=DEFAULT_STALE, guard=None, pc=None):
+        """guard: a SharedTx shared by all PCs; pc: this PC's identity."""
         try:
             root = ET.fromstring(data[data.find(b"<"):])
         except (ET.ParseError, ValueError):
@@ -337,6 +388,10 @@ class RadioSet:
         radio = self.radios.setdefault(nr, RadioState(nr))
         was_tx = radio.tx and now - radio.last_seen <= stale
         _, caption, _, tx, freq, mode = packet_info(data)
+        if guard is not None and pc is not None:
+            tf = (root.findtext("TXFreq") or "").strip()
+            tf = tf if re.fullmatch(r"0*[1-9][0-9]*", tf) else (freq or radio.rx_freq)
+            tx = guard.filter((pc, nr), tx, tf, caption, now, stale)
         started = tx and not was_tx
         ended = copy.copy(radio) if was_tx and not tx else None
         if started:

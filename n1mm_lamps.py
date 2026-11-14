@@ -179,6 +179,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self._hexcache = {}
         self._fw_ok = None  # our firewall rule(s) present: True / False / None = unknown
         self.stale = stale
+        self._shared = SharedTx()  # PCs sharing one radio
         self.config_path = config_path
         self.hints = read_config(config_path)
         self.local_nets = set(local_interfaces())
@@ -390,7 +391,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             station.label = station_name or station.label
         if is_radio:
             radios = station.__dict__.setdefault("radios", RadioSet())
-            event = radios.update(data, time.time(), self.stale)
+            event = radios.update(data, time.time(), self.stale,
+                                  guard=self._shared, pc=station.ip)
             if event is None:
                 return
             radio, started, ended = event

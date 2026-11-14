@@ -696,6 +696,21 @@ PC, kept by updates.
 
 ---
 
+### Several PCs on one shared radio
+
+If the N1MMs of two or more PCs share **one** radio (for example through a
+virtual radio such as N1MM_vRadio2), every N1MM sees the radio transmit and
+reports `IsTransmitting=True` on the same frequency, although only one PC
+keys. PingPong gives the transmission to one PC and ignores the others' TX
+flag on that frequency:
+
+- the first PC to report TX owns it (a PC whose packet has a message caption
+  wins over an owner without one);
+- the others stay ignored while the owner transmits, and for 1.75 s after its
+  last TX (PTT tail and break-in delay);
+- TX on different frequencies is never touched, so separate radios (also on
+  the same band) are not affected. It works by itself, with nothing to set.
+
 ### SO2R radio selection
 
 PingPong keeps separate status for `RadioNr` 1 and 2 under one PC identity
