@@ -132,29 +132,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 lamp.src = lamp.src or src
                 if station:
                     lamp.n1mm_name = station
-                if freq:
-                    lamp.freq = freq
-                if mode:
-                    lamp.mode = mode
-                running = pp.radio_running(payload)
-                if running is not None:
-                    lamp.running = running
-                if is_tx and not lamp.tx:
-                    lamp.tx_start = now
-                    self._pingpong_tx(lamp, now)
-                    self.operating.add(lamp.stats_key())  # ready check ends for it
-                    self._count_key(lamp, payload, caption)
-                if not is_tx and lamp.tx:
-                    lamp.last_tx_end = now
-                    dur = min(now - lamp.tx_start, 600.0)
-                    st = self._stat(lamp)
-                    st["tx_time"] += dur
-                    hour = time.strftime("%Y-%m-%d %H", time.localtime(lamp.tx_start))
-                    st["hours"][hour] = st["hours"].get(hour, 0.0) + dur
-                if is_tx and caption:
-                    lamp.caption = caption
-                    lamp.last_caption = caption
-                lamp.tx = is_tx
+                if lamp.radios.update(payload, now) is not None:
+                    self._sync_radio(lamp, now)
             return
         info = pp.parse_hello(data)
         if info:
@@ -173,6 +152,37 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     lamp.gone = False
                     self._event(lamp.name(), "lamp heard again")
                 self._track_activity(lamp, info, now)
+
+    def _sync_radio(self, lamp, now):
+        """Project SO2R to one PC row and count actual TX transitions only."""
+        radio = lamp.radios.select(now)
+        is_tx = bool(radio and radio.tx)
+        identity = (radio.radio_nr, radio.tx_start) if is_tx else None
+        old_identity = getattr(lamp, "_tx_identity", None)
+        if lamp.tx and old_identity != identity:
+            end = min(now, lamp.radio_data_seen + pp.DEFAULT_STALE)
+            lamp.last_tx_end = end
+            lamp.last_caption = lamp.caption
+            dur = min(max(0.0, end - lamp.tx_start), 600.0)
+            st = self._stat(lamp)
+            st["tx_time"] += dur
+            hour = time.strftime("%Y-%m-%d %H", time.localtime(lamp.tx_start))
+            st["hours"][hour] = st["hours"].get(hour, 0.0) + dur
+        lamp.tx = is_tx
+        lamp.running = radio.running if radio else None
+        if radio:
+            lamp.freq, lamp.mode = radio.freq, radio.mode
+            lamp.radio_nr = radio.radio_nr
+            lamp.radio_data_seen = radio.last_seen
+            if is_tx:
+                lamp.caption = radio.msg
+                lamp.last_caption = radio.msg
+                lamp.tx_start = radio.tx_start
+        if is_tx and old_identity != identity:
+            self._pingpong_tx(lamp, now)
+            self.operating.add(lamp.stats_key())
+            self._count_key(lamp, radio.payload, radio.msg)
+        lamp._tx_identity = identity
 
     def _replace_old(self, lamp):
         """One row per PC: a restarted lamp (e.g. after an update) has a new
@@ -404,7 +414,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         if not key:
             return
         band = key[0]
-        role = lamp.hello.get("role", "")
+        role = ({True: "RUN", False: "INB"}.get(lamp.running)
+                or lamp.hello.get("role", ""))
         if role == "RUN":
             self.slots.pop(band, None)
         elif role == "INB":
@@ -668,6 +679,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
     # ------------------------------------------------------------ table data
 
     def _row(self, lamp, now, masters, target=""):
+        if lamp.radios.radios:
+            self._sync_radio(lamp, now)
         h = lamp.hello
         problems = self._problems(lamp, now, masters, target)
         ready_mode = lamp.stats_key() not in self.operating
@@ -676,7 +689,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         status = h.get("status", "")
         live = now - max(lamp.hello_seen, lamp.radio_seen)
         tx = ""
-        if lamp.tx and now - lamp.radio_seen < 10:
+        if lamp.tx and now - lamp.radio_data_seen <= pp.DEFAULT_STALE:
             tx = "TX  {}  ({})".format(lamp.caption or "?", ago(now - lamp.tx_start))
         last = ""
         if lamp.last_caption and lamp.last_tx_end:
@@ -705,7 +718,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             "mode": mode,
             "freq": pp.freq_khz(lamp.freq) if lamp.freq and now - lamp.radio_seen < 60 else "",
             "run": {True: "Run", False: "S&P", None: "?"}[lamp.is_running()],
-            "role": h.get("role", "") or "–",
+            "role": ({True: "RUN", False: "INB"}.get(lamp.running)
+                     if lamp.radios.radios else None) or h.get("role", "") or "–",
             "tx": tx,
             "last": last,
             "calls": ", ".join(calls),

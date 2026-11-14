@@ -130,7 +130,7 @@ class PhoneMixin:
         }
         owners = self._color_owners(now)
         groups = {}
-        for st in list(self.stations.values()):
+        for st in self._radio_stations(now):
             if st.key is None or now - st.last_seen > 60:
                 continue
             groups.setdefault(st.key, []).append(st)

@@ -141,8 +141,17 @@ class RulesMixin:
             return
         ip = self._canon_ip(src)
         station = self.stations.get(ip)
-        if station is not None and time.time() - station.direct_seen < DIRECT_RECENT:
-            return  # N1MM's own broadcast reaches us: use that
+        if station is not None:
+            direct_seen = station.direct_seen
+            if hasattr(station, "radios"):
+                probe = RadioSet()
+                event = probe.update(data, time.time(), self.stale)
+                if event is None:
+                    return
+                radio = station.radios.radios.get(event[0].radio_nr)
+                direct_seen = getattr(radio, "direct_seen", 0.0)
+            if time.time() - direct_seen < DIRECT_RECENT:
+                return  # prefer direct data for this radio, not the whole PC
         self.on_packet(ip, data, relayed=True)
 
     def _canon_ip(self, src):
@@ -490,6 +499,7 @@ class RulesMixin:
         self.urgent_fkey = fkey
         self.urgent_key = (mine.key[0], mine.key[1])
         self._urgent_tx_seen = False
+        self._urgent_radio = getattr(mine, "radio_nr", None)
         self.urgent_time = time.time()
         self.hello_now.set()
         if self.test_on:
@@ -514,6 +524,7 @@ class RulesMixin:
         self.urgent_fkey = fkey
         self.urgent_key = (mine.key[0], mine.key[1])
         self._urgent_tx_seen = False
+        self._urgent_radio = getattr(mine, "radio_nr", None)
         self.urgent_time = time.time()
         self.hello_now.set()  # the others stop at once
         self._key_event("Ctrl+{} priority call ({} {})".format(fkey, *self.urgent_key))
@@ -578,7 +589,13 @@ class RulesMixin:
             return
         mine = self._local_station()
         tx = mine is not None and mine.tx
+        nr = getattr(self, "_urgent_radio", None)
+        if mine is not None and hasattr(mine, "radios") and nr is not None:
+            radio = mine.radios.radios.get(nr)
+            tx = bool(radio and radio.tx and now - radio.last_seen <= self.stale)
         if tx:
+            if nr is None and mine is not None:
+                self._urgent_radio = getattr(mine, "radio_nr", None)
             self._urgent_tx_seen = True
             return
         if self._urgent_tx_seen:
@@ -625,12 +642,17 @@ class RulesMixin:
     def _local_station(self):
         """This PC's own N1MM station (most recently heard), or None."""
         mine = [st for st in list(self.stations.values()) if st.ip in self.local]
+        for st in mine:
+            if hasattr(st, "radios"):
+                st.radios.project(st, time.time(), self.stale)
         if not mine:
             return None
         return max(mine, key=lambda st: st.last_seen)
 
     def role_of(self, st):
         """Ping-pong role of an N1MM station: "RUN", "INB" or ""."""
+        if hasattr(st, "radio_nr") and st.running is not None:
+            return "RUN" if st.running else "INB"
         if st.ip in self.local:
             role = self._my_role_now()
             return role if role != "off" else ""
@@ -722,8 +744,19 @@ class RulesMixin:
             out.append(note.replace(" – lock off", ""))
         return out
 
-    def _run_on_band(self, band, now):
+    def _radio_stations(self, now):
+        """Per-radio views for band rules/phone; PC identity is unchanged."""
         for st in list(self.stations.values()):
+            if not hasattr(st, "radios"):
+                yield st  # legacy/synthetic single-radio state
+                continue
+            for radio in st.radios.radios.values():
+                if now - radio.last_seen <= self.stale:
+                    radio.ip, radio.label, radio.color = st.ip, st.label, st.color
+                    yield radio
+
+    def _run_on_band(self, band, now):
+        for st in self._radio_stations(now):
             if (
                 st.key and st.key[0] == band
                 and now - st.last_seen <= STATION_FORGET
@@ -747,7 +780,8 @@ class RulesMixin:
             return False, None  # this PC holds the slot
         if self._run_on_band(band, now) is None:
             return False, None  # no RUN known on this band: no lock
-        holder = self.stations.get(slot[0])
+        holder = next((st for st in self._radio_stations(now)
+                       if st.ip == slot[0] and st.key and st.key[0] == band), None)
         self._pp_left = (  # 0 = no time release: no countdown
             max(1, int(self.pp_limit - (now - slot[1]) + 0.999)) if self.pp_limit > 0 else 0)
         return True, holder
@@ -857,10 +891,16 @@ class RulesMixin:
         return self._call_limit(peer) - (now - start)
 
     def _peer_station(self, peer):
-        for st in list(self.stations.values()):
-            if st.ip in peer.ips:
-                return st
-        return None
+        now = time.time()
+        band = peer.urgent_band if peer.urgent else peer.alert_band
+        mode = peer.urgent_mode if peer.urgent else ""
+        candidates = [st for st in self._radio_stations(now)
+                      if st.ip in peer.ips
+                      and (not band or st.key and st.key[0] == band)
+                      and (not mode or st.key and st.key[1] == mode)]
+        if candidates:
+            return max(candidates, key=lambda st: (st.tx, st.last_seen))
+        return next((st for st in self.stations.values() if st.ip in peer.ips), None)
 
     def _my_call_left(self, now):
         """Whole seconds my own F12 call still runs."""
