@@ -97,6 +97,18 @@ class LampTest(unittest.TestCase):
         app.on_vradio(share("none", seq=2))
         self.assertFalse(app._local_station().tx)
 
+    def test_diagnostics_log_shows_verdict_and_addresses(self):
+        app = make_lamp(stale=15.0, test_on=True)
+        lines = []
+        app._test_write = lines.append
+        app.local, app.local_nets = {MY_IP, "127.0.0.1", HOST}, {MY_IP, HOST}
+        app.on_packet(MY_IP, radio(False), relayed=False)
+        app.on_vradio(share("B", CLIENT))
+        text = "\n".join(lines)
+        self.assertIn("vRadioShare  Tx=B  from=" + CLIENT, text)
+        self.assertIn("=False", text)
+        self.assertIn("this PC's addresses", text)
+
     def test_without_a_share_nothing_changes(self):
         app = make_lamp(stale=15.0)
         app.on_packet(MY_IP, radio(True), relayed=False)

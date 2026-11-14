@@ -421,6 +421,23 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                 ips |= set(peer.ips)
         return ips
 
+    def _vradio_log(self, data, now):
+        """Diagnostics: what vRadio said and what it means for each PC."""
+        raw = data.decode("utf-8", errors="replace")
+
+        def field(name):
+            m = re.search(r"<{0}>(.*?)</{0}>".format(name), raw, re.S)
+            return m.group(1).strip() if m else "-"
+
+        verdicts = ", ".join(
+            "{}={}".format(st.label or st.ip, self._shared.vradio.verdict(self._pc_ips(st), now))
+            for st in list(self.stations.values()))
+        self._test_write("{}  vRadioShare  Tx={}  from={}  host={}  clients={}  ->  {}".format(
+            time.strftime("%H:%M:%S"), field("Tx"), field("TxFrom") or "-", field("Ips"),
+            field("Clients"), verdicts or "(no stations yet)"))
+        mine = ", ".join(sorted(self.local - LOOPBACK))
+        self._test_write("          this PC's addresses: {}".format(mine))
+
     @locked
     def on_vradio(self, data):
         """A vRadioShare packet: re-judge every radio with the stored data."""
@@ -428,6 +445,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         vr = self._shared.vradio
         changed = vr.feed(data, now)
         changed = vr.expire(now) or changed
+        if self.test_on and changed:
+            self._vradio_log(data, now)
         if not changed:
             return
         for station in list(self.stations.values()):
