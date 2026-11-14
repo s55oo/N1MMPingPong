@@ -698,6 +698,8 @@ PC, kept by updates.
 
 ### Several PCs on one shared radio
 
+> **Status 14 Nov 2026:** not confirmed on the real station – see [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md) (what was tried, and how to go back to v1.101).
+
 **With N1MM_vRadio2 (1.0.9+, `pcs = 2`):** vRadio sends a `vRadioShare`
 packet to UDP 46070 (every second and at each TX change) that says which PC
 really keys the radio (`Tx`, `TxFrom`). PingPong pairs the PCs by their IP
