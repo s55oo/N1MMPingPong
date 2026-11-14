@@ -83,6 +83,11 @@ class RadioInfoTest(unittest.TestCase):
         self.assertIsNone(m.group_of("701500", "FM"))
         self.assertIsNone(m.group_of("701500", None))
 
+    def test_reverse_cw_is_cw(self):
+        for mode in ("CW-R", "cw-r", "CWR", "CW-U", "CW-L", "CW"):
+            self.assertEqual(m.group_of("352310", mode), ("3.5", "CW"), mode)
+        self.assertEqual(m.group_of("352310", "FSK-R"), ("3.5", "RTTY"))
+
     def test_ssb_radio_info_usb_lsb_match(self):
         # An LSB and a USB radio on the same band are the same lamp group.
         for mode in ("LSB", "USB"):

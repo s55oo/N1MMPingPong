@@ -188,7 +188,9 @@ MODES_ALLOWED = {"CW", "RTTY", "SSB"}
 # N1MM reports phone as "SSB" (seen in RadioInfo) or USB/LSB depending on
 # radio/setup; all of them are one group so stations always match.
 # Reverse RTTY is the same operating group as normal RTTY.
-MODE_ALIASES = {"USB": "SSB", "LSB": "SSB", "RTTY-R": "RTTY"}
+MODE_ALIASES = {"USB": "SSB", "LSB": "SSB", "RTTY-R": "RTTY", "RTTYR": "RTTY",
+                "FSK": "RTTY", "FSK-R": "RTTY",
+                "CW-R": "CW", "CWR": "CW", "CW-U": "CW", "CW-L": "CW"}  # reverse CW (CW on USB)
 
 def norm_mode(mode):
     """N1MM mode text as one of CW/RTTY/SSB, or "" if unknown: case and
