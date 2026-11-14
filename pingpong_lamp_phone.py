@@ -42,7 +42,7 @@ class PhoneMixin:
             else:
                 text = ""
             if label.cget("text") != text:
-                label.configure(text=text, fg="#c00000" if self._phone_error else "#555555")
+                label.configure(text=text, fg=UI_WARN if self._phone_error else UI_DIM)
         if self.phone_port and time.time() - self._phone_req < 10.0:
             self._phone_state = self._phone_snapshot(time.time())
 

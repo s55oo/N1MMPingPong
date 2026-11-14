@@ -617,10 +617,11 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             self.root.iconphoto(True, self.app_icon)  # title bar + taskbar
         except tk.TclError:
             pass
-        frame = tk.Frame(self.root, padx=6, pady=4)
+        self.root.configure(bg=UI_BG)
+        frame = tk.Frame(self.root, padx=8, pady=6, bg=UI_BG)
         frame.pack()
-        top = tk.Frame(frame)
-        top.pack(fill=tk.X)
+        top = tk.Frame(frame, bg=UI_BG)
+        top.pack(fill=tk.X, pady=(0, 2))
         self.frame, self.top = frame, top
         self._compact = False
         self.var_compact = tk.BooleanVar(value=False)
@@ -633,16 +634,19 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.help_icon = tk.PhotoImage(
             data=base64.b64decode(HELP_ICON_B64.encode("ascii"))
         )
-        self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2")
+        self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2", bg=UI_BG)
         self.help_link.pack(side=tk.RIGHT)
         self.help_link.bind("<Button-1>", lambda e: self._open_help())
-        self.options_link = tk.Label(
-            top, text="Options ▾", font=("Segoe UI", 8), cursor="hand2"
+        self.options_link = tk.Label(  # a small "pill" button
+            top, text="Options ▾", font=("Segoe UI", 8, "bold"), cursor="hand2",
+            bg=UI_PILL, fg=UI_TEXT, padx=9, pady=2,
         )
         self.options_link.pack(side=tk.RIGHT, padx=(0, 6))
         self.options_link.bind("<Button-1>", self._show_options)
+        self.options_link.bind("<Enter>", lambda e: self.options_link.configure(bg=UI_PILL_HOVER))
+        self.options_link.bind("<Leave>", lambda e: self.options_link.configure(bg=UI_PILL))
         # Phone lamp address(es), left of Options: click opens the page.
-        self.phone_label = tk.Label(top, text="", font=("Segoe UI", 8), fg="#555555",
+        self.phone_label = tk.Label(top, text="", font=("Segoe UI", 8), fg=UI_DIM, bg=UI_BG,
                                     cursor="hand2", anchor="w", justify=tk.LEFT,
                                     wraplength=230)
         self.phone_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -658,6 +662,12 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         )
         self._window_bg = self.root.cget("bg") or "SystemButtonFace"
         self.canvas.pack(fill=tk.X)
+        # Rounded lamp: four corner pieces in the window color, drawn over
+        # the lamp's corners (they take the call border's color while it is lit).
+        self._corner_ids = [
+            self.canvas.create_polygon(0, 0, 0, 0, 0, 0, fill=self._window_bg, outline="")
+            for _ in range(4)
+        ]
         self.text_id = self.canvas.create_text(
             165, LAMP_HEIGHT / 2 + 6, text="—", font=("Segoe UI", 26, "bold"), fill="white"
         )
@@ -684,12 +694,53 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             fill="white", width=320, justify="center",
         )
         self.info = tk.Label(
-            frame, text="", font=("Segoe UI", 8), justify=tk.CENTER, wraplength=340
+            frame, text="", font=("Segoe UI", 8), justify=tk.CENTER, wraplength=340,
+            bg=UI_BG, fg=UI_TEXT,
         )
-        self.info.pack(fill=tk.X)
+        self.info.pack(fill=tk.X, pady=(2, 0))
+        self.root.after(60, self._dark_titlebar)
         self._info_fg = self.info.cget("fg")
         # Click on the line under the lamp: enter the network password when asked for.
         self.info.bind("<Button-1>", lambda e: self._password_click())
+
+    def _dark_titlebar(self):
+        """Windows 10/11: dark title bar to match the dark window."""
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+
+            self.root.update_idletasks()
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            value = ctypes.c_int(1)
+            for attr in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE (new / old Windows 10)
+                if ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        hwnd, attr, ctypes.byref(value), ctypes.sizeof(value)) == 0:
+                    break
+            # Repaint the frame (0x27 = no move / size / z-order, frame changed).
+            ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0027)
+        except Exception:
+            pass  # only looks: an old Windows keeps its light title bar
+
+    def _round_corners(self, w, h):
+        """Place the four corner pieces (see _build) for a w x h canvas."""
+        ids = getattr(self, "_corner_ids", None)
+        if not ids:
+            return
+        import math
+
+        r = max(4, int(LAMP_RADIUS * getattr(self, "scale", 1.0)))
+        x0 = y0 = CALL_BORDER
+        x1, y1 = w - CALL_BORDER, h - CALL_BORDER
+        steps = [math.radians(a) for a in range(0, 91, 10)]
+        for item, (cx, cy, sx, sy) in zip(ids, (
+            (x0, y0, 1, 1), (x1, y0, -1, 1), (x1, y1, -1, -1), (x0, y1, 1, -1),
+        )):
+            pts = [cx, cy]
+            for t in steps:  # from the corner's one side along the arc to the other
+                pts += [cx + sx * r * (1 - math.sin(t)), cy + sy * r * (1 - math.cos(t))]
+            self.canvas.coords(item, *pts)
+            self.canvas.tag_lower(item)
 
     def _rgb(self, color):
         """(r, g, b) 0-255 of any Tk color name or #rrggbb, or None."""
@@ -726,6 +777,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             color = self._shade(color)
         if self.canvas.cget("highlightbackground") != color:
             self.canvas.configure(highlightbackground=color, highlightcolor=color)
+            for item in getattr(self, "_corner_ids", ()):  # the border's inner corners
+                self.canvas.itemconfigure(item, fill=color)
 
     def _shade(self, color):
         """Night mode: the same color, darker - no dazzling lamp at night."""
@@ -794,6 +847,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.canvas.coords(self.c_freq, w - inset - 6, inset + 3)
         self.canvas.coords(self.c_info, w / 2.0, h - inset - 2)
         self.canvas.itemconfigure(self.c_info, width=max(50, w - 2 * inset - 12))
+        self._round_corners(w, h)
 
     def _toggle_compact(self, event=None):
         """Shift+F: lamp only, no title bar or margins, info drawn on the
@@ -816,10 +870,11 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         else:
             self.root.overrideredirect(False)
             self.canvas.pack_forget()
-            self.frame.configure(padx=6, pady=4)
-            self.top.pack(fill=tk.X)
+            self.frame.configure(padx=8, pady=6)
+            self.top.pack(fill=tk.X, pady=(0, 2))
             self.canvas.pack(fill=tk.X)
-            self.info.pack(fill=tk.X)
+            self.info.pack(fill=tk.X, pady=(2, 0))
+            self.root.after(60, self._dark_titlebar)  # the title bar is new again
             self.root.geometry("+{}+{}".format(x, y))
         self.root.attributes("-topmost", True)
         self.root.focus_force()
@@ -1113,7 +1168,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         if warns:
             self.info.configure(
                 text="  ·  ".join("⚠ " + w for w in warns) + "  ·  " + self.info.cget("text"),
-                fg="#c00000",
+                fg=UI_WARN,
             )
         elif self.info.cget("fg") != self._info_fg:
             self.info.configure(fg=self._info_fg)

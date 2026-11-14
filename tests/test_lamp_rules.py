@@ -661,5 +661,49 @@ class GoTextTest(unittest.TestCase):
         self.assertEqual(app.canvas.fill, "white")  # night mode: the dimmed grey, white GO
 
 
+class RoundCornersTest(unittest.TestCase):
+    """The lamp's rounded corners: four pieces that stay inside the corner squares."""
+
+    class Canvas:
+        def __init__(self):
+            self.pts, self.fills, self.border = {}, {}, "bg"
+
+        def coords(self, item, *pts):
+            self.pts[item] = pts
+
+        def tag_lower(self, item):
+            pass
+
+        def cget(self, key):
+            return self.border
+
+        def configure(self, highlightbackground=None, **kw):
+            self.border = highlightbackground
+
+        def itemconfigure(self, item, fill=None, **kw):
+            self.fills[item] = fill
+
+    def test_pieces_in_the_four_corners(self):
+        app = make_lamp(_corner_ids=[1, 2, 3, 4], scale=1.0)
+        app.canvas = self.Canvas()
+        app._round_corners(356, 126)
+        b, r = m.CALL_BORDER, m.LAMP_RADIUS
+        corners = [(b, b), (356 - b, b), (356 - b, 126 - b), (b, 126 - b)]
+        for item, (cx, cy) in zip((1, 2, 3, 4), corners):
+            pts = app.canvas.pts[item]
+            self.assertEqual(pts[:2], (cx, cy))
+            for x, y in zip(pts[::2], pts[1::2]):
+                self.assertLessEqual(abs(x - cx), r + 0.01)
+                self.assertLessEqual(abs(y - cy), r + 0.01)
+
+    def test_pieces_take_the_call_border_color(self):
+        app = make_lamp(_corner_ids=[1, 2, 3, 4], _window_bg="bg")
+        app.canvas = self.Canvas()
+        app._set_border("#1f6feb")
+        self.assertEqual(set(app.canvas.fills.values()), {"#1f6feb"})
+        app._set_border("bg")
+        self.assertEqual(set(app.canvas.fills.values()), {"bg"})
+
+
 if __name__ == "__main__":
     unittest.main()

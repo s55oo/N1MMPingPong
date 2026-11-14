@@ -145,6 +145,14 @@ FIREWALL_PHONE_RULE = "PingPong phone lamp TCP"
 SENT_ROLES = ("RUN", "INB")
 
 COLOR_IDLE = "#3a3a3a"
+# Look of the lamp window (dark theme)
+UI_BG = "#16181c"  # window background
+UI_TEXT = "#d5d9e0"  # status line
+UI_DIM = "#8b93a1"  # secondary text (phone address)
+UI_WARN = "#ff6b6b"  # warnings (readable red on the dark window)
+UI_PILL = "#2a2e36"  # the Options button
+UI_PILL_HOVER = "#3a404b"
+LAMP_RADIUS = 12  # px: rounded lamp corners at normal size
 GO_COLOR = "#3a3a3a"  # GO for inband stations: the idle lamp's grey, white "GO"
 GO_TEXT = "white"
 TEST_COLOR = "#8957e5"  # lamp test from the Overview

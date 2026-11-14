@@ -65,6 +65,25 @@ class SendKeyTest(unittest.TestCase):
         self.assertIn(keys.ctrl_down(), (True, False))
 
 
+@unittest.skipUnless(WINDOWS, "Windows only")
+class DarkTitleBarTest(unittest.TestCase):
+    def test_runs_on_a_real_window(self):
+        import tkinter as tk
+
+        import n1mm_lamps as lamps
+
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no desktop on this runner")
+        try:
+            app = lamps.DisplayApp.__new__(lamps.DisplayApp)
+            app.root = root
+            app._dark_titlebar()  # must never raise, whatever Windows this is
+        finally:
+            root.destroy()
+
+
 class NotWindowsTest(unittest.TestCase):
     @unittest.skipIf(WINDOWS, "not on Windows")
     def test_safe_answers_elsewhere(self):

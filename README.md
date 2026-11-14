@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.98 · Made by **S55OO** with AI assistance.
+> **Version:** 1.99 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -58,7 +58,9 @@ Three tools are provided:
 
 ![PingPong lamp](PingPong.png)
 
-*RUN1 (PC OO840G4, role RUN) is transmitting `CQ` on 7016.00 kHz CW.*
+*RUN1 (PC OO840G4, role RUN) is transmitting `CQ` on 7016.00 kHz CW.
+(Screenshot from an older version – since v1.99 the window is dark, with
+a rounded lamp.)*
 
 ---
 
@@ -159,7 +161,7 @@ What N1MM reports – and therefore what PingPong can show:
 most at the top, the rest in five groups:
 
 ```
-INB1 · role INB · UDP 12062 · v1.98        (who and what this lamp is)
+INB1 · role INB · UDP 12062 · v1.99        (who and what this lamp is)
 My name…  /  My color…
 Display ▸              Compact mode (Shift+F) · lamp size · night mode
 Calls and keys ▸       F12 call on (also Shift/Ctrl+F2/F4) · block my F-keys · sound
@@ -288,8 +290,8 @@ stations, and every other lamp uses its list.
 - Colors are **sticky**: a station keeps its color while it is there,
   also when the master changes.
 - The **title bar** shows the lamp's N1MM port before the version: the
-  master's lamp says `PingPong - MASTER UDP 12062 v1.98`
-  (the others just `PingPong UDP 12062 v1.98`), and the line under the lamp marks
+  master's lamp says `PingPong - MASTER UDP 12062 v1.99`
+  (the others just `PingPong UDP 12062 v1.99`), and the line under the lamp marks
   it: `RUN1 7 CW RUN (me, master)` or `OO840G3 7 CW RUN (master)`.
 - The master also decides for every lamp: both **F12 block times** and
   **ping-pong lock on/off** (see below).
@@ -739,7 +741,7 @@ text wraps, the table scrolls sideways when needed):
 - **row 1:** the status text, and to its right the contest buttons
   **Ping-pong lock: ON/OFF**, **Ready check**, **Test all lamps**, **Emergency ▾**;
 - **row 2, maintenance:** **Update all lamps…** (shows `Update 2 lamps…` /
-  `All lamps v1.98 ✔`), **Settings ▾** (save / restore setup, network
+  `All lamps v1.99 ✔`), **Settings ▾** (save / restore setup, network
   password, web page in Windows Firewall, always on top), **Statistics ▾**,
   and the yellow **Update Overview to vX…** (only when a newer Overview
   exists).
@@ -770,7 +772,7 @@ Options (the master's lamp must be v1.67 or newer).
 **Update all lamps…** asks every lamp to download the newest release from
 GitHub and restart – no need to go to each PC. The button shows the
 version state: **Update 2 lamps…** when some lamps are behind (the dialog
-lists them), **All lamps v1.98 ✔** when every lamp is current – then a
+lists them), **All lamps v1.99 ✔** when every lamp is current – then a
 click only tells you so and nothing is sent. Lamps accept commands
 **only from the master PC** (where the Overview runs) and only from
 **v1.60** on; older lamps must be updated by hand once.

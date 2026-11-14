@@ -40,7 +40,8 @@ captain a one-page [quick chart](PingPong-captain-chart.pdf).
 - The line under the lamp lists every station: band, mode, Run/S&P and
   role.
 - The **title bar** shows the N1MM port and version, e.g.
-  `PingPong - MASTER UDP 12062 v1.98`.
+  `PingPong - MASTER UDP 12062 v1.99`.
+- **Dark window** with a rounded lamp, easy on the eyes at night.
 - **Compact mode** (Shift+F): just the lamp, with no window frame.
 - **Options ▾** is grouped: name and color at the top, then Display, Calls
   and keys, Ping-pong and F12 times, Network and Updates.
@@ -176,7 +177,7 @@ lamps…**, **Settings ▾** and **Statistics ▾**.)*
 - **Emergency ▾:** restart or stop all lamps – asks twice (Yes, then
   typing `YES` + Enter).
 - **Update all lamps:** one button. It shows how many lamps are behind
-  (`Update 2 lamps…` / `All lamps v1.98 ✔`). Every lamp that needs it
+  (`Update 2 lamps…` / `All lamps v1.99 ✔`). Every lamp that needs it
   downloads the newest release and restarts, and no one has to touch the
   other PCs. Lamps accept commands only from the master PC.
 - **Statistics ▾:** reset the counters now, or **planned at the contest
@@ -276,7 +277,7 @@ operating position.
     the Overview;
   - `pingpong_report.py`: the after-contest report;
   - `pingpong_version.py`: the version number.
-- **Automated tests** (`tests/`, 182 tests; the Windows-only parts are checked on GitHub's
+- **Automated tests** (`tests/`, 185 tests; the Windows-only parts are checked on GitHub's
   Windows runner) run on every push before
   anything is built. A failing test means no release.
 - Releases are built and published automatically by GitHub Actions
