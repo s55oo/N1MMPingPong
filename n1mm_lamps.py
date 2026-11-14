@@ -310,6 +310,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                     self._share,
                     self.on_relay,
                     self.on_command,
+                    self.on_vradio,
                 ),
                 daemon=True,
             )
@@ -391,22 +392,57 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             station.label = station_name or station.label
         if is_radio:
             radios = station.__dict__.setdefault("radios", RadioSet())
-            event = radios.update(data, time.time(), self.stale,
-                                  guard=self._shared, pc=station.ip)
-            if event is None:
-                return
-            radio, started, ended = event
-            if not relayed:
-                radio.direct_seen = time.time()
-            # Per-radio transition context, with the same PC identity/color.
-            radio.ip, radio.label, radio.color = station.ip, station.label, station.color
-            radios.project(station, time.time(), self.stale)
-            if station.ip in self.local:
-                self.tracked = station.key
-            if started:
-                self._pingpong_tx(radio)
-            if ended:
-                self._pingpong_end(ended)
+            event = radios.update(data, time.time(), self.stale, guard=self._shared,
+                                  pc=station.ip, ips=self._pc_ips(station))
+            if event is not None:
+                self._radio_event(station, radios, event, relayed)
+
+    def _radio_event(self, station, radios, event, relayed=False):
+        radio, started, ended = event
+        if not relayed:
+            radio.direct_seen = time.time()
+        # Per-radio transition context, with the same PC identity/color.
+        radio.ip, radio.label, radio.color = station.ip, station.label, station.color
+        radios.project(station, time.time(), self.stale)
+        if station.ip in self.local:
+            self.tracked = station.key
+        if started:
+            self._pingpong_tx(radio)
+        if ended:
+            self._pingpong_end(ended)
+
+    def _pc_ips(self, station):
+        """All addresses of the PC behind a station (for vRadio's pairing)."""
+        ips = {station.ip}
+        if station.ip in self.local:
+            ips |= set(self.local)
+        for peer in self._fresh_peers(time.time()):
+            if station.ip in peer.ips:
+                ips |= set(peer.ips)
+        return ips
+
+    @locked
+    def on_vradio(self, data):
+        """A vRadioShare packet: re-judge every radio with the stored data."""
+        now = time.time()
+        vr = self._shared.vradio
+        changed = vr.feed(data, now)
+        changed = vr.expire(now) or changed
+        if not changed:
+            return
+        for station in list(self.stations.values()):
+            radios = getattr(station, "radios", None)
+            if radios is None:
+                continue
+            for radio in list(radios.radios.values()):
+                if not radio.payload:
+                    continue
+                seen = radio.last_seen
+                event = radios.update(radio.payload, now, self.stale, guard=self._shared,
+                                      pc=station.ip, ips=self._pc_ips(station))
+                radio.last_seen = seen  # a replay is not a fresh packet
+                if event is not None:
+                    self._radio_event(station, radios, event)
 
     def _refresh_radios(self, now):
         for station in self.stations.values():

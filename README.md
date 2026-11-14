@@ -698,7 +698,18 @@ PC, kept by updates.
 
 ### Several PCs on one shared radio
 
-If the N1MMs of two or more PCs share **one** radio (for example through a
+**With N1MM_vRadio2 (1.0.9+, `pcs = 2`):** vRadio sends a `vRadioShare`
+packet to UDP 46070 (every second and at each TX change) that says which PC
+really keys the radio (`Tx`, `TxFrom`). PingPong pairs the PCs by their IP
+addresses (`Ips` = host, `Clients` = clients) and lets vRadio decide: only
+the PC that keys counts as transmitting, the other's `IsTransmitting` is
+ignored (also when the two PCs use different VFOs and frequencies). If no
+packet arrives for 3 s the pairing is dropped and N1MM's own flag is used
+again. The packet is not signed, so it also works with a network password; it
+only decides who is shown as transmitting. PCs that are not in a share work
+as before.
+
+**Without vRadio** (other ways of sharing one radio): the N1MMs of two or more PCs share **one** radio (for example through a
 virtual radio such as N1MM_vRadio2), every N1MM sees the radio transmit and
 reports `IsTransmitting=True` on the same frequency, although only one PC
 keys. PingPong gives the transmission to one PC and ignores the others' TX

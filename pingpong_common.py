@@ -282,6 +282,79 @@ def packet_info(data):
     return True, caption, station, is_tx, freq, mode
 
 
+VRADIO_STALE = 3.0  # s: no vRadioShare packet from an Id for this long -> pairing dropped
+
+
+class VRadioShare:
+    """The <vRadioShare> packets of N1MM_vRadio2 (UDP 46070, every second and
+    at every TX change): vRadio knows which PC really keys the shared radio,
+    N1MM's IsTransmitting on the others is not reliable.
+
+    verdict(ips, now) -> None  this PC is not in a live share: use N1MM's flag;
+                         True  vRadio says this PC transmits;
+                         False vRadio says it does not."""
+
+    def __init__(self):
+        self.shares = {}
+
+    @staticmethod
+    def is_packet(data):
+        return b"<vRadioShare" in data[:200]
+
+    def feed(self, data, now):
+        """Store one packet. True if it changed who transmits (or is new)."""
+        try:
+            root = ET.fromstring(data[data.find(b"<"):])
+        except (ET.ParseError, ValueError):
+            return False
+        if root.tag != "vRadioShare":
+            return False
+
+        def text(tag):
+            return (root.findtext(tag) or "").strip()
+
+        def ips(tag):
+            return {x.strip() for x in text(tag).split(",") if x.strip()}
+
+        key = text("Id") or "?"
+        share = {"ips": ips("Ips"), "clients": ips("Clients"), "tx": text("Tx").upper(),
+                 "from": text("TxFrom"), "hostvfo": text("HostVfo").upper(),
+                 "clientvfo": text("ClientVfo").upper(), "seen": now}
+        old = self.shares.get(key)
+        self.shares[key] = share
+        return (old is None or (old["tx"], old["from"], old["ips"], old["clients"])
+                != (share["tx"], share["from"], share["ips"], share["clients"]))
+
+    def expire(self, now):
+        """Drop old pairings; True if one was dropped."""
+        gone = [k for k, v in self.shares.items() if now - v["seen"] > VRADIO_STALE]
+        for k in gone:
+            del self.shares[k]
+        return bool(gone)
+
+    def verdict(self, ips, now):
+        ips = set(ips or ())
+        for share in self.shares.values():
+            if now - share["seen"] > VRADIO_STALE:
+                continue
+            host, client = ips & share["ips"], ips & share["clients"]
+            if not host and not client:
+                continue
+            tx, src = share["tx"], share["from"]
+            if tx in ("", "NONE"):
+                return False
+            if src in share["clients"]:
+                return src in ips
+            if src.lower() in ("local", "dj") or src in share["ips"]:
+                return bool(host)
+            if tx == share["hostvfo"]:
+                return bool(host)
+            if tx == share["clientvfo"]:
+                return bool(client)
+            return bool(host)
+        return None
+
+
 SHARED_TAIL = 1.75  # s: PTT tail (~200 ms) + break-in delay of a shared radio
 
 
@@ -303,6 +376,7 @@ class SharedTx:
 
     def __init__(self, tail=SHARED_TAIL):
         self.tail = tail
+        self.vradio = VRadioShare()  # authoritative, when vRadio is used
         self.owners = {}  # tx frequency text -> state of its owner
         self.captions = {}  # PC -> time of its last message caption
 
@@ -314,9 +388,14 @@ class SharedTx:
     def _sent_message(self, who, now):
         return now - self.captions.get(who, -1e9) <= self.CAPTION_MEMORY
 
-    def filter(self, who, tx, freq, caption, now, stale=DEFAULT_STALE):
+    def filter(self, who, tx, freq, caption, now, stale=DEFAULT_STALE, ips=None):
         """Effective TX flag for one packet of `who` (any hashable). The
-        caption may come in a packet before the TX flag or after it."""
+        caption may come in a packet before the TX flag or after it. A PC
+        that vRadio pairs is decided by vRadio alone."""
+        if ips:
+            verdict = self.vradio.verdict(ips, now)
+            if verdict is not None:
+                return bool(tx and verdict)
         if caption:
             self.captions[who] = now
         if not freq:
@@ -367,7 +446,7 @@ class RadioSet:
         self.radios = {}
         self.active_nr = self.focus_nr = None
 
-    def update(self, data, now, stale=DEFAULT_STALE, guard=None, pc=None):
+    def update(self, data, now, stale=DEFAULT_STALE, guard=None, pc=None, ips=None):
         """guard: a SharedTx shared by all PCs; pc: this PC's identity."""
         try:
             root = ET.fromstring(data[data.find(b"<"):])
@@ -400,7 +479,7 @@ class RadioSet:
         if guard is not None and pc is not None:
             tf = (root.findtext("TXFreq") or "").strip()
             tf = tf if re.fullmatch(r"0*[1-9][0-9]*", tf) else (freq or radio.rx_freq)
-            tx = guard.filter((pc, nr), tx, tf, caption, now, stale)
+            tx = guard.filter((pc, nr), tx, tf, caption, now, stale, ips)
         started = tx and not was_tx
         ended = copy.copy(radio) if was_tx and not tx else None
         if started:

@@ -105,6 +105,12 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             except OSError:
                 self.stop.wait(0.3)
                 continue
+            if pp.VRadioShare.is_packet(data):  # vRadio is not part of the password
+                try:
+                    self._vradio(data)
+                except Exception:
+                    pp.log_error("overview vradio")
+                continue
             data, status = pp.unseal(data, addr[0])
             if not pp.accepted(status):
                 continue  # network password: not ours
@@ -133,7 +139,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 lamp.src = lamp.src or src
                 if station:
                     lamp.n1mm_name = station
-                if lamp.radios.update(payload, now, guard=self._shared, pc=lamp.stats_key()) is not None:
+                if lamp.radios.update(payload, now, guard=self._shared, pc=lamp.stats_key(),
+                                      ips=self._lamp_ips(lamp)) is not None:
                     self._sync_radio(lamp, now)
             return
         info = pp.parse_hello(data)
@@ -153,6 +160,29 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     lamp.gone = False
                     self._event(lamp.name(), "lamp heard again")
                 self._track_activity(lamp, info, now)
+
+    @staticmethod
+    def _lamp_ips(lamp):
+        return set((lamp.hello or {}).get("ips") or []) | ({lamp.src} if lamp.src else set())
+
+    def _vradio(self, data):
+        """A vRadioShare packet: re-judge every lamp's radios with the stored data."""
+        now = time.time()
+        with self.lock:
+            vr = self._shared.vradio
+            changed = vr.feed(data, now)
+            changed = vr.expire(now) or changed
+            if not changed:
+                return
+            for lamp in list(self.lamps.values()):
+                for radio in list(lamp.radios.radios.values()):
+                    if not radio.payload:
+                        continue
+                    seen = radio.last_seen
+                    lamp.radios.update(radio.payload, now, guard=self._shared,
+                                       pc=lamp.stats_key(), ips=self._lamp_ips(lamp))
+                    radio.last_seen = seen
+                self._sync_radio(lamp, now)
 
     def _sync_radio(self, lamp, now):
         """Project SO2R to one PC row and count actual TX transitions only."""
