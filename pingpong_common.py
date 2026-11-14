@@ -299,17 +299,26 @@ class SharedTx:
       same band are not affected.
     """
 
+    CAPTION_MEMORY = 1.5  # s: a message caption counts for this long
+
     def __init__(self, tail=SHARED_TAIL):
         self.tail = tail
         self.owners = {}  # tx frequency text -> state of its owner
+        self.captions = {}  # PC -> time of its last message caption
 
     def _active(self, o, now, stale):
         if o["on"]:
             return now - o["seen"] <= stale
         return now - o["end"] <= self.tail
 
+    def _sent_message(self, who, now):
+        return now - self.captions.get(who, -1e9) <= self.CAPTION_MEMORY
+
     def filter(self, who, tx, freq, caption, now, stale=DEFAULT_STALE):
-        """Effective TX flag for one packet of `who` (any hashable)."""
+        """Effective TX flag for one packet of `who` (any hashable). The
+        caption may come in a packet before the TX flag or after it."""
+        if caption:
+            self.captions[who] = now
         if not freq:
             return tx
         o = self.owners.get(freq)
@@ -317,18 +326,18 @@ class SharedTx:
             o = None
         if o is None:
             if tx:
-                self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0, "msg": caption}
+                self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0}
             return tx
         if o["who"] == who:
             if tx:
                 o["on"], o["seen"] = True, now
-                o["msg"] = caption or o["msg"]
             elif o["on"]:
                 o["on"], o["end"] = False, now
             return tx
-        if tx and caption and not o["msg"]:  # the one that really sent a message
-            self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0, "msg": caption}
-            return True
+        # another PC owns this frequency right now
+        if tx and self._sent_message(who, now) and not self._sent_message(o["who"], now):
+            self.owners[freq] = {"who": who, "on": True, "seen": now, "end": 0.0}
+            return True  # the one that really sent a message
         return False
 
 

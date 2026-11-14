@@ -61,6 +61,23 @@ class SharedRadioTest(unittest.TestCase):
         self.assertTrue(n.tx("RUN3", 100.6))
         self.assertFalse(n.tx("RUN2", 100.6))
 
+    def test_caption_in_an_earlier_or_later_packet_still_wins(self):
+        n = Net()
+        n.send("RUN2", pkt(True), 100.0)                       # echo owns first
+        n.send("RUN3", pkt(False, caption="F1 CQ"), 100.02)    # caption comes alone
+        n.send("RUN3", pkt(True), 100.1)                       # TX flag without caption
+        self.assertTrue(n.tx("RUN3", 100.2))
+        n.send("RUN2", pkt(True), 100.3)
+        self.assertFalse(n.tx("RUN2", 100.4))
+
+    def test_old_caption_does_not_win_later(self):
+        n = Net()
+        n.send("RUN3", pkt(True, caption="CQ"), 100.0)
+        n.send("RUN3", pkt(False), 101.0)
+        n.send("RUN2", pkt(True), 103.0)   # RUN2 keys, no caption seen from it
+        n.send("RUN3", pkt(True), 103.1)   # RUN3's old caption (3 s ago) must not steal it
+        self.assertFalse(n.tx("RUN3", 103.2))
+
     def test_different_frequencies_are_independent(self):
         n = Net()
         n.send("RUN3", pkt(True, freq="352310", caption="CQ"), 100.0)
