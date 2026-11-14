@@ -76,6 +76,22 @@ class RadioInfoTest(unittest.TestCase):
         self.assertIsNone(m.group_of("1402500", "FT8"))
         self.assertEqual(m.freq_khz("1402500"), "14025.00 kHz")
 
+    def test_phone_modes_any_case(self):
+        for mode in ("USB", "LSB", "SSB", "usb", " Lsb ", "ssb"):
+            self.assertEqual(m.group_of("701500", mode), ("7", "SSB"), mode)
+        self.assertEqual(m.group_of("1409458", "rtty-r"), ("14", "RTTY"))
+        self.assertIsNone(m.group_of("701500", "FM"))
+        self.assertIsNone(m.group_of("701500", None))
+
+    def test_ssb_radio_info_usb_lsb_match(self):
+        # An LSB and a USB radio on the same band are the same lamp group.
+        for mode in ("LSB", "USB"):
+            radio = ("<RadioInfo><Freq>701500</Freq><Mode>{}</Mode>"
+                     "<IsTransmitting>True</IsTransmitting></RadioInfo>").format(mode).encode()
+            _, _, _, tx, freq, md = m.packet_info(radio)
+            self.assertTrue(tx)
+            self.assertEqual(m.group_of(freq, md), ("7", "SSB"))
+
     def test_reverse_rtty_radio_info_group(self):
         # Mode and frequency observed in S53M1's diagnostic RadioInfo.
         radio = (b"<RadioInfo><Freq>1409458</Freq><Mode>RTTY-R</Mode>"

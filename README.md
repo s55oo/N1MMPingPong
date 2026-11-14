@@ -241,7 +241,7 @@ A lamp shows **only transmissions on the same band and mode as its own
 PC's N1MM**, so separate radios never clash:
 
 - Bands: **1.8, 3.5, 7, 14, 21, 28** MHz
-- Modes: **CW, RTTY, SSB** (`SSB`, `USB` and `LSB` all count as SSB)
+- Modes: **CW, RTTY, SSB** (`SSB`, `USB` and `LSB` all count as SSB; `RTTY-R` counts as RTTY)
 
 Example: PC1, PC2, PC3 on 14 MHz CW share one lamp picture; PC4 on 7 MHz
 CW is never shown on their lamps, and vice versa. The group follows this

@@ -189,6 +189,12 @@ MODES_ALLOWED = {"CW", "RTTY", "SSB"}
 # Reverse RTTY is the same operating group as normal RTTY.
 MODE_ALIASES = {"USB": "SSB", "LSB": "SSB", "RTTY-R": "RTTY"}
 
+def norm_mode(mode):
+    """N1MM mode text as one of CW/RTTY/SSB, or "" if unknown: case and
+    spaces ignored; USB/LSB/SSB, RTTY/RTTY-R all map to their group."""
+    mode = (mode or "").strip().upper()
+    return MODE_ALIASES.get(mode, mode)
+
 def band_of(freq_str):
     try:
         mhz = float(freq_str) / 100000.0
@@ -208,7 +214,7 @@ def freq_khz(freq):
 
 def group_of(freq, mode):
     band = band_of(freq)
-    mode = MODE_ALIASES.get(mode, mode)
+    mode = norm_mode(mode)
     if not band or mode not in MODES_ALLOWED:
         return None
     return band, mode
