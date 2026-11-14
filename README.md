@@ -241,7 +241,7 @@ A lamp shows **only transmissions on the same band and mode as its own
 PC's N1MM**, so separate radios never clash:
 
 - Bands: **1.8, 3.5, 7, 14, 21, 28** MHz
-- Modes: **CW, RTTY, SSB** (`SSB`, `USB` and `LSB` all count as SSB; `RTTY-R` and `FSK` count as RTTY; `CW-R` and `CW-U`/`CW-L` count as CW)
+- Modes: **CW, RTTY, SSB** (`SSB`, `USB` and `LSB` all count as SSB; `RTTY-R` counts as RTTY)
 
 Example: PC1, PC2, PC3 on 14 MHz CW share one lamp picture; PC4 on 7 MHz
 CW is never shown on their lamps, and vice versa. The group follows this
@@ -696,33 +696,7 @@ PC, kept by updates.
 
 ---
 
-### Several PCs on one shared radio
-
-> **Status 14 Nov 2026:** not confirmed on the real station – see [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md) (what was tried, and how to go back to v1.101).
-
-**With N1MM_vRadio2 (1.0.9+, `pcs = 2`):** vRadio sends a `vRadioShare`
-packet to UDP 46070 (every second and at each TX change) that says which PC
-really keys the radio (`Tx`, `TxFrom`). PingPong pairs the PCs by their IP
-addresses (`Ips` = host, `Clients` = clients) and lets vRadio decide: only
-the PC that keys counts as transmitting, the other's `IsTransmitting` is
-ignored (also when the two PCs use different VFOs and frequencies). If no
-packet arrives for 3 s the pairing is dropped and N1MM's own flag is used
-again. The packet is not signed, so it also works with a network password; it
-only decides who is shown as transmitting. PCs that are not in a share work
-as before.
-
-**Without vRadio** (other ways of sharing one radio): the N1MMs of two or more PCs share **one** radio (for example through a
-virtual radio such as N1MM_vRadio2), every N1MM sees the radio transmit and
-reports `IsTransmitting=True` on the same frequency, although only one PC
-keys. PingPong gives the transmission to one PC and ignores the others' TX
-flag on that frequency:
-
-- the first PC to report TX owns it (a PC whose packet has a message caption
-  wins over an owner without one);
-- the others stay ignored while the owner transmits, and for 1.75 s after its
-  last TX (PTT tail and break-in delay);
-- TX on different frequencies is never touched, so separate radios (also on
-  the same band) are not affected. It works by itself, with nothing to set.
+> **Shared radio (two PCs, one radio, e.g. through vRadio):** not supported in this version. v1.102-v1.106 tried and were rolled back in v1.107 – see [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md).
 
 ### SO2R radio selection
 

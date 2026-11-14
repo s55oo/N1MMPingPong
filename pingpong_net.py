@@ -607,7 +607,7 @@ def send_relay(share, payload):
 
 def discovery_loop(
     port, node_id, get_state, on_networks, on_hello, stop, hello_now=None,
-    share=None, on_relay=None, on_command=None, on_vradio=None,
+    share=None, on_relay=None, on_command=None,
 ):
     """Active discovery between PCs running PingPong.
 
@@ -682,10 +682,6 @@ def discovery_loop(
             continue
         except OSError:
             stop.wait(0.3)
-            continue
-        if VRadioShare.is_packet(data):  # vRadio is not part of the PingPong password
-            if on_vradio is not None:
-                guarded("vradio", on_vradio)(data)
             continue
         data, status = unseal(data, addr[0])
         if not accepted(status):

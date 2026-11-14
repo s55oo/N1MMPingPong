@@ -1,5 +1,9 @@
 # Status – shared radio (RUN2 / RUN3), 14 Nov 2026 (CQ WW CW weekend)
 
+**Update – v1.107 (14 Nov, 23:50): rolled back.** v1.107 has exactly the code of v1.101 (PR #1 and
+PR #2 kept); the experiments of v1.102–v1.106 are removed from the code but stay in git history
+(commits below) and on their release pages. The text below describes how it came to that.
+
 **Short version:** v1.101 is the last version that is known to work (PR #2, SO2R radio state,
 merged and released). Versions v1.102 to v1.106 tried to fix a problem with **two PCs
 sharing one radio**. None of them has been confirmed on the real station, and the last
@@ -65,7 +69,7 @@ meant, not that the station sends what I assumed. The most likely suspects for t
 after v1.104 are the IP pairing with `vRadioShare` (a paired PC whose address does not match
 is judged "does not transmit") and the mode strings.
 
-## Back to v1.101
+## Back to v1.101 (done in v1.107)
 
 All code of v1.102–v1.106 sits in a few commits, so it can be removed cleanly. Pick one:
 

@@ -76,7 +76,7 @@ def make_lamp(**over):
         urgent_on=False, urgent_fkey="F4", urgent_time=0.0, urgent_key=("", ""),
         urgent_priority=False, _priority_block=False,
         _urgent_tx_seen=False, _shown_urgent=None, silenced=set(), _shown_call=None,
-        hello_now=Event(), _shared=m.SharedTx(), _share={"targets": [], "port": 46070}, relay_on=True,
+        hello_now=Event(), _share={"targets": [], "port": 46070}, relay_on=True,
         test_on=False, my_alias="", started=now - 3600, n1mm_master=None,
         color_map={}, block_limit=30.0, block_limit_run=5.0,
         _i_am_master=False, _master_peer=None,
