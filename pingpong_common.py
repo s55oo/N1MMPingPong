@@ -186,7 +186,8 @@ MODES_ALLOWED = {"CW", "RTTY", "SSB"}
 
 # N1MM reports phone as "SSB" (seen in RadioInfo) or USB/LSB depending on
 # radio/setup; all of them are one group so stations always match.
-MODE_ALIASES = {"USB": "SSB", "LSB": "SSB"}
+# Reverse RTTY is the same operating group as normal RTTY.
+MODE_ALIASES = {"USB": "SSB", "LSB": "SSB", "RTTY-R": "RTTY"}
 
 def band_of(freq_str):
     try:

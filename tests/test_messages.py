@@ -76,6 +76,17 @@ class RadioInfoTest(unittest.TestCase):
         self.assertIsNone(m.group_of("1402500", "FT8"))
         self.assertEqual(m.freq_khz("1402500"), "14025.00 kHz")
 
+    def test_reverse_rtty_radio_info_group(self):
+        # Mode and frequency observed in S53M1's diagnostic RadioInfo.
+        radio = (b"<RadioInfo><Freq>1409458</Freq><Mode>RTTY-R</Mode>"
+                 b"<IsTransmitting>True</IsTransmitting></RadioInfo>")
+        is_radio, _, _, tx, freq, mode = m.packet_info(radio)
+        self.assertTrue(is_radio)
+        self.assertTrue(tx)
+        self.assertEqual(mode, "RTTY-R")
+        self.assertEqual(m.group_of(freq, mode), ("14", "RTTY"))
+        self.assertEqual(m.group_of(freq, mode), m.group_of(freq, "RTTY"))
+
     def test_caption_and_block_time(self):
         self.assertEqual(m.clean_caption("F1 CQ"), "CQ")
         self.assertEqual(m.clean_caption("  F12 NULL"), "NULL")
