@@ -596,14 +596,18 @@ Delete the file any time.
 ### Command line (optional)
 
 ```bat
-n1mm_lamps.exe [--port 12062] [--stale 5.0] [--config lamps.cfg]
+n1mm_lamps.exe [--port 12062] [--stale 15.0] [--config lamps.cfg]
                [--discovery-port 46070] [--no-discovery] [--phone-port 8047]
 ```
 
 - `--port` – UDP port for this PC's N1MM data (default 12062; N1MM's
   Broadcast Data → Radio line must include `127.0.0.1:<port>`).
-- `--stale` – safety fallback in seconds: if the transmitting station
-  sends nothing for this long, the lamp turns off (default 5.0).
+- `--stale` – safety fallback in seconds: if the transmitting radio
+  sends no valid RadioInfo for this long, the lamp turns off (default 15.0).
+  N1MM refreshes each radio every 10 seconds; the default allows 5 seconds
+  of delivery jitter. Updates from the other SO2R radio do not extend TX.
+  Explicit RX status still clears the lamp immediately. A shorter override
+  can make a long transmission disappear between periodic updates.
 - `--config` – path to `lamps.cfg` (default: next to the exe).
 - `--discovery-port` – port the lamps use to talk to each other
   (default 46070, `0` = off). Must be the same on all PCs.
@@ -691,6 +695,35 @@ PC, kept by updates.
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 
 ---
+
+### SO2R radio selection
+
+PingPong keeps separate status for `RadioNr` 1 and 2 under one PC identity
+and color. An idle radio's packet cannot clear the other radio's TX caption,
+change its band, or replace its Run/S&P role. A new transmission on the
+other radio supersedes the previous TX (SO2R permits one TX at a time), so
+a lost RX packet cannot make the previous transmission reappear.
+
+The lamp follows a fresh transmitting radio first. While neither radio is
+transmitting it follows `FocusRadioNr` (keyboard/receive focus), then
+`ActiveRadioNr` (transmit focus), then the lowest known fresh radio number.
+Transmit focus alone does not light the lamp. This selected radio supplies
+the local band/mode, Run/S&P role, and F12/urgent/priority call context.
+Each radio's own Run/S&P status drives its transmission's ping-pong lock
+transition; an older PC hello does not override it. The phone band tiles
+include both radios, while Overview keeps one PC row and follows the same
+selection rules for its TX caption and statistics.
+
+During TX, band grouping and displayed frequency use `TXFreq`, falling back
+to `Freq` when TXFreq is absent or invalid. Idle grouping uses `Freq`.
+Missing `RadioNr` means radio 1 for older single-radio senders; explicitly
+invalid radio numbers or missing/invalid TX flags are ignored. Missing or
+invalid focus fields keep the last valid focus. Diagnostics include
+`radio`, `active`, and `focus` in both direct and relayed RadioInfo summaries.
+
+Protocol reference: [N1MM External UDP Messages — Radio Info](https://n1mmwp.hamdocs.com/appendices/external-udp-broadcasts/#radio-info).
+As with single-radio operation, `IsTransmitting` only describes transmissions
+started by N1MM; paddle or microphone PTT transmissions can remain invisible.
 
 ## 3. Overview (pingpong_overview.exe)
 

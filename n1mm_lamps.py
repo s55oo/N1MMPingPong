@@ -38,7 +38,7 @@ The program is split into parts:
 Made by S55OO with AI assistance.
 
 Usage:
-    python n1mm_lamps.py [--port 12062] [--stale 5.0] [--config lamps.cfg]
+    python n1mm_lamps.py [--port 12062] [--stale 15.0] [--config lamps.cfg]
                          [--discovery-port 46070] [--no-discovery]
 """
 
@@ -379,35 +379,40 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                     send_relay(self._share, make_relay(self.node_id, data))
             else:
                 src = self._canon_ip(src)
+        if src in self.local:
+            # Loopback and a local LAN broadcast describe the same N1MM PC.
+            src = next((ip for ip in sorted(self.stations) if ip in self.local), src)
         station = self._station(src, station_name)
-        if not relayed:
+        if not relayed and is_radio:
             station.direct_seen = time.time()
         station.count += 1
         if not station.label or station.label == station.ip:
             station.label = station_name or station.label
         if is_radio:
-            running = radio_running(data)
-            if running is not None:
-                station.running = running
-            started = is_tx and not station.tx
-            ended = station.tx and not is_tx
-            station.tx = is_tx
-            station.last_seen = time.time()
-            if caption:
-                if caption != station.msg:
-                    station.msg_time = time.time()
-                station.msg = caption
-            if freq:
-                station.freq = freq
-            if mode:
-                station.mode = mode
-            station.key = group_of(station.freq, station.mode)
+            radios = station.__dict__.setdefault("radios", RadioSet())
+            event = radios.update(data, time.time(), self.stale)
+            if event is None:
+                return
+            radio, started, ended = event
+            if not relayed:
+                radio.direct_seen = time.time()
+            # Per-radio transition context, with the same PC identity/color.
+            radio.ip, radio.label, radio.color = station.ip, station.label, station.color
+            radios.project(station, time.time(), self.stale)
             if station.ip in self.local:
                 self.tracked = station.key
             if started:
-                self._pingpong_tx(station)
+                self._pingpong_tx(radio)
             if ended:
-                self._pingpong_end(station)
+                self._pingpong_end(ended)
+
+    def _refresh_radios(self, now):
+        for station in self.stations.values():
+            if hasattr(station, "radios"):
+                station.radios.project(station, now, self.stale)
+        mine = self._local_station()
+        if mine is not None:
+            self.tracked = mine.key
 
     def _set_title(self, master):
         """Title bar: 'MASTER' on the master PC only."""
@@ -997,6 +1002,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         while self._ui_calls:
             self.root.after(0, self._ui_calls.pop(0))
         now = time.time()
+        self._refresh_radios(now)
         owners = self._color_owners(now)
         self._update_master(owners, now)
         role = self._my_role_now()
@@ -1194,11 +1200,12 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         kind = tag.group(1) if tag else "?"
         if kind == "RadioInfo":
             self._test_write(
-                "{}  {}  RadioInfo{}  {}  key='{}'  tx={}  freq={}  mode={}  run={}".format(
+                "{}  {}  RadioInfo{}  {}  key='{}'  tx={}  freq={}  mode={}  run={}  radio={}  active={}  focus={}".format(
                     stamp, src, " ({})".format(via) if via else "",
                     field("StationName"), field("FunctionKeyCaption"),
                     field("IsTransmitting"), field("Freq"), field("Mode"),
-                    field("IsRunning"),
+                    field("IsRunning"), field("RadioNr"),
+                    field("ActiveRadioNr"), field("FocusRadioNr"),
                 )
             )
         else:

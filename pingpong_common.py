@@ -4,6 +4,7 @@ Used by the lamp (n1mm_lamps.py), its network and rules parts and by
 PingPong Overview. No windows and no sockets here.
 """
 
+import copy
 import os
 import re
 import sys
@@ -17,7 +18,7 @@ from pingpong_version import __version__
 # Callbooker). N1MM's Broadcast Data → Radio line must include 127.0.0.1:12062.
 DEFAULT_PORT = 12062
 
-DEFAULT_STALE = 5.0
+DEFAULT_STALE = 15.0  # N1MM refreshes each radio every 10 s; allow delivery jitter.
 
 # Keep well away from N1MM's own ports (12060 external broadcast and
 # multi-computer networking, 12070 multi-computer UDP): N1MM tries to
@@ -279,6 +280,117 @@ def packet_info(data):
         elif el.tag == "IsTransmitting":
             is_tx = (el.text or "").strip().lower() == "true"
     return True, caption, station, is_tx, freq, mode
+
+
+class RadioState:
+    """One radio's state. PC identity/color stay on the containing Station."""
+
+    def __init__(self, radio_nr):
+        self.radio_nr = radio_nr
+        self.tx = False
+        self.running = None
+        self.rx_freq = self.tx_freq = self.freq = self.mode = self.msg = ""
+        self.key = None
+        self.last_seen = self.msg_time = self.tx_start = 0.0
+        self.payload = b""
+
+
+class RadioSet:
+    """RadioInfo state shared by the lamp and Overview.
+
+    RX updates touch only their RadioNr. A new TX supersedes any previous
+    TX on this SO2R PC. Selection is TX first, then keyboard
+    focus, then TX focus, then the lowest radio number (never arrival order).
+    Expired records cannot keep a transmission alive via the other radio.
+    """
+
+    def __init__(self):
+        self.radios = {}
+        self.active_nr = self.focus_nr = None
+
+    def update(self, data, now, stale=DEFAULT_STALE):
+        try:
+            root = ET.fromstring(data[data.find(b"<"):])
+        except (ET.ParseError, ValueError):
+            return None
+        if root.tag != "RadioInfo":
+            return None
+
+        def number(tag, default=None):
+            value = root.findtext(tag)
+            if value is None:
+                return default
+            return int(value.strip()) if value.strip() in ("1", "2") else None
+
+        nr = number("RadioNr", 1)  # older/single-radio senders omit RadioNr
+        if nr is None:
+            return None  # do not let an invalid radio number overwrite radio 1
+        # A malformed/missing TX flag must neither stop nor refresh a TX.
+        flag = (root.findtext("IsTransmitting") or "").strip().lower()
+        if flag not in ("true", "false"):
+            return None
+        active, focus = number("ActiveRadioNr"), number("FocusRadioNr")
+        if active is not None:
+            self.active_nr = active
+        if focus is not None:
+            self.focus_nr = focus
+        radio = self.radios.setdefault(nr, RadioState(nr))
+        was_tx = radio.tx and now - radio.last_seen <= stale
+        _, caption, _, tx, freq, mode = packet_info(data)
+        started = tx and not was_tx
+        ended = copy.copy(radio) if was_tx and not tx else None
+        if started:
+            # SO2R has one transmitter at a time. A lost RX packet from the
+            # previous radio must not resurrect its TX after this one ends.
+            for other in self.radios.values():
+                if other is not radio:
+                    other.tx = False
+                    other.freq = other.rx_freq
+                    other.key = group_of(other.freq, other.mode)
+            radio.tx_start = now
+            radio.msg = ""  # never reuse a previous transmission's caption
+        if caption:
+            if caption != radio.msg:
+                radio.msg_time = now
+            radio.msg = caption
+        running = (root.findtext("IsRunning") or "").strip().lower()
+        if running in ("true", "false"):
+            radio.running = running == "true"
+        if freq:
+            radio.rx_freq = freq
+        # TXFreq is per packet: absent/invalid values fall back to RX, not an
+        # old split frequency. N1MM frequencies are positive 10 Hz integers.
+        tx_freq = (root.findtext("TXFreq") or "").strip()
+        radio.tx_freq = (tx_freq if re.fullmatch(r"0*[1-9][0-9]*", tx_freq)
+                         else radio.rx_freq)
+        if mode:
+            radio.mode = mode
+        radio.tx = tx
+        radio.payload = data
+        radio.last_seen = now
+        radio.freq = radio.tx_freq if tx else radio.rx_freq
+        radio.key = group_of(radio.freq, radio.mode)
+        return radio, started, ended
+
+    def select(self, now, stale=DEFAULT_STALE):
+        fresh = {nr: r for nr, r in self.radios.items() if now - r.last_seen <= stale}
+        transmitting = {nr: r for nr, r in fresh.items() if r.tx}
+        if transmitting:
+            return max(transmitting.values(), key=lambda r: (r.tx_start, -r.radio_nr))
+        return (fresh.get(self.focus_nr) or fresh.get(self.active_nr)
+                or (fresh[min(fresh)] if fresh else None))
+
+    def project(self, target, now, stale=DEFAULT_STALE):
+        """Update the single PC view without changing its identity or color."""
+        radio = self.select(now, stale)
+        target.tx = bool(radio and radio.tx)
+        target.running = radio.running if radio else None
+        target.key = radio.key if radio else None
+        if radio:
+            for name in ("radio_nr", "freq", "mode", "msg", "msg_time", "last_seen", "tx_start"):
+                setattr(target, name, getattr(radio, name))
+        return radio
+
 
 def parse_spec(spec):
     spec = spec.strip()

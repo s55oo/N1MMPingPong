@@ -176,6 +176,9 @@ class Lamp:
         self.src = ""
         # from relayed N1MM RadioInfo
         self.radio_seen = 0.0
+        self.radio_data_seen = 0.0
+        self.radio_nr = None
+        self.radios = pp.RadioSet()
         self.freq = ""
         self.mode = ""
         self.running = None
