@@ -393,6 +393,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             radios = station.__dict__.setdefault("radios", RadioSet())
             event = radios.update(data, time.time(), self.stale,
                                   guard=self._shared, pc=station.ip)
+            if self.test_on and radios.verdict is not None:
+                self._test_verdict(station, radios.verdict, relayed)
             if event is None:
                 return
             radio, started, ended = event
@@ -1092,6 +1094,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         elif active is not None:
             color = self._color_for(active, owners, now) or "red"
             shown = active.msg or "—"
+            if self.test_on:
+                self._test_shown(self.station_name(active), shown, color)
             self._set_bg(color)
             if self.canvas.itemcget(self.text_id, "text") != shown:
                 self.canvas.itemconfigure(self.text_id, text=shown)
@@ -1108,6 +1112,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                 )
             )
         else:
+            if self.test_on:
+                self._test_shown("", "idle", COLOR_IDLE)
             self._set_bg(COLOR_IDLE)
             idle = "—"
             key, when = self._blocked_key
@@ -1188,6 +1194,28 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                 fh.write(line + "\n")
         except OSError:
             pass
+
+    def _test_verdict(self, station, v, relayed=False):
+        """Diagnostics, second layer: what PingPong made of one RadioInfo packet.
+        Compare with the raw 'RadioInfo' line just above it."""
+        change = "START" if v["started"] else "END" if v["ended"] else "-"
+        note = ("  <- " + v["note"]) if v["note"] else ""
+        self._test_write(
+            "{}  PP  {} radio{}{}  N1MM tx={} key='{}'  ->  PingPong tx={} key='{}'  [{}]{}".format(
+                self._stamp(), station.label or station.ip, v["nr"], " (relayed)" if relayed else "",
+                v["n1mm_tx"], v["n1mm_key"], v["tx"], v["key"], change, note,
+            )
+        )
+
+    def _stamp(self):
+        return time.strftime("%H:%M:%S") + ".{:03d}".format(int(time.time() * 1000) % 1000)
+
+    def _test_shown(self, who, text, bg):
+        """Diagnostics: what the lamp now shows (only when it changes)."""
+        state = (who, text, bg)
+        if state != getattr(self, "_last_shown", None):
+            self._last_shown = state
+            self._test_write("{}  PP  LAMP shows: who='{}'  text='{}'  color={}".format(self._stamp(), who, text, bg))
 
     def _test_log(self, src, data, via=""):
         """Diagnostics: one line per packet from this PC's N1MM."""

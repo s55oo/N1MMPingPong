@@ -97,3 +97,30 @@ class EchoTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VerdictTests(unittest.TestCase):
+    """The diagnostics log shows N1MM's raw values next to PingPong's verdict."""
+
+    def test_echo_verdict(self):
+        n = Net()
+        n.send("S", "F4 S51CAB", True, 352310, 100.0)
+        n.send("L", "", True, 352777, 100.2)
+        v = n.sets["L"].verdict
+        self.assertTrue(v["n1mm_tx"])
+        self.assertFalse(v["tx"])
+        self.assertIn("ECHO", v["note"])
+
+    def test_caption_carried_verdict(self):
+        n = Net()
+        n.send("L", "F4 S51CAB", True, 352777, 100.0)
+        n.send("L", "", True, 352777, 100.4)
+        v = n.sets["L"].verdict
+        self.assertTrue(v["tx"])
+        self.assertEqual(v["key"], "S51CAB")
+        self.assertIn("carried over", v["note"])
+
+    def test_plain_packet_has_no_note(self):
+        n = Net()
+        n.send("L", "", False, 352777, 100.0)
+        self.assertEqual(n.sets["L"].verdict["note"], "")

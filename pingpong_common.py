@@ -324,6 +324,7 @@ class EchoFilter:
         """-> (effective tx flag, caption to use) for one packet of `who`
         = (pc, radio number); group = (band, mode) or None."""
         st = self.seen.setdefault(who, {"group": group, "cap_at": 0.0, "cap": "", "tx": False, "at": now})
+        self.note = ""
         if tx and caption:
             st.update(cap_at=now, cap=caption)
         elif tx:
@@ -331,8 +332,10 @@ class EchoFilter:
             other = self._other_busy(who, group, now, stale) if group else 0.0
             if other and other > own:
                 tx = False  # rule 2: the other PC transmitted last - an echo
+                self.note = "ECHO ignored (another PC transmits on this band, no caption here)"
             elif own:
                 caption = st["cap"]  # rule 1: the same message goes on
+                self.note = "caption carried over ('{}' sent {:.2f} s ago)".format(caption, now - st["cap_at"])
         st.update(group=group, tx=tx, at=now)
         return tx, caption
 
@@ -362,6 +365,7 @@ class RadioSet:
     def __init__(self):
         self.radios = {}
         self.active_nr = self.focus_nr = None
+        self.verdict = None  # filled by update(): see the diagnostics log
 
     def update(self, data, now, stale=DEFAULT_STALE, guard=None, pc=None):
         """guard: an EchoFilter shared by all PCs; pc: this PC's identity."""
@@ -393,12 +397,19 @@ class RadioSet:
         radio = self.radios.setdefault(nr, RadioState(nr))
         was_tx = radio.tx and now - radio.last_seen <= stale
         _, caption, _, tx, freq, mode = packet_info(data)
+        raw_tx, raw_caption = tx, caption
         if guard is not None and pc is not None:
             tf = (root.findtext("TXFreq") or "").strip()
             tf = tf if re.fullmatch(r"0*[1-9][0-9]*", tf) else (freq or radio.rx_freq)
             tx, caption = guard.filter((pc, nr), tx, group_of(tf, mode or radio.mode), caption, now, stale)
         started = tx and not was_tx
         ended = copy.copy(radio) if was_tx and not tx else None
+        # For the diagnostics log: N1MM's raw values next to PingPong's verdict.
+        self.verdict = {
+            "nr": nr, "n1mm_tx": raw_tx, "n1mm_key": raw_caption, "tx": tx, "key": caption,
+            "note": guard.note if guard is not None and pc is not None else "",
+            "started": started, "ended": ended is not None,
+        }
         if started:
             # SO2R has one transmitter at a time. A lost RX packet from the
             # previous radio must not resurrect its TX after this one ends.

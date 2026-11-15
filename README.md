@@ -716,6 +716,10 @@ vRadio:
 On the logged session this took RUN2 from 99 transmissions shown without a
 message to 6. Status and history: [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md).
 
+With **Diagnostics** on, `pingpong_test.log` shows each raw N1MM `RadioInfo` line followed by a `PP` line
+(what PingPong decided: TX flag and message used, echo ignored / caption carried over) and a `PP  LAMP shows`
+line whenever the lamp display changes - so N1MM's packets and PingPong's output can be compared directly.
+
 ### SO2R radio selection
 
 PingPong keeps separate status for `RadioNr` 1 and 2 under one PC identity
