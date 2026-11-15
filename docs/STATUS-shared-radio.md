@@ -5,7 +5,10 @@ showed what N1MM really sends: each PC reports its own TX with the key's caption
 TX **without caption** right after RUN3's captioned TX (an echo of the shared radio) – 116 of its 270 TX packets.
 v1.108 ignores such packets (and keeps the caption of a message that goes on). Replayed on that log: RUN2's
 transmissions shown without a message 99 → 6; RUN3 unchanged. It uses only N1MM's `RadioInfo`, nothing from vRadio.
-Not yet confirmed on the station. The history below (v1.102–v1.107) stays as it was.
+**Confirmed on the station (15 Nov, 12:05, v1.108 on both PCs):** the operator saw no empty messages and RUN2 showed
+the correct messages; in the log of that run all 3 captionless TX packets of RUN2 came 0.06–1.2 s after RUN3's TX
+(echoes) and none after RUN2's own message. Short test (40 s, 31 TX packets, RUN2's side only) – a longer, busier one
+is still worth doing before the contest. The history below (v1.102–v1.107) stays as it was.
 
 **Update – v1.107 (14 Nov, 23:50): rolled back.** v1.107 has exactly the code of v1.101 (PR #1 and
 PR #2 kept); the experiments of v1.102–v1.106 are removed from the code but stay in git history
