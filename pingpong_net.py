@@ -270,6 +270,7 @@ def make_hello(
     n1mm_master="", started=0.0, colors="", block_time=0.0,
     alert_run=False, block_time_run=0.0, pingpong="", problems="", pp_limit="",
     urgent=False, urgent_band="", urgent_mode="", urgent_time=0.0, urgent_priority=False,
+    diag=False,
 ):
     root = ET.Element("PingPongHello")
     for tag, value in (
@@ -300,6 +301,7 @@ def make_hello(
         ("UrgentMode", urgent_mode or ""),
         ("UrgentTime", "{:.3f}".format(urgent_time or 0.0)),
         ("UrgentPriority", "1" if urgent_priority else "0"),
+        ("Diag", "1" if diag else "0"),  # Diagnostics (log to file) is on
     ):
         ET.SubElement(root, tag).text = value
     return ET.tostring(root, encoding="utf-8")
@@ -346,6 +348,7 @@ def parse_hello(data):
         "urgent_mode": get("UrgentMode"),
         "urgent_time": _float(get("UrgentTime")),
         "urgent_priority": get("UrgentPriority") == "1",
+        "diag": get("Diag") == "1",
     }
 
 def format_colors(mapping):
@@ -587,6 +590,43 @@ def parse_command(data):
     if not isinstance(body, dict) or not body.get("id") or not body.get("cmd"):
         return None
     return body
+
+LOG_MAGIC = b"PPL1"  # a piece of a lamp's diagnostics log -> the Overview
+LOG_CHUNK = 1000  # bytes of compressed log per UDP packet
+LOG_TAIL = 600 * 1024  # the newest part of the log that is sent
+
+def make_log_packets(node_id, name, raw):
+    """Compress a log and cut it into UDP packets (each: magic, JSON head, \\n, data)."""
+    import gzip
+    import json
+    import uuid
+
+    data = gzip.compress(raw, 6)
+    sid = uuid.uuid4().hex[:8]
+    parts = [data[i:i + LOG_CHUNK] for i in range(0, len(data), LOG_CHUNK)] or [b""]
+    out = []
+    for i, part in enumerate(parts):
+        head = json.dumps({"n": node_id, "name": name, "sid": sid, "i": i, "c": len(parts),
+                           "raw": len(raw)}).encode("utf-8")
+        out.append(LOG_MAGIC + head + b"\n" + part)
+    return out
+
+def parse_log(data):
+    """(head dict, compressed bytes) of a log packet, or None."""
+    if not data.startswith(LOG_MAGIC):
+        return None
+    import json
+
+    head, sep, part = data[len(LOG_MAGIC):].partition(b"\n")
+    if not sep:
+        return None
+    try:
+        info = json.loads(head.decode("utf-8"))
+    except ValueError:
+        return None
+    if not isinstance(info, dict) or not all(k in info for k in ("n", "sid", "i", "c")):
+        return None
+    return info, part
 
 def parse_relay(data):
     """(node_id, N1MM packet) of a relay message, or None."""

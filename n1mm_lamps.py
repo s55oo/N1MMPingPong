@@ -646,6 +646,9 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2", bg=UI_BG)
         self.help_link.pack(side=tk.RIGHT)
         self.help_link.bind("<Button-1>", lambda e: self._open_help())
+        # Shown only while Diagnostics (log to file) is on.
+        self.diag_badge = tk.Label(top, text="DIAG", font=("Segoe UI", 8, "bold"),
+                                   bg="#b00020", fg="white", padx=5)
         self._hover_tip(self.help_link, "PingPong help  ·  S55OO software")
         self.options_link = tk.Label(  # a small "pill" button
             top, text="Options ▾", font=("Segoe UI", 8, "bold"), cursor="hand2",
@@ -1217,7 +1220,31 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             self.info.configure(fg=self._info_fg)
         self._sync_compact()
 
+    def _test_rotate(self, limit=TEST_LOG_LIMIT):
+        """pingpong_test.log -> .1 -> .2 -> .3 when it is bigger than `limit` bytes."""
+        try:
+            if os.path.getsize(self.test_log_path) <= limit:
+                return False
+        except OSError:
+            return False
+        base = self.test_log_path
+        try:
+            for n in (3, 2, 1):
+                old = "{}.{}".format(base, n)
+                if os.path.exists(old):
+                    if n == 3:
+                        os.remove(old)
+                    else:
+                        os.replace(old, "{}.{}".format(base, n + 1))
+            os.replace(base, base + ".1")
+        except OSError:
+            return False
+        return True
+
     def _test_write(self, line):
+        self._test_writes = getattr(self, "_test_writes", 0) + 1
+        if self._test_writes % 500 == 0:
+            self._test_rotate()
         try:
             with open(self.test_log_path, "a", encoding="utf-8") as fh:
                 fh.write(line + "\n")

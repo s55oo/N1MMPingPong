@@ -366,6 +366,21 @@ class AdminMixin:
         if not self._send_command(pp.make_command("diagnostics", value="1" if on else "0")):
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
 
+    def _collect_logs(self):
+        """Every lamp sends the newest part of its diagnostics log; the Overview
+        saves each one in the logs folder next to its exe."""
+        if not self._on_master_pc(time.time()):
+            messagebox.showwarning(TITLE, "This PC is not the master PC – the lamps take this "
+                                   "only from the master PC.", parent=self.root)
+            return
+        self._event("-", "diagnostics logs requested from all lamps")
+        if not self._send_command(pp.make_command("sendlog")):
+            messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
+            return
+        messagebox.showinfo(
+            TITLE, "Asked every lamp for its log.\nIt arrives in a few seconds as a file in\n{}\n"
+            "(see the event log).".format(os.path.join(pp.app_dir(), "logs")), parent=self.root)
+
     def _toggle_pingpong(self):
         """Ping-pong lock ON <-> OFF: asks the master lamp, which passes the
         setting on to every lamp (the button follows the master's hello)."""

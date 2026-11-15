@@ -1,6 +1,8 @@
 """Lamp rules: F12 calls, urgent calls, ping-pong lock, master, notes, commands."""
 
 import time
+import os
+import tempfile
 import unittest
 
 from helpers import MY_IP, m, make_lamp, peer, station
@@ -429,6 +431,7 @@ class DiagnosticsCommandTest(unittest.TestCase):
         app = make_lamp()
         app.var_test = Var()
         app.test_on = False
+        app.test_log_path = os.path.join(tempfile.mkdtemp(), "t.log")
         written = []
         app._test_write = written.append
         app._set_diagnostics(True)
@@ -437,6 +440,76 @@ class DiagnosticsCommandTest(unittest.TestCase):
         self.assertEqual(len(written), 1)
         app._set_diagnostics(False)
         self.assertFalse(app.test_on)
+
+
+class LogCollectTest(unittest.TestCase):
+    def test_log_packets_roundtrip(self):
+        raw = b"".join(b"12:00:%02d.000  PP  line %d\n" % (i % 60, i) for i in range(5000))
+        packets = m.make_log_packets("node1", "RUN2", raw)
+        self.assertGreater(len(packets), 1)
+        self.assertTrue(all(len(p) < 1300 for p in packets))  # fits one UDP packet
+        import gzip
+        got = {}
+        for p in reversed(packets):  # any order
+            head, part = m.parse_log(p)
+            got[head["i"]] = part
+            self.assertEqual((head["n"], head["name"], head["c"]), ("node1", "RUN2", len(packets)))
+        self.assertEqual(gzip.decompress(b"".join(got[i] for i in range(len(packets)))), raw)
+        self.assertIsNone(m.parse_log(b"PPR1xyz"))
+        self.assertIsNone(m.parse_log(m.LOG_MAGIC + b"not json\ndata"))
+
+    def test_hello_carries_diagnostics_flag(self):
+        on = m.parse_hello(m.make_hello("n", "h", ["1.2.3.4"], True, diag=True))
+        off = m.parse_hello(m.make_hello("n", "h", ["1.2.3.4"], True))
+        self.assertTrue(on["diag"])
+        self.assertFalse(off["diag"])
+
+    def test_sendlog_command_only_from_master_pc(self):
+        app = make_lamp()
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        started = []
+        orig = m.threading.Thread if hasattr(m, "threading") else None
+        app._send_log = lambda: started.append(1)
+        app.on_command("10.0.0.5", m.parse_command(m.make_command("sendlog")))
+        self.assertEqual(started, [])  # not from the master PC
+
+    def test_send_log_sends_the_tail(self):
+        app = make_lamp()
+        app.test_log_path = os.path.join(tempfile.mkdtemp(), "t.log")
+        with open(app.test_log_path, "wb") as fh:
+            fh.write(b"old line\n" * 100000 + b"newest line\n")
+        sent = []
+        import pingpong_rules as rules
+        orig = rules.send_relay
+        rules.send_relay = lambda share, payload: sent.append(payload)
+        app._share = {}
+        app._key_event = lambda *a, **k: None
+        try:
+            app._send_log()
+        finally:
+            rules.send_relay = orig
+        import gzip
+        parts = {}
+        for p in sent:
+            head, part = m.parse_log(p)
+            parts[head["i"]] = part
+        raw = gzip.decompress(b"".join(parts[i] for i in range(len(parts))))
+        self.assertTrue(raw.endswith(b"newest line\n"))
+        self.assertLessEqual(len(raw), m.LOG_TAIL)
+
+    def test_rotation_keeps_three_old_logs(self):
+        app = make_lamp()
+        d = tempfile.mkdtemp()
+        app.test_log_path = os.path.join(d, "t.log")
+        for n in range(5):
+            with open(app.test_log_path, "w") as fh:
+                fh.write("run {} ".format(n) + "x" * 100)
+            self.assertTrue(app._test_rotate(limit=50))
+        self.assertEqual(sorted(os.listdir(d)), ["t.log.1", "t.log.2", "t.log.3"])
+        self.assertTrue(open(os.path.join(d, "t.log.1")).read().startswith("run 4"))
+        with open(app.test_log_path, "w") as fh:
+            fh.write("small")
+        self.assertFalse(app._test_rotate(limit=50))
 
 
 class EmergencyCommandTest(unittest.TestCase):

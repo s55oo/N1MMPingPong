@@ -593,6 +593,15 @@ an error never stops its display or its messages to the other lamps.
 Always off after a restart, so the log only grows while you diagnose.
 Delete the file any time.
 
+- **Header with date and time:** `=== diagnostics ON · 2026-11-15 13:36:55 · PingPong v… ===` (also OFF).
+- **DIAG mark:** a red `DIAG` label in the lamp's top bar while Diagnostics is on.
+- **Size limit:** a log bigger than 5 MB is rotated when Diagnostics is switched on (and while it runs):
+  `pingpong_test.log` → `.1` → `.2` → `.3` (the oldest is deleted).
+- **From the Overview** (master PC only), **Settings ▾**: *Diagnostics ON on all lamps* (the menu shows
+  how many lamps have it on), *Diagnostics OFF…* and *Collect diagnostics logs from all lamps*: every lamp
+  sends the newest ~600 KB of its log (compressed, signed with the network password) and the Overview saves
+  each one as `logs\<name>_<date>_<time>.log` next to its exe (the event log notes it).
+
 ### Command line (optional)
 
 ```bat
@@ -1001,7 +1010,22 @@ is open to the network.
 
 ---
 
-## 4. Troubleshooting
+## 4. Contest checklist
+
+Before the contest (about 10 minutes, Overview open on the master PC):
+
+1. **Same version everywhere** – Overview shows no `v… – update`; if it does: **Update all lamps…**.
+2. **One master** – only the master's title bar says `MASTER` (no `⚠ TWO MASTERS`).
+3. **Every PC heard** – each station is listed in the Overview with the right name, color and role (RUN / INB).
+4. **N1MM** – on every PC *Broadcast Data → Radio* includes `127.0.0.1:12062`; *Test all lamps* flashes every lamp.
+5. **Network password** – set on all PCs (Settings ▾ → Network password…), or none anywhere.
+6. **Firewall** – the rule for UDP 12062 and 46070 is allowed on every PC (and TCP 8046 / 8047 if you use the web pages).
+7. **Ping-pong lock** – ON or OFF as agreed; release time set on the master.
+8. **Shared radio** – two PCs on one radio: run a short test, key from each PC and watch that each shows its own message.
+9. **Diagnostics OFF** – no red `DIAG` mark on any lamp (it only logs, but the file grows).
+10. **Reset statistics** at the contest start (Statistics ▾).
+
+## 5. Troubleshooting
 
 | Problem | What to check |
 |---|---|
@@ -1021,7 +1045,7 @@ is open to the network.
 
 ---
 
-## 5. Watcher (PingPong.bat / n1mm_watch.py)
+## 6. Watcher (PingPong.bat / n1mm_watch.py)
 
 Detailed view of all UDP traffic: station table on the left, traffic on the
 right, details of the selected packet at the bottom. Needs Python.
@@ -1042,7 +1066,7 @@ right, details of the selected packet at the bottom. Needs Python.
 
 ---
 
-## 6. Building the EXEs
+## 7. Building the EXEs
 
 Normally you don't need to: every release is built automatically (see
 below). To build locally, with Python installed, double-click
@@ -1098,7 +1122,7 @@ Existing releases are never overwritten.
 
 ---
 
-## 7. Files
+## 8. Files
 
 ```
 n1mm_lamps.py       – lamp: window and display loop (start here)

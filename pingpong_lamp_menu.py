@@ -570,6 +570,9 @@ class OptionsMixin:
 
     def _test_toggled(self):
         self.test_on = bool(self.var_test.get())
+        if self.test_on:
+            self._test_rotate()  # start a big log afresh
+        self._show_diag_badge()
         self._test_write(
             "=== diagnostics {} · {} · PingPong v{} · local IPs {} ===".format(
                 "ON" if self.test_on else "OFF",
@@ -578,6 +581,15 @@ class OptionsMixin:
                 ", ".join(sorted(self.local)) or "?",
             )
         )
+
+    def _show_diag_badge(self):
+        badge = getattr(self, "diag_badge", None)
+        if badge is None:
+            return
+        if self.test_on:
+            badge.pack(side=tk.RIGHT, padx=(0, 4))
+        else:
+            badge.pack_forget()
 
     def _keys_toggled(self):
         call, block = bool(self.var_keys.get()), bool(self.var_block.get())

@@ -11,6 +11,7 @@ listener, the discovery thread, the keyboard hook and the window all
 touch the station and lamp lists.
 """
 
+import os
 import socket
 import threading
 import time
@@ -82,6 +83,8 @@ class RulesMixin:
         elif command["cmd"] == "diagnostics" and command.get("value") in ("1", "0"):
             on = command["value"] == "1"
             self._ui_calls.append(lambda: self._set_diagnostics(on))
+        elif command["cmd"] == "sendlog":  # "Collect diagnostics logs" in the Overview
+            threading.Thread(target=self._send_log, daemon=True).start()
         elif command["cmd"] == "restart":  # emergency, from the Overview
             self._ui_calls.append(self._remote_restart)
         elif command["cmd"] == "stop":  # emergency, from the Overview
@@ -93,6 +96,29 @@ class RulesMixin:
             if self._i_am_master:
                 on = command["value"] == "1"
                 self._ui_calls.append(lambda: self._set_pingpong(on))
+
+    def _send_log(self):
+        """Send the newest part of pingpong_test.log to the Overview (compressed,
+        signed with the network password like every message)."""
+        try:
+            size = os.path.getsize(self.test_log_path)
+            with open(self.test_log_path, "rb") as fh:
+                if size > LOG_TAIL:
+                    fh.seek(size - LOG_TAIL)
+                    fh.readline()  # start at a whole line
+                raw = fh.read()
+        except OSError:
+            raw = b""
+        if not raw:
+            self._key_event("diagnostics log requested - no log on this PC")
+            return
+        name = self.my_alias or socket.gethostname()
+        packets = make_log_packets(self.node_id, name, raw)
+        for packet in packets:
+            send_relay(self._share, packet)
+            time.sleep(0.004)
+        self._key_event("diagnostics log sent to the Overview ({} KB, {} packets)".format(
+            len(raw) // 1024, len(packets)))
 
     def _set_diagnostics(self, on):
         """'Diagnostics ON/OFF on all lamps' from the Overview (UI thread)."""
@@ -298,6 +324,7 @@ class RulesMixin:
             "urgent_mode": self.urgent_key[1],
             "urgent_time": self.urgent_time,
             "urgent_priority": self.urgent_on and self.urgent_priority,
+            "diag": bool(getattr(self, "test_on", False)),
         }
 
     def _fresh_peers(self, now):

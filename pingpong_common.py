@@ -34,6 +34,7 @@ NETWORK_REFRESH = 30.0  # s: re-read this PC's network adapters
 LOCAL_N1MM_RECENT = 10.0  # s: own N1MM counts as running if heard this recently
 
 TEST_LOG = "pingpong_test.log"
+TEST_LOG_LIMIT = 5 * 1024 * 1024  # bytes: a bigger log is rotated (.1 .2 .3 kept)
 
 ERROR_LOG = "pingpong_error.log"
 

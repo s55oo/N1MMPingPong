@@ -565,3 +565,30 @@ class PlannedResetTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CollectLogTest(unittest.TestCase):
+    def test_log_from_a_lamp_is_saved(self):
+        o = make_overview()
+        o.logs_dir = os.path.join(tempfile.mkdtemp(), "logs")
+        raw = b"".join(b"12:00:00.000  PP  line %d\n" % i for i in range(4000))
+        packets = m.make_log_packets("node7", "RUN 2", raw)
+        for p in packets[:-1]:
+            o._packet("10.0.0.5", p)
+        self.assertEqual(os.listdir(o.logs_dir) if os.path.isdir(o.logs_dir) else [], [])  # not complete yet
+        o._packet("10.0.0.5", packets[-1])
+        files = os.listdir(o.logs_dir)
+        self.assertEqual(len(files), 1)
+        self.assertTrue(files[0].startswith("RUN_2_"))
+        with open(os.path.join(o.logs_dir, files[0]), "rb") as fh:
+            self.assertEqual(fh.read(), raw)
+
+    def test_damaged_log_is_not_saved(self):
+        o = make_overview()
+        o.logs_dir = os.path.join(tempfile.mkdtemp(), "logs")
+        packets = m.make_log_packets("node7", "RUN2", b"x" * 100000)
+        head, part = m.parse_log(packets[0])
+        packets[0] = packets[0][:len(m.LOG_MAGIC)] + packets[0][len(m.LOG_MAGIC):].replace(part[:20], b"\x00" * 20, 1)
+        for p in packets:
+            o._packet("10.0.0.5", p)
+        self.assertFalse(os.path.isdir(o.logs_dir) and os.listdir(o.logs_dir))

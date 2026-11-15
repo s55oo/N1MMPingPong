@@ -38,6 +38,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         self.port = port
         self.web_port = web_port
         self.lamps = {}
+        self.log_parts = {}  # (node, session) -> pieces of a lamp's log being received
         self._shared = pp.EchoFilter()  # echo of a shared radio
         self.lock = threading.Lock()
         self.slots = {}  # band -> [node_id of INB holding the slot, time]
@@ -113,6 +114,38 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             except Exception:
                 pp.log_error("overview packet")
 
+    LOG_WAIT = 20.0  # s: a log that is still incomplete after this is reported
+
+    def _log_piece(self, head, part):
+        """A piece of a lamp's diagnostics log; the whole log is saved in logs/."""
+        import gzip
+
+        now = time.time()
+        self.__dict__.setdefault("log_parts", {})
+        key = (head["n"], head["sid"])
+        with self.lock:
+            got = self.log_parts.setdefault(key, {"at": now, "parts": {}, "head": head})
+            got["parts"][head["i"]] = part
+            count = head["c"]
+            done = len(got["parts"]) == count
+            for old in [k for k, v in self.log_parts.items() if now - v["at"] > self.LOG_WAIT * 3]:
+                self.log_parts.pop(old, None)
+            if not done:
+                return
+            self.log_parts.pop(key, None)
+        name = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(head.get("name") or head["n"]))[:40]
+        try:
+            raw = gzip.decompress(b"".join(got["parts"][i] for i in range(count)))
+            folder = getattr(self, "logs_dir", "") or os.path.join(pp.app_dir(), "logs")
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, "{}_{}.log".format(name, time.strftime("%Y%m%d_%H%M%S")))
+            with open(path, "wb") as fh:
+                fh.write(raw)
+            self._event(name, "diagnostics log received", "{} KB -> logs\\{}".format(
+                len(raw) // 1024, os.path.basename(path)))
+        except (OSError, EOFError, ValueError):
+            self._event(name, "diagnostics log damaged", "ask again")
+
     def _lamp(self, node_id):
         lamp = self.lamps.get(node_id)
         if lamp is None:
@@ -121,6 +154,10 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
 
     def _packet(self, src, data):
         now = time.time()
+        log = pp.parse_log(data)
+        if log is not None:
+            self._log_piece(*log)
+            return
         relay = pp.parse_relay(data)
         if relay is not None:
             node_id, payload = relay
@@ -652,8 +689,14 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     self.web_port),
                 command=self._allow_firewall)
         m.add_separator()
-        m.add_command(label="Diagnostics ON on all lamps", command=lambda: self._diagnostics_all(True))
+        with self.lock:
+            heard = [l for l in self.lamps.values() if l.hello and time.time() - l.hello_seen < 30]
+            on = [l.name() for l in heard if l.hello.get("diag")]
+        m.add_command(label="Diagnostics ON on all lamps  (now on: {} of {})".format(len(on), len(heard)),
+                      command=lambda: self._diagnostics_all(True))
         m.add_command(label="Diagnostics OFF on all lamps", command=lambda: self._diagnostics_all(False))
+        m.add_command(label="Collect diagnostics logs from all lamps  (-> logs folder)",
+                      command=self._collect_logs)
         m.add_separator()
         m.add_checkbutton(label="Always on top", variable=self.var_top, command=self._on_top)
 
