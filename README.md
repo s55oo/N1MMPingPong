@@ -696,7 +696,25 @@ PC, kept by updates.
 
 ---
 
-> **Shared radio (two PCs, one radio, e.g. through vRadio):** not supported in this version. v1.102-v1.106 tried and were rolled back in v1.107 – see [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md).
+### Two PCs on one shared radio (echo filter)
+
+If the N1MMs of two PCs share **one** radio (e.g. through a CAT translator
+such as vRadio), the N1MM of one PC may report `IsTransmitting=True` right
+after the other PC's transmission **without a caption** – an echo of the
+shared radio. Real captures (S51CAB, 15 Nov 2026) show it: the PC that really
+keys always reports its transmission with the caption of the key
+(`F4 S51CAB`). PingPong uses only N1MM's `RadioInfo` for this, nothing from
+vRadio:
+
+- a TX packet **without caption** right after the other PC's captioned TX (or
+  while it still transmits) on the same band and mode is **ignored** – the lamp
+  does not show it and the ping-pong lock does not count it;
+- a TX packet without caption right after the **same** PC's own captioned TX
+  (within 1.5 s) is the same message going on – its caption is used again;
+- everything else is left as N1MM reports it. Nothing to set.
+
+On the logged session this took RUN2 from 99 transmissions shown without a
+message to 6. Status and history: [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md).
 
 ### SO2R radio selection
 

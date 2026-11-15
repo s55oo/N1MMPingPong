@@ -282,6 +282,61 @@ def packet_info(data):
     return True, caption, station, is_tx, freq, mode
 
 
+ECHO_WINDOW = 1.5  # s
+
+
+class EchoFilter:
+    """Filters the TX flag of the N1MMs of several PCs (used by the lamp and the
+    Overview, one filter for all PCs). Real N1MM captures (two PCs sharing one
+    radio through a CAT translator) show:
+
+    - the PC that really keys reports TX with the caption of the key
+      ("F4 S51CAB"); the other PC's N1MM may report IsTransmitting=True
+      right after it **without any caption** (an echo of the shared radio);
+    - the keying PC's own later TX packets may also come without caption.
+
+    Rules, per TX packet without a caption (within ECHO_WINDOW s):
+    1. the same radio sent a captioned TX, and no other PC did later: the same
+       message goes on - its caption is used again;
+    2. another PC on the same band and mode is transmitting, or sent a
+       captioned TX later than this radio: an echo - the TX flag is ignored.
+    Everything else (TX with a caption, TX without any other PC transmitting)
+    is left as N1MM reports it."""
+
+    def __init__(self, window=ECHO_WINDOW):
+        self.window = window
+        self.seen = {}  # who -> {"group", "cap_at", "cap", "tx", "at"}
+
+    def _other_busy(self, who, group, now, stale):
+        """Time of the latest captioned TX of another PC on this band and mode
+        (now, while it still transmits); 0.0 if there is none."""
+        latest = 0.0
+        for other, st in self.seen.items():
+            if other[0] == who[0] or st["group"] != group:  # same PC: not "other"
+                continue
+            if st["tx"] and st["cap"] and now - st["at"] <= stale:
+                latest = max(latest, now)  # still transmitting a captioned message
+            elif st["cap_at"] and now - st["cap_at"] <= self.window:
+                latest = max(latest, st["cap_at"])
+        return latest
+
+    def filter(self, who, tx, group, caption, now, stale=DEFAULT_STALE):
+        """-> (effective tx flag, caption to use) for one packet of `who`
+        = (pc, radio number); group = (band, mode) or None."""
+        st = self.seen.setdefault(who, {"group": group, "cap_at": 0.0, "cap": "", "tx": False, "at": now})
+        if tx and caption:
+            st.update(cap_at=now, cap=caption)
+        elif tx:
+            own = st["cap_at"] if st["cap_at"] and now - st["cap_at"] <= self.window else 0.0
+            other = self._other_busy(who, group, now, stale) if group else 0.0
+            if other and other > own:
+                tx = False  # rule 2: the other PC transmitted last - an echo
+            elif own:
+                caption = st["cap"]  # rule 1: the same message goes on
+        st.update(group=group, tx=tx, at=now)
+        return tx, caption
+
+
 class RadioState:
     """One radio's state. PC identity/color stay on the containing Station."""
 
@@ -308,7 +363,8 @@ class RadioSet:
         self.radios = {}
         self.active_nr = self.focus_nr = None
 
-    def update(self, data, now, stale=DEFAULT_STALE):
+    def update(self, data, now, stale=DEFAULT_STALE, guard=None, pc=None):
+        """guard: an EchoFilter shared by all PCs; pc: this PC's identity."""
         try:
             root = ET.fromstring(data[data.find(b"<"):])
         except (ET.ParseError, ValueError):
@@ -337,6 +393,10 @@ class RadioSet:
         radio = self.radios.setdefault(nr, RadioState(nr))
         was_tx = radio.tx and now - radio.last_seen <= stale
         _, caption, _, tx, freq, mode = packet_info(data)
+        if guard is not None and pc is not None:
+            tf = (root.findtext("TXFreq") or "").strip()
+            tf = tf if re.fullmatch(r"0*[1-9][0-9]*", tf) else (freq or radio.rx_freq)
+            tx, caption = guard.filter((pc, nr), tx, group_of(tf, mode or radio.mode), caption, now, stale)
         started = tx and not was_tx
         ended = copy.copy(radio) if was_tx and not tx else None
         if started:

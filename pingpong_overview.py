@@ -38,6 +38,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         self.port = port
         self.web_port = web_port
         self.lamps = {}
+        self._shared = pp.EchoFilter()  # echo of a shared radio
         self.lock = threading.Lock()
         self.slots = {}  # band -> [node_id of INB holding the slot, time]
         self.error = ""
@@ -132,7 +133,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 lamp.src = lamp.src or src
                 if station:
                     lamp.n1mm_name = station
-                if lamp.radios.update(payload, now) is not None:
+                if lamp.radios.update(payload, now, guard=self._shared, pc=lamp.stats_key()) is not None:
                     self._sync_radio(lamp, now)
             return
         info = pp.parse_hello(data)

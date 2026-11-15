@@ -24,6 +24,7 @@ def make_overview():
     o.root = Root()
     o.port = 46070
     o.lamps = {}
+    o._shared = ov.pp.EchoFilter()
     o.lock = threading.Lock()
     o.slots = {}
     o.error = o.web_error = ""
