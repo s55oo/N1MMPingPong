@@ -646,6 +646,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self.help_link = tk.Label(top, image=self.help_icon, cursor="hand2", bg=UI_BG)
         self.help_link.pack(side=tk.RIGHT)
         self.help_link.bind("<Button-1>", lambda e: self._open_help())
+        self._hover_tip(self.help_link, "PingPong help  ·  S55OO software")
         self.options_link = tk.Label(  # a small "pill" button
             top, text="Options ▾", font=("Segoe UI", 8, "bold"), cursor="hand2",
             bg=UI_PILL, fg=UI_TEXT, padx=9, pady=2,
@@ -972,6 +973,34 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             self._silence_call()
         else:
             self._save_window()
+
+    def _hover_tip(self, widget, text):
+        """A small hover comment next to a widget."""
+        tip = []
+
+        def show(event):
+            if tip:
+                return
+            try:
+                win = tk.Toplevel(widget)
+                win.wm_overrideredirect(True)
+                win.wm_geometry("+{}+{}".format(event.x_root + 12, event.y_root + 14))
+                tk.Label(win, text=text, bg="#ffffe0", fg="black", relief=tk.SOLID,
+                         borderwidth=1, font=("Segoe UI", 9), padx=5, pady=2).pack()
+                tip.append(win)
+            except tk.TclError:
+                pass
+
+        def hide(event=None):
+            while tip:
+                try:
+                    tip.pop().destroy()
+                except tk.TclError:
+                    pass
+
+        widget.bind("<Enter>", show)
+        widget.bind("<Leave>", hide)
+        widget.bind("<Button-1>", lambda e: hide(), add="+")
 
     def _open_help(self):
         try:
