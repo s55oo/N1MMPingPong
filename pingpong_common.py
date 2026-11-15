@@ -282,7 +282,8 @@ def packet_info(data):
     return True, caption, station, is_tx, freq, mode
 
 
-ECHO_WINDOW = 1.5  # s
+ECHO_WINDOW = 1.5
+ECHO_TAIL = 0.3  # s after the other PC's TX ended in which its echo may still arrive
 
 
 class EchoFilter:
@@ -316,7 +317,9 @@ class EchoFilter:
                 continue
             if st["tx"] and st["cap"] and now - st["at"] <= stale:
                 latest = max(latest, now)  # still transmitting a captioned message
-            elif st["cap_at"] and now - st["cap_at"] <= self.window:
+            elif st["cap_at"] and not st["tx"] and now - st["at"] <= ECHO_TAIL:
+                latest = max(latest, st["cap_at"])  # just ended: a late echo may still come
+            elif st["cap_at"] and st["tx"] and now - st["cap_at"] <= self.window:
                 latest = max(latest, st["cap_at"])
         return latest
 

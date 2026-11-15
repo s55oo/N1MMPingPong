@@ -710,7 +710,7 @@ vRadio:
   while it still transmits) on the same band and mode is **ignored** – the lamp
   does not show it and the ping-pong lock does not count it;
 - a TX packet without caption right after the **same** PC's own captioned TX
-  (within 1.5 s) is the same message going on – its caption is used again;
+  (within 1.5 s; after its end only 0.3 s) is the same message going on – its caption is used again;
 - everything else is left as N1MM reports it. Nothing to set.
 
 On the logged session this took RUN2 from 99 transmissions shown without a

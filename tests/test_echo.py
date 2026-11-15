@@ -124,3 +124,21 @@ class VerdictTests(unittest.TestCase):
         n = Net()
         n.send("L", "", False, 352777, 100.0)
         self.assertEqual(n.sets["L"].verdict["note"], "")
+
+
+class TailTest(unittest.TestCase):
+    """Real log, 15 Nov 12:28:07: RUN2's TX 0.58 s after RUN3's TX ended is not an echo."""
+
+    def test_tx_well_after_the_other_ended_is_kept(self):
+        n = Net()
+        n.send("S", "F4 S51CAB", True, 352310, 100.0)
+        n.send("S", "", False, 352310, 100.5)
+        n.send("L", "", True, 352777, 101.08)  # 0.58 s after RUN3 ended
+        self.assertTrue(n.tx("L", 101.1))
+
+    def test_echo_right_after_the_other_ended_is_ignored(self):
+        n = Net()
+        n.send("S", "F4 S51CAB", True, 352310, 100.0)
+        n.send("S", "", False, 352310, 100.5)
+        n.send("L", "", True, 352777, 100.7)  # 0.2 s after: relay lag
+        self.assertFalse(n.tx("L", 100.8))
