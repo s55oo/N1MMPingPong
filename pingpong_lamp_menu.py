@@ -571,8 +571,9 @@ class OptionsMixin:
     def _test_toggled(self):
         self.test_on = bool(self.var_test.get())
         self._test_write(
-            "=== diagnostics {} · PingPong v{} · local IPs {} ===".format(
+            "=== diagnostics {} · {} · PingPong v{} · local IPs {} ===".format(
                 "ON" if self.test_on else "OFF",
+                time.strftime("%Y-%m-%d %H:%M:%S"),
                 __version__,
                 ", ".join(sorted(self.local)) or "?",
             )
