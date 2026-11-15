@@ -79,6 +79,9 @@ class RulesMixin:
             self._ui_calls.append(self._remote_update)
         elif command["cmd"] == "test":  # "Test all lamps" in the Overview
             self._ui_calls.append(self._lamp_test)
+        elif command["cmd"] == "diagnostics" and command.get("value") in ("1", "0"):
+            on = command["value"] == "1"
+            self._ui_calls.append(lambda: self._set_diagnostics(on))
         elif command["cmd"] == "restart":  # emergency, from the Overview
             self._ui_calls.append(self._remote_restart)
         elif command["cmd"] == "stop":  # emergency, from the Overview
@@ -90,6 +93,12 @@ class RulesMixin:
             if self._i_am_master:
                 on = command["value"] == "1"
                 self._ui_calls.append(lambda: self._set_pingpong(on))
+
+    def _set_diagnostics(self, on):
+        """'Diagnostics ON/OFF on all lamps' from the Overview (UI thread)."""
+        if bool(self.var_test.get()) != on:
+            self.var_test.set(on)
+            self._test_toggled()
 
     def _apply_setup(self, pcs, master):
         """Restore a saved station setup: this PC's name and color (found by

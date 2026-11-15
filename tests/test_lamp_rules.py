@@ -410,6 +410,35 @@ class CommandTest(unittest.TestCase):
         self.assertGreater(master.hello_now.count, 0)  # passed on to all lamps at once
 
 
+class DiagnosticsCommandTest(unittest.TestCase):
+    def test_diagnostics_only_from_master_pc(self):
+        app = make_lamp()
+        app._master_peer = peer(app, "M", ["10.0.0.9"], alias="MASTER")
+        app.on_command("10.0.0.5", m.parse_command(m.make_command("diagnostics", value="1")))
+        self.assertEqual(app._ui_calls, [])  # not from the master PC
+        app.on_command("10.0.0.9", m.parse_command(m.make_command("diagnostics", value="1")))
+        self.assertEqual(len(app._ui_calls), 1)
+        app.on_command("10.0.0.9", m.parse_command(m.make_command("diagnostics", value="x")))
+        self.assertEqual(len(app._ui_calls), 1)  # invalid value ignored
+
+    def test_diagnostics_switches_on_and_off(self):
+        class Var:
+            v = False
+            def get(self): return self.v
+            def set(self, x): self.v = x
+        app = make_lamp()
+        app.var_test = Var()
+        app.test_on = False
+        written = []
+        app._test_write = written.append
+        app._set_diagnostics(True)
+        self.assertTrue(app.test_on)
+        app._set_diagnostics(True)  # already on: no second header
+        self.assertEqual(len(written), 1)
+        app._set_diagnostics(False)
+        self.assertFalse(app.test_on)
+
+
 class EmergencyCommandTest(unittest.TestCase):
     def test_restart_and_stop_from_master_pc_only(self):
         app = make_lamp()

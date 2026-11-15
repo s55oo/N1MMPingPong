@@ -719,6 +719,7 @@ message to 6. Status and history: [docs/STATUS-shared-radio.md](docs/STATUS-shar
 With **Diagnostics** on, `pingpong_test.log` shows each raw N1MM `RadioInfo` line followed by a `PP` line
 (what PingPong decided: TX flag and message used, echo ignored / caption carried over) and a `PP  LAMP shows`
 line whenever the lamp display changes - so N1MM's packets and PingPong's output can be compared directly.
+The Overview switches Diagnostics on or off on every lamp: **Settings ▾ → Diagnostics ON / OFF on all lamps** (master PC only).
 
 ### SO2R radio selection
 

@@ -652,6 +652,9 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     self.web_port),
                 command=self._allow_firewall)
         m.add_separator()
+        m.add_command(label="Diagnostics ON on all lamps", command=lambda: self._diagnostics_all(True))
+        m.add_command(label="Diagnostics OFF on all lamps", command=lambda: self._diagnostics_all(False))
+        m.add_separator()
         m.add_checkbutton(label="Always on top", variable=self.var_top, command=self._on_top)
 
     def _on_top(self, save=True):
