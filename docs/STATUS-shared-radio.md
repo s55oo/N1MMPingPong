@@ -1,4 +1,34 @@
-# Status – shared radio (RUN2 / RUN3), 14–15 Nov 2026
+# Status – shared radio (RUN2 / RUN3), 14–16 Nov 2026
+
+**Update – v1.115 (16 Nov): the echo filter has its own 3 s limit.** Found in a code review, not seen on the
+station. The filter decided "the other PC is still transmitting" with the display timeout `--stale` (15 s since
+v1.101 / PR #2, which is right for the display: N1MM repeats each radio every 10 s). If the other PC's "TX off"
+packet was lost (UDP, e.g. over ZeroTier), this PC's TX packets without caption were ignored as echoes until
+N1MM's next status packet – up to 10 s. Now the other PC counts as transmitting for the echo decision only for
+`ECHO_BUSY` = 3 s after its last packet; `--stale` is unchanged. Basis for 3 s: in all station logs of
+14–15 Nov, the 55 echoes that came while the other PC transmitted arrived at most 1.6 s after that PC's last
+packet (median 0.15 s). **Trade-off:** an echo that comes more than 3 s into a long message of the other PC,
+with no packet from it in between, is now shown (red, no message). Not seen in the logs, but possible.
+
+**Versions since v1.108** (all only N1MM `RadioInfo`, nothing from vRadio):
+
+| Version | What | Station |
+|---|---|---|
+| v1.109 | Diagnostics, second layer: `PP` lines (N1MM's values → PingPong's verdict) and `PP  LAMP shows` | used for the logs below |
+| v1.110 | Overview: Diagnostics ON / OFF on all lamps | not reported |
+| v1.111 | Echo only while the other PC transmits, or 0.3 s after its end (was 1.5 s). From the log of 12:27–12:28: 3 of 8 ignored packets were not echoes | log of 13:36–13:39: 12 starts, all with the right message; 3 echoes ignored, all real |
+| v1.112 | Date and time in the Diagnostics header | – |
+| v1.113 | Hover comment on the help icon | not reported |
+| v1.114 | Collect logs from the Overview, log rotation (5 MB), DIAG mark, contest checklist | **not yet run on the station** |
+| v1.115 | Echo filter: own 3 s limit instead of `--stale` | **not yet run on the station** |
+
+**Known open points (code review, 16 Nov):**
+
+- The echo filter acts for **every** pair of PCs on the same band and mode, not only for PCs that share a radio.
+  With two radios, a TX packet without caption from one PC is hidden while the other transmits. In the logs a
+  PC with its own TX always sent the caption (RUN3: 0 of 439 without), so it may never happen.
+- Collect logs has no retransmit; a log with a lost piece is dropped without a message.
+- Still only short tests (longest 3 minutes) and only RUN2's log. A 15-minute test on both PCs is worth doing.
 
 **Update – v1.108 (15 Nov): echo filter, based on a real capture.** The log of RUN2 (v1.101 session, 20:22–21:40)
 showed what N1MM really sends: each PC reports its own TX with the key's caption, but RUN2's N1MM also reports

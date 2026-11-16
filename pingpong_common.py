@@ -285,6 +285,13 @@ def packet_info(data):
 
 ECHO_WINDOW = 1.5
 ECHO_TAIL = 0.3  # s after the other PC's TX ended in which its echo may still arrive
+# s without any packet from the other PC after which it no longer counts as
+# transmitting for the echo decision. Its own limit, on purpose not --stale
+# (15 s, right for the display): if the other PC's "TX off" packet is lost, this
+# PC's TX packets without caption would be ignored until N1MM's next status
+# packet (up to 10 s). In the station logs every echo came at most 1.6 s after
+# the other PC's last packet (55 echoes, 14-15 Nov 2026).
+ECHO_BUSY = 3.0
 
 
 class EchoFilter:
@@ -300,8 +307,9 @@ class EchoFilter:
     Rules, per TX packet without a caption (within ECHO_WINDOW s):
     1. the same radio sent a captioned TX, and no other PC did later: the same
        message goes on - its caption is used again;
-    2. another PC on the same band and mode is transmitting, or sent a
-       captioned TX later than this radio: an echo - the TX flag is ignored.
+    2. another PC on the same band and mode is transmitting (heard within
+       ECHO_BUSY s), or sent a captioned TX later than this radio: an echo -
+       the TX flag is ignored.
     Everything else (TX with a caption, TX without any other PC transmitting)
     is left as N1MM reports it."""
 
@@ -316,7 +324,7 @@ class EchoFilter:
         for other, st in self.seen.items():
             if other[0] == who[0] or st["group"] != group:  # same PC: not "other"
                 continue
-            if st["tx"] and st["cap"] and now - st["at"] <= stale:
+            if st["tx"] and st["cap"] and now - st["at"] <= min(stale, ECHO_BUSY):
                 latest = max(latest, now)  # still transmitting a captioned message
             elif st["cap_at"] and not st["tx"] and now - st["at"] <= ECHO_TAIL:
                 latest = max(latest, st["cap_at"])  # just ended: a late echo may still come

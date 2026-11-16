@@ -65,8 +65,8 @@ class EchoTest(unittest.TestCase):
     def test_long_message_without_new_packets_still_filters_the_echo(self):
         n = Net()
         n.send("S", "CQ TEST S51CAB", True, 352310, 100.0)
-        n.send("L", "", True, 352777, 104.0)  # 4 s later, RUN3 still transmitting
-        self.assertFalse(n.tx("L", 104.1))
+        n.send("L", "", True, 352777, 102.5)  # 2.5 s later, RUN3 still transmitting
+        self.assertFalse(n.tx("L", 102.6))  # (after ECHO_BUSY s without a packet: see LostTxOffTest)
 
     def test_own_message_continues_without_caption(self):
         n = Net()
@@ -142,3 +142,26 @@ class TailTest(unittest.TestCase):
         n.send("S", "", False, 352310, 100.5)
         n.send("L", "", True, 352777, 100.7)  # 0.2 s after: relay lag
         self.assertFalse(n.tx("L", 100.8))
+
+
+class LostTxOffTest(unittest.TestCase):
+    """The other PC's "TX off" packet is lost (UDP): it must not hide this PC for long."""
+
+    def test_echo_still_ignored_shortly_after_the_others_last_packet(self):
+        n = Net()
+        n.send("S", "F1 CQ", True, 352310, 100.0)
+        n.send("L", "", True, 352777, 101.6)  # the latest echo seen on the station: 1.6 s
+        self.assertFalse(n.tx("L", 101.7))
+
+    def test_silent_other_pc_no_longer_counts_as_transmitting(self):
+        n = Net()
+        n.send("S", "F1 CQ", True, 352310, 100.0)  # its "TX off" never arrives
+        n.send("L", "", True, 352777, 100.0 + m.ECHO_BUSY + 0.5)
+        self.assertTrue(n.tx("L", 104.0))  # before: ignored until --stale (15 s)
+
+    def test_long_message_with_fresh_packets_keeps_filtering(self):
+        n = Net()
+        n.send("S", "F1 CQ", True, 352310, 100.0)
+        n.send("S", "F1 CQ", True, 352310, 102.5)  # e.g. a frequency change during TX
+        n.send("L", "", True, 352777, 104.0)
+        self.assertFalse(n.tx("L", 104.1))

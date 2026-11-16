@@ -720,6 +720,9 @@ vRadio:
   does not show it and the ping-pong lock does not count it;
 - a TX packet without caption right after the **same** PC's own captioned TX
   (within 1.5 s; after its end only 0.3 s) is the same message going on – its caption is used again;
+- the other PC counts as "still transmitting" only while its packets keep coming: after **3 s** without any
+  packet from it, a TX packet without caption is shown again. So a lost "TX off" packet (UDP) cannot hide
+  this PC for long. (The display timeout `--stale`, 15 s, is separate and unchanged.)
 - everything else is left as N1MM reports it. Nothing to set.
 
 On the logged session this took RUN2 from 99 transmissions shown without a
