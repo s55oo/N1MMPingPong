@@ -195,7 +195,7 @@ class BandWatcherMixin:
             if s['limit'] is None:
                 detail = 'conservative hold {:02d}:{:02d}'.format(int(s['operational_remaining']) // 60, int(s['operational_remaining']) % 60)
             else:
-                detail = '{}/{} changes; resets {} UTC'.format(s['changes'], s['limit'],
+                detail = '{}/{} changes; {} left; resets {} UTC'.format(s['changes'], s['limit'], s['left'],
                                      time.strftime('%H:%M', time.gmtime(s['resets'])))
             text += ' · {} {} MHz: {}'.format(s['signal'], s['band'] or '?', detail)
         if active:
@@ -434,7 +434,7 @@ class BandWatcherMixin:
             + (self.watch_detected or 'not received') + '\n' + view.get('coverage', ''))
         self.watch_summary.configure(text='\n'.join('{} · {} MHz · {}'.format(s['signal'], s['band'] or '?',
             '{} seconds remaining'.format(int(s['operational_remaining'])) if s['limit'] is None
-            else '{}/{} changes this UTC hour'.format(s['changes'], s['limit'])) for s in view['signals']))
+            else '{}/{} changes this UTC hour; {} left'.format(s['changes'], s['limit'], s['left'])) for s in view['signals']))
         self.watch_history.delete(*self.watch_history.get_children())
         for f in sorted(view['findings'], key=lambda f: f['at'], reverse=True)[:500]:
             self.watch_history.insert('', 'end', values=(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(f['at'])),
