@@ -61,6 +61,7 @@ from pingpong_common import *  # noqa: F401,F403
 from pingpong_common import _float, guarded, log_error  # noqa: F401
 from pingpong_net import *  # noqa: F401,F403
 from pingpong_net import _sender_socket  # noqa: F401
+from pingpong_lamp_band import BandAlertMixin
 from pingpong_lamp_menu import OptionsMixin
 from pingpong_lamp_phone import PhoneMixin
 from pingpong_lamp_update import UpdateMixin
@@ -166,7 +167,7 @@ APP_ICON_B64 = (
 FONT_SIZES = [(4, 34), (8, 29), (12, 23), (9999, 21)]  # +30 % (v1.30)
 
 
-class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
+class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMixin):
     def __init__(self, root, config_path, port, stale, discovery_port=None,
                  phone_port=phone.PHONE_PORT):
         self.root = root
@@ -310,6 +311,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
                     self._share,
                     self.on_relay,
                     self.on_command,
+                    self.on_band,
                 ),
                 daemon=True,
             )
@@ -324,6 +326,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
             self._phone_server, self._phone_error = phone.start_server(
                 phone_port, lambda: self._phone_state, self._phone_seen)
             threading.Thread(target=self._phone_address_loop, daemon=True).start()
+        self._band_init()  # BAND VIOLATION alerts from N1MM_timer
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
         if keys.supported():
@@ -874,6 +877,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         x, y = pos
         self._compact = on
         self.var_compact.set(on)
+        self._band_repack()
         if self._compact:
             self.top.pack_forget()
             self.info.pack_forget()
@@ -1041,6 +1045,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self._refresh_radios(now)
         owners = self._color_owners(now)
         self._update_master(owners, now)
+        self._band_update(now)
         role = self._my_role_now()
         if role != self._last_role:
             if self._last_role:

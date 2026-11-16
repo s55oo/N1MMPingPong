@@ -69,7 +69,7 @@ class OptionsMixin:
         )
         calls.add_checkbutton(label="Block my F-keys while another station calls (F12)",
                               variable=self.var_block, command=self._keys_toggled)
-        calls.add_checkbutton(label="Sound on F12 call", variable=self.var_sound,
+        calls.add_checkbutton(label="Sound (F12 calls, BAND VIOLATION)", variable=self.var_sound,
                               command=lambda: self.settings.set("call_sound", self.var_sound.get()))
         menu.add_cascade(label="Calls and keys", menu=calls)
 

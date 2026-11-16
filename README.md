@@ -325,7 +325,7 @@ Warn the other operators on your band without transmitting.
   your lamp closes; on a receiving PC it ends when that PC changes band,
   or (for an S&P call) goes to Run.
 - The receiving PC also gives a short **double beep** when the call starts
-  (once per call; **Options ▾ → Calls and keys → Sound on F12 call**, on by default).
+  (once per call; **Options ▾ → Calls and keys → Sound (F12 calls, BAND VIOLATION)**, on by default).
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
 - **S&P stations can't answer a call with their own.** While another PC's
@@ -707,6 +707,29 @@ PC, kept by updates.
 | `[n1mm]` | optional `ini` – path of N1MM's settings file, if it isn't in the usual `Documents\N1MM Logger+` folder |
 
 ---
+
+### BAND VIOLATION (from N1MM_timer)
+
+PingPong does **not** check band-change rules itself. A separate program,
+[N1MM_timer](https://github.com/s55oo/N1MM_timer), runs on the **master PC**, follows the N1MM log and
+checks the contest's band-change rules (10-minute rule, hourly band changes, MULT on the RUN band).
+PingPong only shows what it reports, on every lamp, in the Overview and on its web page:
+
+- **Red footer `BAND VIOLATION: <text>`**, plus `(+N more)` when there are more, and `· YOUR STATION`
+  on the lamp whose N1MM StationName logged one of them. One beep per new violation if the lamp's
+  sound is on (**Options ▾ → Calls and keys → Sound (F12 calls, BAND VIOLATION)**).
+- **Grey `Band watcher offline`**: N1MM_timer was heard before but sent nothing for longer than its
+  `ttl_s` (10 s). Nothing is shown if N1MM_timer never ran.
+- The footer clears when N1MM_timer reports `ok` (a violation acknowledged in N1MM_timer leaves its list).
+- **Advisory only**: it never changes the ping-pong lock, F-key blocking, radios or N1MM.
+
+How it travels: N1MM_timer → **UDP 127.0.0.1:46071** (loopback only, no password) → the master's lamp →
+every lamp and the Overview over the signed lamp network (UDP 46070, network password as for all
+messages). Lamps and the Overview accept it **only from the master PC**; a message from a lamp that is
+not the master is ignored. Port 46071 needs no firewall rule (it never leaves the PC). Other port:
+`[band_alert] port = …` in `pingpong.ini` next to the lamp (`0` switches the receiver off).
+Older lamps ignore the message. Test without N1MM_timer: `python tools/send_band_alert.py` on the
+master PC (a test violation for 12 s, then `ok`; `--stop` to see the offline state).
 
 ### Two PCs on one shared radio (echo filter)
 

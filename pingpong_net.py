@@ -653,7 +653,7 @@ def send_relay(share, payload):
 
 def discovery_loop(
     port, node_id, get_state, on_networks, on_hello, stop, hello_now=None,
-    share=None, on_relay=None, on_command=None,
+    share=None, on_relay=None, on_command=None, on_band=None,
 ):
     """Active discovery between PCs running PingPong.
 
@@ -732,6 +732,11 @@ def discovery_loop(
         data, status = unseal(data, addr[0])
         if not accepted(status):
             continue
+        if data.startswith(BAND_MAGIC):
+            # A BAND VIOLATION alert from N1MM_timer, passed on by the master's lamp.
+            if on_band is not None:
+                guarded("band alert", on_band)(addr[0], data[len(BAND_MAGIC):])
+            continue
         command = parse_command(data)
         if command is not None:
             if on_command is not None:
@@ -751,6 +756,34 @@ def discovery_loop(
             sock.close()
         except OSError:
             pass
+
+BAND_MAGIC = b"PPB1"  # see pingpong_bandalert.py
+
+def loopback_loop(port, on_datagram, stop):
+    """Receive datagrams on 127.0.0.1:`port` only (N1MM_timer on this PC).
+    No SO_REUSEADDR: no other program can share the port and read along.
+    Returns at once if the port is taken."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        sock.bind(("127.0.0.1", port))
+        sock.settimeout(0.3)
+    except OSError:
+        return False  # the port is taken (e.g. a second lamp on this PC)
+    try:
+        while not stop.is_set():
+            try:
+                data, addr = sock.recvfrom(65535)
+            except socket.timeout:
+                continue
+            except OSError:
+                stop.wait(0.3)
+                continue
+            guarded("band alert receive", on_datagram)(addr[0], data)
+    finally:
+        sock.close()
+    return True
 
 PORT_CHECK = 30.0  # s: how often to look for other programs on N1MM's port
 
