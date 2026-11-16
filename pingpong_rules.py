@@ -24,6 +24,25 @@ from pingpong_net import *  # noqa: F401,F403
 
 
 class RulesMixin:
+    def _band_client(self):
+        from pingpong_bandwire import WatchClient
+        if not hasattr(self, "_band_status"):
+            settings = getattr(self, "settings", None)
+            enabled = settings.get("bandwatch_enabled", False) if settings else False
+            self._band_status = WatchClient(enabled=enabled)
+        return self._band_status
+
+    def _band_authority(self):
+        if self._i_am_master:
+            return self.node_id
+        return self._master_peer.id if self._master_peer is not None else None
+
+    def _band_text(self, now):
+        return self._band_client().text(self._band_authority(), now)
+
+    def _band_ack(self):
+        self._band_client().acknowledge()
+
     def _my_role_now(self):
         """This PC's ping-pong role right now, always from its N1MM:
         Run = RUN, S&P = INB, not known (yet) = off."""
@@ -69,6 +88,13 @@ class RulesMixin:
         if not from_master:
             self._key_event("command '{}' from {} ignored - not the master PC".format(
                 command["cmd"], src))
+            return
+        if command["cmd"] == "bandwatch":
+            client = self._band_client()
+            if client.accept(command.get("state"), self._band_authority(), time.time()):
+                settings = getattr(self, "settings", None)
+                if settings is not None and settings.get("bandwatch_enabled", False) != client.enabled:
+                    settings.set("bandwatch_enabled", client.enabled)
             return
         if command["cmd"] == "ping":
             # Answer at once from this (network) thread: the Overview

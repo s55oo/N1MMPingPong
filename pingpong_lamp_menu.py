@@ -125,6 +125,8 @@ class OptionsMixin:
                              state=tk.DISABLED if self._busy else tk.NORMAL)
         menu.add_separator()
 
+        menu.add_command(label="Silence current band watcher alert", command=self._band_ack)
+
         # Network
         net_menu = tk.Menu(menu, tearoff=0)
         net_menu.add_checkbutton(label="Share my N1MM with other lamps (all networks)",

@@ -1019,6 +1019,25 @@ is open to the network.
 
 ---
 
+### Central band-change watcher (optional)
+
+Overview's **Band watcher** tab monitors the complete contest log centrally
+and distributes advisory status to the lamps. It supports explicit 2026 CQ
+WW/WPX CW, SSB and RTTY Multi-Single/Multi-Two profiles. An unacknowledged
+logged breach makes **every updated client flash red/dark**, including
+clients on other bands, until acknowledged or resolved. Captions remain
+visible, and findings remain in the audit history.
+
+Setup requires N1MM Application Info, Contacts and Radio broadcasts from
+each PC to the master Overview on **UDP 12063**, explicit logical signal
+assignments, and a complete Cabrillo import for bootstrap/recovery. Existing
+UDP 12062 lamp destinations remain in place. UDP delivery is not guaranteed:
+the watcher distinguishes incomplete history and an unavailable publisher
+from an actual finding. It never controls radios or blocks transmission.
+
+See [band watcher setup, rule sources and recovery](docs/band-watcher.md)
+for configuration, supported rules, red flashing, and coverage limitations.
+
 ## 4. Contest checklist
 
 Before the contest (about 10 minutes, Overview open on the master PC):

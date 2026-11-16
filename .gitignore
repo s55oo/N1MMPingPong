@@ -22,3 +22,6 @@ pingpong_error.log
 # PingPong Overview (per-PC)
 pingpong_overview.ini
 pingpong_stats.json
+
+# Central band watcher ledger (per-PC)
+bandwatch.sqlite*

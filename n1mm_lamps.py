@@ -1208,9 +1208,20 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         self._update_tail()
 
     def _update_tail(self):
-        self._phone_tail()
         warns = [w for w in (self._master_warn, self._port_warning()) if w]
         warns += self._password_warnings(time.time())
+        band_text = self._band_text(time.time())
+        if band_text:
+            warns.append(band_text)
+        client = self._band_client()
+        if client.ring:
+            client.ring = False
+            if self.var_sound.get():
+                self.root.bell()
+        if client.flash(self._band_authority(), time.time()):
+            # All clients flash for a logged breach, including clients on
+            # other bands. Keep the caption; only override the lamp color.
+            self._set_bg("red" if int(time.time() / 0.35) % 2 == 0 else "#202020")
         if warns:
             self.info.configure(
                 text="  ·  ".join("⚠ " + w for w in warns) + "  ·  " + self.info.cget("text"),
@@ -1219,6 +1230,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin):
         elif self.info.cget("fg") != self._info_fg:
             self.info.configure(fg=self._info_fg)
         self._sync_compact()
+        self._phone_tail()
 
     def _test_rotate(self, limit=TEST_LOG_LIMIT):
         """pingpong_test.log -> .1 -> .2 -> .3 when it is bigger than `limit` bytes."""

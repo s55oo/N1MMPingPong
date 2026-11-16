@@ -2,8 +2,9 @@
 
 A separate, read-only program, meant for the master PC. It shows the same
 live table in its own window and as a web page (http://<this PC>:8046).
-It only LISTENS to what the PingPong lamps broadcast on UDP 46070 and
-never opens N1MM's ports, so it runs next to a lamp.
+It listens to the PingPong lamps on UDP 46070. The optional central band
+watcher also accepts N1MM data on dedicated UDP 12063; it never shares
+N1MM's usual 12060 or the local lamp's 12062.
 
 Code:
 - pingpong_overview.py         - this file: window, table, alarm, start
@@ -28,11 +29,12 @@ from tkinter import messagebox, simpledialog, ttk  # noqa: F401  (simpledialog: 
 import n1mm_lamps as pp
 from pingpong_overview_admin import AdminMixin
 from pingpong_overview_common import *  # noqa: F401,F403
+from pingpong_bandservice import BandWatcherMixin
 from pingpong_overview_stats import StatsMixin
 from pingpong_overview_web import WebMixin
 
 
-class Overview(AdminMixin, StatsMixin, WebMixin):
+class Overview(BandWatcherMixin, AdminMixin, StatsMixin, WebMixin):
     def __init__(self, root, port, web_port):
         self.root = root
         self.port = port
@@ -82,7 +84,11 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
         except ValueError:
             self.reset_at = 0.0
+        self._watch_init()
         self._build()
+        self._watch_build()
+        self.watch_thread = threading.Thread(target=self._watch_listen, daemon=True)
+        self.watch_thread.start()
         threading.Thread(target=self._listen, daemon=True).start()
         if web_port:
             threading.Thread(target=self._serve_web, daemon=True).start()
@@ -777,6 +783,10 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         except Exception:
             pass
         self.stop.set()
+        if hasattr(self, 'watch_thread'):
+            self.watch_thread.join(timeout=1)
+            if not self.watch_thread.is_alive():
+                self.watch_log.db.close()
         self.root.destroy()
 
     # ------------------------------------------------------------ table data
@@ -859,6 +869,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
 
     def _make_snapshot(self):
         now = time.time()
+        bandwatch = self._watch_tick(now)
         with self.lock:
             heard_keys = {l.stats_key() for l in self.lamps.values()
                           if now - l.hello_seen <= SILENT_AFTER}
@@ -916,6 +927,9 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 ready = "ok"
                 head = "✔ READY  ·  " + head
         notes = []
+        if bandwatch and bandwatch.get("enabled"):
+            notes.append("Band watcher: " + bandwatch["health"])
+            notes.append(self._watch_wire(bandwatch, set(), now)["text"])
         for err in (self.error, self.web_error):
             if err:
                 notes.append("⚠ " + err)
@@ -943,6 +957,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             "title": "{} v{}".format(TITLE, pp.__version__),
             "head": head, "warn": warn, "ready": ready, "rows": rows, "notes": notes,
             "alarm": alarm,
+            "bandwatch": bandwatch,
             "pingpong": pp_state,
             "master_name": masters[0].name() if len(masters) == 1 else "",
             "pp_limit": "{:g}".format(self._pp_limit()) if pp_state else "",

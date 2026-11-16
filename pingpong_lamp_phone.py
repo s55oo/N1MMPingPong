@@ -119,6 +119,10 @@ class PhoneMixin:
         """What the phone page shows: the lamp as it is now, plus one tile
         per band with who transmits there (UI thread, lock held)."""
         border = self.canvas.cget("highlightbackground")
+        info = self.info.cget("text")
+        watcher = self._band_text(now)
+        if watcher and watcher not in info:
+            info = watcher + "  " + info
         lamp = {
             "bg": self._hex(self.canvas.cget("bg")),
             "fg": self._hex(self.canvas.itemcget(self.text_id, "fill")),
@@ -126,7 +130,7 @@ class PhoneMixin:
             "who": self._who_text,
             "freq": self._freq_text,
             "border": "" if border == self._window_bg else self._hex(border),
-            "info": self.info.cget("text")[:300],
+            "info": info[:1000],
         }
         owners = self._color_owners(now)
         groups = {}
