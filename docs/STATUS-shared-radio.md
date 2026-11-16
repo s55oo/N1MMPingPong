@@ -27,7 +27,8 @@ with no packet from it in between, is now shown (red, no message). Not seen in t
 - The echo filter acts for **every** pair of PCs on the same band and mode, not only for PCs that share a radio.
   With two radios, a TX packet without caption from one PC is hidden while the other transmits. In the logs a
   PC with its own TX always sent the caption (RUN3: 0 of 439 without), so it may never happen.
-- Collect logs has no retransmit; a log with a lost piece is dropped without a message.
+- ~~Collect logs has no retransmit; a log with a lost piece is dropped without a message.~~ Solved in v1.116
+  (missing pieces are asked for again; every lamp gets a line in the event log). Not yet run on the station.
 - Still only short tests (longest 3 minutes) and only RUN2's log. A 15-minute test on both PCs is worth doing.
 
 **Update – v1.108 (15 Nov): echo filter, based on a real capture.** The log of RUN2 (v1.101 session, 20:22–21:40)

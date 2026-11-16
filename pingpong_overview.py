@@ -39,6 +39,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         self.web_port = web_port
         self.lamps = {}
         self.log_parts = {}  # (node, session) -> pieces of a lamp's log being received
+        self.log_done = []  # logs already saved or given up
+        self.log_asked = {}  # node -> (name, time): lamps asked for a log, no piece yet
         self._shared = pp.EchoFilter()  # echo of a shared radio
         self.lock = threading.Lock()
         self.slots = {}  # band -> [node_id of INB holding the slot, time]
@@ -114,28 +116,53 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             except Exception:
                 pp.log_error("overview packet")
 
-    LOG_WAIT = 20.0  # s: a log that is still incomplete after this is reported
+    LOG_QUIET = 1.5  # s without a new piece before the missing ones are asked for again
+    LOG_TRIES = 4  # such requests per log
+    LOG_WAIT = 20.0  # s after "Collect logs" until a lamp without answer is reported
 
     def _log_piece(self, head, part):
-        """A piece of a lamp's diagnostics log; the whole log is saved in logs/."""
-        import gzip
-
+        """A piece of a lamp's diagnostics log; the whole log is saved in logs/.
+        Pieces may arrive twice (every network) and in any order."""
         now = time.time()
-        self.__dict__.setdefault("log_parts", {})
         key = (head["n"], head["sid"])
         with self.lock:
-            got = self.log_parts.setdefault(key, {"at": now, "parts": {}, "head": head})
-            got["parts"][head["i"]] = part
-            count = head["c"]
-            done = len(got["parts"]) == count
-            for old in [k for k, v in self.log_parts.items() if now - v["at"] > self.LOG_WAIT * 3]:
-                self.log_parts.pop(old, None)
-            if not done:
+            self.log_asked.pop(head["n"], None)  # this lamp answers
+            if key in self.log_done:
+                return  # a late copy of a log that is already handled
+            got = self.log_parts.get(key)
+            if got is None:
+                if len(self.log_parts) >= 32:
+                    return  # more logs at once than any station has lamps
+                got = self.log_parts[key] = {"parts": {}, "head": head, "tries": 0, "at": now}
+            if head["c"] != got["head"]["c"]:
                 return
-            self.log_parts.pop(key, None)
-        name = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(head.get("name") or head["n"]))[:40]
+            if head["i"] not in got["parts"]:
+                got["parts"][head["i"]] = part
+                got["at"] = now
+            if len(got["parts"]) < head["c"]:
+                return
+            self._log_close(key)
+        self._log_save(got)
+
+    def _log_close(self, key):
+        self.log_parts.pop(key, None)
+        self.log_done.append(key)
+        del self.log_done[:-64]
+
+    @staticmethod
+    def _log_name(head):
+        return "".join(c if c.isalnum() or c in "-_" else "_"
+                       for c in str(head.get("name") or head["n"]))[:40] or "lamp"
+
+    def _log_save(self, got):
+        import gzip
+
+        head, name = got["head"], self._log_name(got["head"])
+        if not head.get("raw"):
+            self._event(name, "no diagnostics log on that PC", "Diagnostics was never on there")
+            return
         try:
-            raw = gzip.decompress(b"".join(got["parts"][i] for i in range(count)))
+            raw = gzip.decompress(b"".join(got["parts"][i] for i in range(head["c"])))
             folder = getattr(self, "logs_dir", "") or os.path.join(pp.app_dir(), "logs")
             os.makedirs(folder, exist_ok=True)
             path = os.path.join(folder, "{}_{}.log".format(name, time.strftime("%Y%m%d_%H%M%S")))
@@ -143,8 +170,37 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 fh.write(raw)
             self._event(name, "diagnostics log received", "{} KB -> logs\\{}".format(
                 len(raw) // 1024, os.path.basename(path)))
-        except (OSError, EOFError, ValueError):
-            self._event(name, "diagnostics log damaged", "ask again")
+        except (OSError, EOFError, ValueError, KeyError):
+            self._event(name, "diagnostics log damaged", "collect the logs again")
+
+    def _log_check(self, now):
+        """Display timer: ask again for missing pieces; report what did not arrive."""
+        ask, failed, silent = [], [], []
+        with self.lock:
+            for key, got in list(self.log_parts.items()):
+                if now - got["at"] < self.LOG_QUIET:
+                    continue
+                count = got["head"]["c"]
+                missing = [i for i in range(count) if i not in got["parts"]]
+                if got["tries"] >= self.LOG_TRIES:
+                    self._log_close(key)
+                    failed.append((self._log_name(got["head"]), count - len(missing), count))
+                    continue
+                got["tries"] += 1
+                got["at"] = now
+                ask.append((key, missing[:pp.LOG_ASK]))
+            for node, (name, at) in list(self.log_asked.items()):
+                if now - at > self.LOG_WAIT:
+                    self.log_asked.pop(node, None)
+                    silent.append(name)
+        for (node, sid), missing in ask:
+            self._send_command(pp.make_command("relog", to=node, sid=sid, pieces=missing))
+        for name, have, count in failed:
+            self._event(name, "diagnostics log incomplete", "{} of {} pieces arrived - "
+                        "collect the logs again".format(have, count))
+        for name in silent:
+            self._event(name, "no diagnostics log received", "no answer (lamp older than v1.114, "
+                        "or its messages do not reach this PC)")
 
     def _lamp(self, node_id):
         lamp = self.lamps.get(node_id)
@@ -905,6 +961,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         self.root.after(REFRESH_MS, self._refresh)
 
     def _refresh_body(self):
+        self._log_check(time.time())
         if (pp.password_needed(time.time())[0] or pp.password_removed(time.time())[0]) \
                 and time.time() - getattr(self, "_key_checked", 0) > 5:
             self._load_network_key()  # the master's lamp may have just set or removed one

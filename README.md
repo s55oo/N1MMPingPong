@@ -601,6 +601,9 @@ Delete the file any time.
   how many lamps have it on), *Diagnostics OFF…* and *Collect diagnostics logs from all lamps*: every lamp
   sends the newest ~600 KB of its log (compressed, signed with the network password) and the Overview saves
   each one as `logs\<name>_<date>_<time>.log` next to its exe (the event log notes it).
+  Pieces lost on the network are asked for again (up to 4 times). The event log has one line per lamp:
+  *diagnostics log received*, *no diagnostics log on that PC*, *diagnostics log incomplete* (n of m pieces
+  arrived) or *no diagnostics log received* (no answer within 20 s) – a log never goes missing silently.
 
 ### Command line (optional)
 

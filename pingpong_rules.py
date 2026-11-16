@@ -85,6 +85,11 @@ class RulesMixin:
             self._ui_calls.append(lambda: self._set_diagnostics(on))
         elif command["cmd"] == "sendlog":  # "Collect diagnostics logs" in the Overview
             threading.Thread(target=self._send_log, daemon=True).start()
+        elif command["cmd"] == "relog":  # the Overview misses pieces of the log just sent
+            pieces = command.get("pieces")
+            if isinstance(pieces, list) and all(isinstance(i, int) for i in pieces):
+                threading.Thread(target=self._resend_log, daemon=True,
+                                 args=(str(command.get("sid")), pieces[:LOG_ASK])).start()
         elif command["cmd"] == "restart":  # emergency, from the Overview
             self._ui_calls.append(self._remote_restart)
         elif command["cmd"] == "stop":  # emergency, from the Overview
@@ -109,16 +114,28 @@ class RulesMixin:
                 raw = fh.read()
         except OSError:
             raw = b""
-        if not raw:
-            self._key_event("diagnostics log requested - no log on this PC")
-            return
         name = self.my_alias or socket.gethostname()
         packets = make_log_packets(self.node_id, name, raw)
+        # Kept for a minute: the Overview asks again for pieces it did not get.
+        self._log_sent = {"sid": parse_log(packets[0])[0]["sid"], "packets": packets, "at": time.time()}
         for packet in packets:
             send_relay(self._share, packet)
             time.sleep(0.004)
-        self._key_event("diagnostics log sent to the Overview ({} KB, {} packets)".format(
-            len(raw) // 1024, len(packets)))
+        if raw:
+            self._key_event("diagnostics log sent to the Overview ({} KB, {} packets)".format(
+                len(raw) // 1024, len(packets)))
+        else:
+            self._key_event("diagnostics log requested - no log on this PC")
+
+    def _resend_log(self, sid, pieces):
+        sent = self.__dict__.get("_log_sent")
+        if not sent or sent["sid"] != sid or time.time() - sent["at"] > 120:
+            return
+        for i in pieces:
+            if 0 <= i < len(sent["packets"]):
+                send_relay(self._share, sent["packets"][i])
+                time.sleep(0.004)
+        self._key_event("diagnostics log: {} pieces sent again".format(len(pieces)))
 
     def _set_diagnostics(self, on):
         """'Diagnostics ON/OFF on all lamps' from the Overview (UI thread)."""

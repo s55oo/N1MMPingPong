@@ -24,6 +24,7 @@ def make_overview():
     o.root = Root()
     o.port = 46070
     o.lamps = {}
+    o.log_parts, o.log_done, o.log_asked = {}, [], {}
     o._shared = ov.pp.EchoFilter()
     o.lock = threading.Lock()
     o.slots = {}
@@ -592,3 +593,82 @@ class CollectLogTest(unittest.TestCase):
         for p in packets:
             o._packet("10.0.0.5", p)
         self.assertFalse(os.path.isdir(o.logs_dir) and os.listdir(o.logs_dir))
+
+
+def events(o):
+    try:
+        with open(o.events_path, encoding="utf-8-sig") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+class CollectLogLossTest(unittest.TestCase):
+    def setUp(self):
+        self.o = make_overview()
+        self.o.logs_dir = os.path.join(tempfile.mkdtemp(), "logs")
+        self.sent = []
+        self.o._send_command = lambda payload: self.sent.append(m.parse_command(payload)) or True
+        self.raw = b"".join(b"12:00:00.000  PP  line %d\n" % i for i in range(6000))
+        self.packets = m.make_log_packets("node7", "RUN2", self.raw)
+        self.assertGreater(len(self.packets), 8)
+
+    def files(self):
+        return os.listdir(self.o.logs_dir) if os.path.isdir(self.o.logs_dir) else []
+
+    def test_missing_pieces_are_asked_for_again_and_the_log_is_saved(self):
+        lost = {1, 4, len(self.packets) - 1}
+        for i, p in enumerate(self.packets):
+            if i not in lost:
+                self.o._packet("10.0.0.5", p)
+        self.o._log_check(time.time())  # pieces still arriving: nothing asked yet
+        self.assertEqual(self.sent, [])
+        self.o._log_check(time.time() + 2)
+        self.assertEqual(len(self.sent), 1)
+        ask = self.sent[0]
+        self.assertEqual((ask["cmd"], ask["to"], set(ask["pieces"])), ("relog", "node7", lost))
+        for i in ask["pieces"]:
+            self.o._packet("10.0.0.5", self.packets[i])
+        self.assertEqual(len(self.files()), 1)
+        with open(os.path.join(self.o.logs_dir, self.files()[0]), "rb") as fh:
+            self.assertEqual(fh.read(), self.raw)
+
+    def test_a_log_that_never_completes_is_reported(self):
+        for p in self.packets[:-2]:
+            self.o._packet("10.0.0.5", p)
+        t = time.time()
+        for n in range(1, self.o.LOG_TRIES + 2):
+            self.o._log_check(t + 2 * n)
+        self.assertEqual(len(self.sent), self.o.LOG_TRIES)
+        self.assertEqual(self.files(), [])
+        self.assertIn("diagnostics log incomplete", events(self.o))
+        self.assertIn("{} of {} pieces".format(len(self.packets) - 2, len(self.packets)), events(self.o))
+        self.o._packet("10.0.0.5", self.packets[-1])  # a late piece does not start it again
+        self.assertEqual(self.o.log_parts, {})
+
+    def test_copies_from_a_second_network_are_ignored(self):
+        for p in self.packets + self.packets:
+            self.o._packet("10.0.0.5", p)
+        self.assertEqual(len(self.files()), 1)
+        self.assertEqual(self.o.log_parts, {})
+
+    def test_lamp_without_a_log_is_reported(self):
+        for p in m.make_log_packets("node8", "RUN3", b""):
+            self.o._packet("10.0.0.6", p)
+        self.assertEqual(self.files(), [])
+        self.assertIn("no diagnostics log on that PC", events(self.o))
+
+    def test_lamp_that_does_not_answer_is_reported(self):
+        now = time.time()
+        self.o.log_asked = {"node7": ("RUN2", now), "node9": ("INB1", now)}
+        self.o._packet("10.0.0.5", self.packets[0])  # RUN2 answers
+        self.o._log_check(now + self.o.LOG_WAIT + 1)
+        text = events(self.o)
+        self.assertIn("INB1;no diagnostics log received", text)
+        self.assertNotIn("RUN2;no diagnostics log received", text)
+
+    def test_nonsense_piece_numbers_are_refused(self):
+        import json
+        for head in ({"n": "x", "sid": "s", "i": 5, "c": 3}, {"n": "x", "sid": "s", "i": 0, "c": 10 ** 9},
+                     {"n": "x", "sid": "s", "i": "0", "c": 3}, {"n": 1, "sid": "s", "i": 0, "c": 3}):
+            self.assertIsNone(m.parse_log(m.LOG_MAGIC + json.dumps(head).encode() + b"\nxx"))

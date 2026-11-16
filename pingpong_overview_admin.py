@@ -374,12 +374,16 @@ class AdminMixin:
                                    "only from the master PC.", parent=self.root)
             return
         self._event("-", "diagnostics logs requested from all lamps")
+        now = time.time()
+        with self.lock:
+            self.log_asked = {l.id: (l.name(), now) for l in self.lamps.values()
+                              if l.hello and now - l.hello_seen < 30}
         if not self._send_command(pp.make_command("sendlog")):
             messagebox.showerror(TITLE, "Could not send the request (no network).", parent=self.root)
             return
         messagebox.showinfo(
             TITLE, "Asked every lamp for its log.\nIt arrives in a few seconds as a file in\n{}\n"
-            "(see the event log).".format(os.path.join(pp.app_dir(), "logs")), parent=self.root)
+            "The event log says for every lamp whether its log arrived.".format(os.path.join(pp.app_dir(), "logs")), parent=self.root)
 
     def _toggle_pingpong(self):
         """Ping-pong lock ON <-> OFF: asks the master lamp, which passes the

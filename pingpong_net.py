@@ -594,6 +594,8 @@ def parse_command(data):
 LOG_MAGIC = b"PPL1"  # a piece of a lamp's diagnostics log -> the Overview
 LOG_CHUNK = 1000  # bytes of compressed log per UDP packet
 LOG_TAIL = 600 * 1024  # the newest part of the log that is sent
+LOG_MAX_PIECES = 2000  # more than any real log needs (LOG_TAIL / LOG_CHUNK, uncompressed)
+LOG_ASK = 150  # missing pieces asked for in one request
 
 def make_log_packets(node_id, name, raw):
     """Compress a log and cut it into UDP packets (each: magic, JSON head, \\n, data)."""
@@ -601,7 +603,7 @@ def make_log_packets(node_id, name, raw):
     import json
     import uuid
 
-    data = gzip.compress(raw, 6)
+    data = gzip.compress(raw, 6) if raw else b""  # no log: one empty piece, "raw": 0
     sid = uuid.uuid4().hex[:8]
     parts = [data[i:i + LOG_CHUNK] for i in range(0, len(data), LOG_CHUNK)] or [b""]
     out = []
@@ -625,6 +627,10 @@ def parse_log(data):
     except ValueError:
         return None
     if not isinstance(info, dict) or not all(k in info for k in ("n", "sid", "i", "c")):
+        return None
+    if not (isinstance(info["i"], int) and isinstance(info["c"], int)
+            and 0 <= info["i"] < info["c"] <= LOG_MAX_PIECES
+            and isinstance(info["n"], str) and isinstance(info["sid"], str)):
         return None
     return info, part
 

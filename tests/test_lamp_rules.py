@@ -497,6 +497,47 @@ class LogCollectTest(unittest.TestCase):
         self.assertTrue(raw.endswith(b"newest line\n"))
         self.assertLessEqual(len(raw), m.LOG_TAIL)
 
+    def test_missing_pieces_are_sent_again(self):
+        app = make_lamp()
+        app.test_log_path = os.path.join(tempfile.mkdtemp(), "t.log")
+        with open(app.test_log_path, "wb") as fh:
+            fh.write(os.urandom(6000))  # does not compress: several pieces
+        sent = []
+        import pingpong_rules as rules
+        orig = rules.send_relay
+        rules.send_relay = lambda share, payload: sent.append(payload)
+        app._share = {}
+        app._key_event = lambda *a, **k: None
+        try:
+            app._send_log()
+            first = list(sent)
+            self.assertGreater(len(first), 3)
+            sid = m.parse_log(first[0])[0]["sid"]
+            del sent[:]
+            app._resend_log(sid, [2, 0, 999])
+            self.assertEqual(sent, [first[2], first[0]])
+            del sent[:]
+            app._resend_log("other", [0])  # not the log that was sent
+            self.assertEqual(sent, [])
+        finally:
+            rules.send_relay = orig
+
+    def test_no_log_is_answered_too(self):
+        app = make_lamp()
+        app.test_log_path = os.path.join(tempfile.mkdtemp(), "none.log")
+        sent = []
+        import pingpong_rules as rules
+        orig = rules.send_relay
+        rules.send_relay = lambda share, payload: sent.append(payload)
+        app._share = {}
+        app._key_event = lambda *a, **k: None
+        try:
+            app._send_log()
+        finally:
+            rules.send_relay = orig
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(m.parse_log(sent[0])[0]["raw"], 0)
+
     def test_rotation_keeps_three_old_logs(self):
         app = make_lamp()
         d = tempfile.mkdtemp()
