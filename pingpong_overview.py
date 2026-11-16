@@ -26,6 +26,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk  # noqa: F401  (simpledialog: tests)
 
 import n1mm_lamps as pp
+import pingpong_bandalert as band
 from pingpong_overview_admin import AdminMixin
 from pingpong_overview_common import *  # noqa: F401,F403
 from pingpong_overview_stats import StatsMixin
@@ -38,6 +39,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         self.port = port
         self.web_port = web_port
         self.lamps = {}
+        self.band = band.BandAlert()  # BAND VIOLATION from N1MM_timer, via the master's lamp
+        self.band_master = None
         self.log_parts = {}  # (node, session) -> pieces of a lamp's log being received
         self.log_done = []  # logs already saved or given up
         self.log_asked = {}  # node -> (name, time): lamps asked for a log, no piece yet
@@ -115,6 +118,41 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 self._packet(addr[0], data)
             except Exception:
                 pp.log_error("overview packet")
+
+    def _band_packet(self, src, data, now):
+        """A BAND VIOLATION alert: accepted only from the master PC's lamp."""
+        with self.lock:
+            source = next((l.id for l in self._masters(now)
+                           if src == l.src or src in (l.hello.get("ips") or [])), None)
+            if source is None:
+                return
+            msg, _why = band.validate(data, now)
+            if msg is None:
+                return
+            if source != self.band_master:
+                self.band.reset()  # a new master: the old state is not valid
+                self.band_master = source
+            self.band.offer(msg, now)
+
+    def _band_view(self, now):
+        """(kind, text) for the footer; forgets the alert when the master changed."""
+        with self.lock:
+            if self.band_master is not None and \
+                    self.band_master not in {l.id for l in self._masters(now)}:
+                self.band.reset()
+                self.band_master = None
+            return self.band.footer(now)
+
+    def _show_band(self, kind, text):
+        if (kind, text) == getattr(self, "_band_shown", ("", "")):
+            return
+        self._band_shown = (kind, text)
+        if not kind:
+            self.band_foot.pack_forget()
+            return
+        self.band_foot.configure(text=text, bg="#c62828" if kind == "violation" else "#5f6368")
+        if not self.band_foot.winfo_ismapped():
+            self.band_foot.pack(fill=tk.X, before=self.foot)
 
     LOG_QUIET = 1.5  # s without a new piece before the missing ones are asked for again
     LOG_TRIES = 4  # such requests per log
@@ -210,6 +248,9 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
 
     def _packet(self, src, data):
         now = time.time()
+        if data.startswith(band.BAND_MAGIC):
+            self._band_packet(src, data[len(band.BAND_MAGIC):], now)
+            return
         log = pp.parse_log(data)
         if log is not None:
             self._log_piece(*log)
@@ -683,6 +724,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 opts["background"] = bg
             self.tree.tag_configure(tag, **opts)
 
+        self.band_foot = tk.Label(self.root, text="", anchor="w", justify=tk.LEFT, padx=8, pady=4,
+                                  font=("Segoe UI", 10, "bold"), fg="white", bg="#c62828")
         self.foot = tk.Label(self.root, text="", anchor="w", justify=tk.LEFT, padx=8, pady=6,
                              font=("Segoe UI", 9), wraplength=1200)
         self.foot.pack(fill=tk.X)
@@ -976,6 +1019,13 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 self._offer_scheduled = True  # ask once per start
                 self.root.after(0, self._offer_self_update)
         snap = self._make_snapshot()
+        try:  # never let the alert footer stop the table refresh
+            kind, text = self._band_view(time.time())
+            self._show_band(kind, text)
+        except Exception:
+            kind, text = "", ""
+            pp.log_error("band alert display")
+        snap["band"] = {"kind": kind, "text": text}
         self.snapshot = snap  # served to the web page as it is
         with self.lock:
             lamps = list(self.lamps.values())

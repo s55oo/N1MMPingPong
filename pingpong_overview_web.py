@@ -152,6 +152,8 @@ PAGE = """<!doctype html>
   table.stats tr.all td { font-weight:700; }
   table.heat td { min-width:44px; }
   .foot { color:var(--muted); font-size:12px; margin:8px 16px 24px; }
+  #band { margin:8px 16px; padding:6px 10px; border-radius:6px; color:#fff; font-weight:700; background:#c62828; }
+  #band.offline { background:#5f6368; }
 </style>
 </head>
 <body>
@@ -162,6 +164,7 @@ PAGE = """<!doctype html>
 </header>
 <div class="wrap"><table><thead><tr id="cols"></tr></thead><tbody id="rows"></tbody></table>
 <div class="empty" id="empty" hidden>No PingPong lamps heard yet.</div></div>
+<div id="band" hidden></div>
 <div id="notes"></div>
 <h2>Function keys <span id="since"></span></h2>
 <div class="wrap"><table class="stats"><thead><tr id="scols"></tr></thead><tbody id="srows"></tbody></table></div>
@@ -202,6 +205,9 @@ function render(d) {
     body.appendChild(tr);
   }
   document.getElementById("empty").hidden = d.rows.length > 0;
+  const band = document.getElementById("band");
+  band.hidden = !(d.band && d.band.kind);
+  if (d.band && d.band.kind) { band.textContent = d.band.text; band.className = d.band.kind; }
   const notes = document.getElementById("notes"); notes.innerHTML = "";
   for (const n of d.notes) {
     const div = document.createElement("div"); div.textContent = n;
