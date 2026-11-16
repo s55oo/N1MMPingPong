@@ -24,9 +24,19 @@ with no packet from it in between, is now shown (red, no message). Not seen in t
 
 **Known open points (code review, 16 Nov):**
 
-- The echo filter acts for **every** pair of PCs on the same band and mode, not only for PCs that share a radio.
-  With two radios, a TX packet without caption from one PC is hidden while the other transmits. In the logs a
-  PC with its own TX always sent the caption (RUN3: 0 of 439 without), so it may never happen.
+- **The echo filter acts for every pair of PCs on the same band and mode, not only for PCs that share a
+  radio. Decision (S55OO, 16 Nov): it stays like this.** With two radios (a normal RUN + INB pair), a TX
+  packet without caption from one PC is hidden while the other transmits (and up to 0.3 s after) – a real
+  collision would then not be shown. In the logs a PC with its own TX always sent the caption (RUN3: 0 of 439
+  without), so it may never happen.
+  - *How to notice it:* with Diagnostics on, a `PP … <- ECHO ignored` line for a PC that does **not** share a
+    radio.
+  - *Suggestion if it ever shows up (not built):* a setting on the master, "PCs sharing one radio" (here:
+    RUN2 + RUN3), passed to all lamps like the colours and the lock setting. The filter then acts only between
+    those PCs; all others are shown exactly as N1MM reports. Cost: one more thing to set – if it is forgotten,
+    "RUN2 red without message" comes back.
+  - *Rejected:* detecting a shared radio automatically from the echo pattern (guessing; the two N1MMs even
+    report different frequencies on the one radio, 3.52777 / 3.52310), and using vRadio's data (not wanted).
 - ~~Collect logs has no retransmit; a log with a lost piece is dropped without a message.~~ Solved in v1.116
   (missing pieces are asked for again; every lamp gets a line in the event log). Not yet run on the station.
 - Still only short tests (longest 3 minutes) and only RUN2's log. A 15-minute test on both PCs is worth doing.

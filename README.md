@@ -727,6 +727,9 @@ vRadio:
   packet from it, a TX packet without caption is shown again. So a lost "TX off" packet (UDP) cannot hide
   this PC for long. (The display timeout `--stale`, 15 s, is separate and unchanged.)
 - everything else is left as N1MM reports it. Nothing to set.
+- the filter acts for all PCs on the same band and mode (it cannot know which PCs share a radio). Known limit:
+  with two radios, a TX packet without caption from one PC is not shown while the other transmits – see the
+  status file for the details and a possible setting.
 
 On the logged session this took RUN2 from 99 transmissions shown without a
 message to 6. Status and history: [docs/STATUS-shared-radio.md](docs/STATUS-shared-radio.md).
