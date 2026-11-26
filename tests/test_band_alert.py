@@ -104,6 +104,16 @@ class StateTest(unittest.TestCase):
         self.assertTrue(self.offer(msg(seq=900)))
         self.assertTrue(self.offer(msg(seq=1, instance="new-run")))  # N1MM_timer restarted
 
+    def test_retired_ok_cannot_clear_restarted_timer_and_monotonic_expiry(self):
+        from unittest.mock import patch
+        with patch("pingpong_bandalert.time.monotonic", return_value=100) as mono:
+            self.offer(msg(seq=7, status="ok"))
+            self.offer(msg(instance="restarted"))
+            self.assertFalse(self.offer(msg(seq=6, status="ok")))
+            self.assertEqual(self.a.footer(NOW)[0], "violation")
+            mono.return_value = 111
+            self.assertFalse(self.a.online(NOW-1))
+
     def test_footer_one_violation(self):
         self.offer(msg())
         self.assertEqual(self.a.footer(NOW), ("violation", "BAND VIOLATION: RUN 20->15 m 14:29 - 1 QSOs"))

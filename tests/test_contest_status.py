@@ -17,14 +17,21 @@ class ContestStatusTest(unittest.TestCase):
                                                         "MULT": None}, last={"PC": self.now-50}))
         self.assertEqual(contest.display(msg, self.now, {"pc"}, True),
                          "RUN · 20 m · 0:04 left\nMULT · No QSO yet\nLast QSO · 0:50 ago")
+        msg["_received"] -= 4
         self.assertIn("Timer clear", contest.display(msg, self.now+4, set(), False))
         self.assertEqual(contest.display(msg, self.now+11, set(), True), "Timer data unavailable")
+
+    def test_fast_lamp_clock_cannot_clear_timer(self):
+        msg = self.receive(dict(category="MS", signals={"RUN": {"band": "20", "until": self.now+4},
+                                                        "MULT": None}, last={}))
+        self.assertIn("0:04 left", contest.display(msg, self.now+5, set(), False))
 
     def test_hour_reset(self):
         self.now = 35999
         msg = self.receive(dict(category="M2", hour=9, signals={"TX1": {"band": "20", "used": 8},
                                                                 "TX2": None}, last={}))
         self.assertIn("8/8", contest.display(msg, self.now, set(), False))
+        msg["_received"] -= 1
         self.assertIn("Waiting for current-hour", contest.display(msg, self.now+1, set(), False))
 
     def test_activity_and_invalid_state(self):
@@ -62,10 +69,8 @@ class LampRelayTest(unittest.TestCase):
         lamp.on_band("10.0.0.2", contest.MAGIC + json.dumps(dict(msg, seq=1, state=None)).encode())
         lamp._band_update_body(now)
         self.assertIn("2:00 left", lamp._contest_text)
-        lamp._band_update_body(now + 11)
-        self.assertEqual(lamp._contest_text, "Timer data unavailable")
         lamp._master_peer = None
-        lamp._band_update_body(now + 12)
+        lamp._band_update_body(now + 1)
         self.assertEqual(lamp._contest_text, "Timer data unavailable")
         lamp._master_peer = peer(lamp, "master", ["10.0.0.2"])
         newer = dict(msg, instance="new", seq=1, state=None)

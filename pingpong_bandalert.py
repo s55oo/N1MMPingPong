@@ -105,6 +105,8 @@ def validate(data, now):
         problem = _check_violation(item)
         if problem:
             return None, problem
+    if sent - now > SKEW:
+        return None, "future timestamp"
     if now - sent > ttl + SKEW:
         return None, "too old ({:.0f} s)".format(now - sent)
     msg["violations"] = items
@@ -126,11 +128,19 @@ class BandAlert:
         self.high = -1  # the highest seq accepted from this instance
         self.msg = None
         self.got_at = 0.0
+        self.expires = 0.0
+        self.retired = {}
         self.sounded = set()  # violation ids that already beeped (this instance)
 
     def offer(self, msg, now):
         """Take a validated message. False if it is a copy or out of order."""
+        mono = time.monotonic()
         if msg["instance"] != self.instance:
+            self.retired = {key: end for key, end in self.retired.items() if end > mono}
+            if msg["instance"] in self.retired:
+                return False
+            if self.instance is not None:
+                self.retired[self.instance] = mono + 300 + SKEW
             self.instance = msg["instance"]  # N1MM_timer started again
             self.high = -1
             self.sounded = set()
@@ -139,10 +149,12 @@ class BandAlert:
         self.high = msg["seq"]
         self.msg = msg
         self.got_at = now
+        self.expires = mono + msg["ttl_s"]
         return True
 
     def online(self, now):
-        return self.msg is not None and now - self.got_at <= self.msg["ttl_s"]
+        return (self.msg is not None and time.monotonic() <= self.expires and
+                -SKEW <= now - self.got_at <= self.msg["ttl_s"])
 
     def violations(self, now):
         if not self.online(now) or self.msg["status"] != "violation":

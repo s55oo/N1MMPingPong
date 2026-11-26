@@ -132,11 +132,12 @@ class BandAlertMixin:
         lines = text.splitlines()
         activity = lines.pop() if lines and lines[-1].startswith("Last QSO · ") else ""
         self._contest_label = self._contest_row(getattr(self, "_contest_label", None),
-                                                "\n".join(lines), 9, UI_TEXT)
+                                                "\n".join(lines), 9, UI_TEXT,
+                                                before=getattr(self, "_activity_label", None))
         self._activity_label = self._contest_row(getattr(self, "_activity_label", None),
                                                  activity, 8, UI_DIM)
 
-    def _contest_row(self, label, text, size, color):
+    def _contest_row(self, label, text, size, color, before=None):
         if not text:
             if label is not None:
                 label.pack_forget()
@@ -146,7 +147,8 @@ class BandAlertMixin:
                              bg=UI_BG, fg=color)
         label.configure(text=text)
         if not label.winfo_manager():
-            label.pack(fill=tk.X, pady=(2, 0))
+            position = {"before": before} if before is not None and before.winfo_manager() else {}
+            label.pack(fill=tk.X, pady=(2, 0), **position)
         return label
 
     def _band_take(self, msg, source):

@@ -1,6 +1,7 @@
 """Read the master's CQ WW operating status and format it for a lamp."""
 import json
 import math
+import time
 
 MAGIC = b"PPS1"
 BANDS = ("160", "80", "40", "20", "15", "10")
@@ -41,10 +42,13 @@ def decode(data, now):
     if category == "M2" and not integer(state.get("hour")):
         return None
     for row in rows.values():
+        if category == "M2" and row == {"reason": "qso_order"}:
+            continue
         if row is not None and (not isinstance(row, dict) or row.get("band") not in BANDS or
                                 set(row) != {"band", "until" if category == "MS" else "used"} or
                                 not integer(row.get("until" if category == "MS" else "used"))):
             return None
+    msg["_received"] = time.monotonic()
     return msg
 
 
@@ -61,12 +65,19 @@ def display(msg, now, station_names, show_last, stale=False):
         return ""
     if stale or not -2 <= now - msg["sent"] <= msg["ttl"]:
         return "Timer data unavailable"
-    if state["category"] == "M2" and int(now) // 3600 != state["hour"]:
+    # Transit delays can make this estimate late. A fast lamp clock must
+    # never advance a timer past the time established by the master.
+    master_now = msg["sent"] + max(0, time.monotonic() - msg["_received"])
+    if state["category"] == "M2" and int(master_now) // 3600 != state["hour"]:
         return "Waiting for current-hour counts"
     lines = []
     if state["category"] == "unknown":
         if state.get("reason") == "contest_dates":
             return "Check contest dates · all log QSOs excluded"
+        if state.get("reason") == "incomplete_log":
+            return "Check log · QSO timestamp or ID missing"
+        if state.get("reason") == "invalid_band":
+            return "Check log · invalid CQ WW band"
         lines.append("Timer data unavailable")
     for name in ("RUN", "MULT", "TX1", "TX2"):
         if name not in state["signals"]:
@@ -75,8 +86,11 @@ def display(msg, now, station_names, show_last, stale=False):
         if row is None:
             lines.append(name + " · No QSO yet")
             continue
+        if row.get("reason") == "qso_order":
+            lines.append(name + " · Check log · band order unclear")
+            continue
         if state["category"] == "MS":
-            left = math.ceil(row["until"] - now)
+            left = math.ceil(row["until"] - master_now)
             status = clock(left) + " left" if left > 0 else "Timer clear"
         else:
             used = row["used"]
@@ -84,5 +98,5 @@ def display(msg, now, station_names, show_last, stale=False):
         lines.append("{} · {} m · {}".format(name, row["band"], status))
     if show_last and state["category"] != "unknown":
         latest = max((state["last"].get(n.upper(), 0) for n in station_names), default=0)
-        lines.append("Last QSO · " + (clock(max(0, int(now - latest))) + " ago" if latest else "None yet"))
+        lines.append("Last QSO · " + (clock(max(0, int(master_now - latest))) + " ago" if latest else "None yet"))
     return "\n".join(lines)

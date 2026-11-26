@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.99 · Made by **S55OO** with AI assistance.
+> **Version:** 1.118 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -1219,7 +1219,7 @@ pingpong_events.csv – Overview's contest event log
 
 ### CQ WW CW and SSB band status on the lamp
 
-Run the matching N1MM_timer on the PingPong master and select or follow the
+Run N1MM_timer with PPS1 support (v0.4.0 source or newer) on the PingPong master and select or follow the
 active local N1MM log database in the timer. Leave its PingPong alerts enabled.
 Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
 bands and their independent countdowns, using the UTC minute of each signal's
