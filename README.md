@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.119 · Made by **S55OO** with AI assistance.
+> **Version:** 1.120 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -1224,7 +1224,11 @@ N1MM Logger+ → Config → Broadcast Data and add `127.0.0.1:12062`. Open the
 contest after starting PingPong so it receives the database name and contest
 number. The master reads the synchronized local N1MM database read-only.
 For databases outside the usual Documents folder, set `database_folder` in
-the `[contest]` section of the master lamp's INI file.
+the `[contest]` section of the master lamp's INI file. Use that setting
+to select the correct folder if both Documents and OneDrive contain a matching
+log. PingPong checks the contest name and number. If valid local Radio packets
+stop for 30 seconds, lamps show “N1MM feed unavailable” until reception resumes.
+A QSO dated more than two seconds ahead of the master produces a clock warning.
 
 Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
 bands and their independent countdowns, using the UTC minute of each signal's

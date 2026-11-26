@@ -72,6 +72,14 @@ def display(msg, now, station_names, show_last, stale=False):
         return "Waiting for current-hour counts"
     lines = []
     if state["category"] == "unknown":
+        warnings = {
+            "radio_offline": "N1MM feed unavailable · check Radio on the master",
+            "contest_mismatch": "Check log · database does not match Application Info",
+            "duplicate_database": "Multiple matching logs · set database_folder on the master",
+            "future_qso": "Check station clocks · future QSO in log",
+        }
+        if isinstance(state.get("reason"), str) and state["reason"] in warnings:
+            return warnings[state["reason"]]
         if state.get("reason") == "contest_dates":
             return "Check contest dates · all log QSOs excluded"
         if state.get("reason") == "incomplete_log":

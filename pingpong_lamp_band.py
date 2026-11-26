@@ -30,6 +30,7 @@ class BandAlertMixin:
     _master_peer, _share, stations, var_sound, frame, root, _key_event."""
 
     def _band_init(self):
+        self._contest_radio_seen = None
         self._contest_selection = None
         self._contest_folder = self.settings.get_text("contest", "database_folder", "")
         self._contest_msg = None
@@ -135,6 +136,8 @@ class BandAlertMixin:
         if msg:
             pc = os.environ.get("COMPUTERNAME") or socket.gethostname()
             text = contest.display(msg, now, {pc}, self.var_last_qso.get(), stale)
+        elif getattr(self, "var_last_qso", None) is not None and self.var_last_qso.get():
+            text = "Waiting for Application Info · open or reselect the contest on the master"
         if text == getattr(self, "_contest_text", ""):
             return
         self._contest_text = text

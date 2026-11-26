@@ -372,7 +372,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
 
     @locked
     def on_packet(self, src, data, relayed=False):
-        if not relayed and src in self.local and b"<appinfo" in data.lower():
+        local_input = not relayed and contest_log.local_input(src, self.local_nets)
+        if local_input and b"<appinfo" in data.lower():
             selected = contest_log.selection(data)
             if selected is not None:
                 self._contest_selection = selected
@@ -406,6 +407,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
                 self._test_verdict(station, radios.verdict, relayed)
             if event is None:
                 return
+            if local_input:
+                self._contest_radio_seen = time.monotonic()
             radio, started, ended = event
             if not relayed:
                 radio.direct_seen = time.time()

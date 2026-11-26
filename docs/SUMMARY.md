@@ -201,8 +201,9 @@ lamps…**, **Settings ▾** and **Statistics ▾**.)*
 1. **Setup, once per PC:**
    - In N1MM: **Config → Configure Ports, Mode Control, Winkey, etc… →
      Broadcast Data**. Tick **Radio** and set its line to
-     `127.0.0.1:12060 127.0.0.1:12062`. Only the Radio line needs 12062;
-     leave the others as they are.
+     `127.0.0.1:12060 127.0.0.1:12062`. For CQ WW band status, also enable **Application Info** and add
+     `127.0.0.1:12062` to that line. Start the lamp, then open or reselect
+     the contest in N1MM so the master receives its database name and contest number.
 
      ![N1MM Broadcast Data – Radio line](n1mm-broadcast-data.png)
    - Start the lamp.
