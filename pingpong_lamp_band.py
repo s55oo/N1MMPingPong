@@ -17,6 +17,7 @@ import tkinter as tk
 
 import pingpong_bandalert as band
 import pingpong_contest as contest
+import pingpong_contest_log as contest_log
 from pingpong_common import UI_BG, UI_DIM, UI_TEXT, log_error
 from pingpong_net import BAND_MAGIC, loopback_loop, send_relay
 
@@ -29,6 +30,8 @@ class BandAlertMixin:
     _master_peer, _share, stations, var_sound, frame, root, _key_event."""
 
     def _band_init(self):
+        self._contest_selection = None
+        self._contest_folder = self.settings.get_text("contest", "database_folder", "")
         self._contest_msg = None
         self._contest_master = None
         self._contest_retired = {}
@@ -46,6 +49,7 @@ class BandAlertMixin:
         except ValueError:
             port = band.BAND_PORT
         self.band_port = port if 0 < port < 65536 else 0  # 0 = off
+        threading.Thread(target=contest_log.publish_loop, args=(self,), daemon=True).start()
         if self.band_port:
             threading.Thread(target=self._band_listen, daemon=True).start()
 
@@ -60,7 +64,8 @@ class BandAlertMixin:
         if src not in band.LOOPBACK:
             return  # the socket only listens on 127.0.0.1; checked again anyway
         if data.startswith(contest.MAGIC):
-            if self._i_am_master and self._contest_take(data, "me"):
+            if (self._i_am_master and getattr(self, "_contest_selection", None) is None
+                    and self._contest_take(data, "me")):
                 send_relay(self._share, data)
             return
         msg, why = band.validate(data, time.time())
@@ -91,6 +96,10 @@ class BandAlertMixin:
             self._key_event("band alert refused: " + why)
             return
         self._band_take(msg, source)
+
+    def _publish_contest(self, data):
+        if self._contest_take(data, "me"):
+            send_relay(self._share, data)
 
     def _contest_take(self, data, source):
         now = time.time()

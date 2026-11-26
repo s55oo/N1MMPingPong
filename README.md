@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.118 · Made by **S55OO** with AI assistance.
+> **Version:** 1.119 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -78,9 +78,8 @@ a rounded lamp.)*
    127.0.0.1:12060 127.0.0.1:12062
    ```
 
-   Only the **Radio** line needs 12062 – PingPong reads only N1MM's
-   `RadioInfo`. Leave the other lines (Application Info, Contacts, Spots,
-   Score, External Callsign Lookup) as they are. Click **OK**.
+   For CQ WW band status also enable **Application Info** and add
+   `127.0.0.1:12062` to that line. Keep existing destinations.
 
    ![N1MM Configurer – Broadcast Data with the Radio line sending to 12060 and 12062](docs/n1mm-broadcast-data.png)
 
@@ -1219,8 +1218,14 @@ pingpong_events.csv – Overview's contest event log
 
 ### CQ WW CW and SSB band status on the lamp
 
-Run N1MM_timer with PPS1 support (v0.4.0 source or newer) on the PingPong master and select or follow the
-active local N1MM log database in the timer. Leave its PingPong alerts enabled.
+PingPong calculates the status inside the master lamp and shares it with the
+other lamps. On each PC that can become master, enable **Application Info** in
+N1MM Logger+ → Config → Broadcast Data and add `127.0.0.1:12062`. Open the
+contest after starting PingPong so it receives the database name and contest
+number. The master reads the synchronized local N1MM database read-only.
+For databases outside the usual Documents folder, set `database_folder` in
+the `[contest]` section of the master lamp's INI file.
+
 Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
 bands and their independent countdowns, using the UTC minute of each signal's
 first QSO on its band. “Timer clear” refers only to the ten-minute rule.
@@ -1232,5 +1237,4 @@ At 8/8 you can continue working the same band.
 Options → Display → **Show time since my last CQ WW QSO** adds the age of
 the latest logged contact on this PC. This is the only row for single-operator
 entries, overlays, Multi-Multi, Multi-Distributed and checklogs. A missing
-role/category or an expired snapshot shows “Timer data unavailable”. An older
-timer supplies violation alerts only. The display is advisory.
+role/category or an expired snapshot shows “Timer data unavailable”. The display is advisory.

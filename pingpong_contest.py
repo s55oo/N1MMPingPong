@@ -42,7 +42,7 @@ def decode(data, now):
     if category == "M2" and not integer(state.get("hour")):
         return None
     for row in rows.values():
-        if category == "M2" and row == {"reason": "qso_order"}:
+        if row == {"reason": "qso_order"}:
             continue
         if row is not None and (not isinstance(row, dict) or row.get("band") not in BANDS or
                                 set(row) != {"band", "until" if category == "MS" else "used"} or

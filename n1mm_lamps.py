@@ -54,6 +54,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox
 
+import pingpong_contest_log as contest_log
 import pingpong_keys as keys
 import pingpong_phone as phone
 import pingpong_update as upd
@@ -371,6 +372,11 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
 
     @locked
     def on_packet(self, src, data, relayed=False):
+        if not relayed and src in self.local and b"<appinfo" in data.lower():
+            selected = contest_log.selection(data)
+            if selected is not None:
+                self._contest_selection = selected
+                return
         is_radio, caption, station_name, is_tx, freq, mode = packet_info(data)
         if self.test_on:
             if src in self.local:
