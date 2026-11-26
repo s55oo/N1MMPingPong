@@ -9,12 +9,15 @@
 - Advisory only: nothing here touches the ping-pong lock, F-keys, radios or N1MM.
 """
 
+import os
+import socket
 import threading
 import time
 import tkinter as tk
 
 import pingpong_bandalert as band
-from pingpong_common import log_error
+import pingpong_contest as contest
+from pingpong_common import UI_BG, UI_DIM, UI_TEXT, log_error
 from pingpong_net import BAND_MAGIC, loopback_loop, send_relay
 
 BAND_RED = "#c62828"
@@ -26,6 +29,14 @@ class BandAlertMixin:
     _master_peer, _share, stations, var_sound, frame, root, _key_event."""
 
     def _band_init(self):
+        self._contest_msg = None
+        self._contest_master = None
+        self._contest_retired = {}
+        self._contest_expires = 0.0
+        self._contest_label = None
+        self._activity_label = None
+        self._contest_text = ""
+        self.var_last_qso = tk.BooleanVar(value=self.settings.get("show_last_qso", False))
         self.band = band.BandAlert()
         self._band_master = None  # the master the alert came from
         self._band_view = None  # (kind, text) shown now
@@ -48,6 +59,10 @@ class BandAlertMixin:
         """Loopback thread: a datagram from N1MM_timer on this PC."""
         if src not in band.LOOPBACK:
             return  # the socket only listens on 127.0.0.1; checked again anyway
+        if data.startswith(contest.MAGIC):
+            if self._i_am_master and self._contest_take(data, "me"):
+                send_relay(self._share, data)
+            return
         msg, why = band.validate(data, time.time())
         if msg is None:
             self._key_event("band alert from N1MM_timer refused: " + why)
@@ -68,11 +83,71 @@ class BandAlertMixin:
         else:
             self._key_event("band alert from {} ignored - not the master PC".format(src))
             return
+        if data.startswith(contest.MAGIC):
+            self._contest_take(data, source)
+            return
         msg, why = band.validate(data, time.time())
         if msg is None:
             self._key_event("band alert refused: " + why)
             return
         self._band_take(msg, source)
+
+    def _contest_take(self, data, source):
+        now = time.time()
+        msg = contest.decode(data, now)
+        if msg is None:
+            return False
+        with self.lock:
+            old = getattr(self, "_contest_msg", None)
+            mono = time.monotonic()
+            retired = {k: expires for k, expires in getattr(self, "_contest_retired", {}).items()
+                       if expires > mono}
+            if (source, msg["instance"]) in retired:
+                return False
+            if old and self._contest_master == source:
+                if msg["instance"] == old["instance"] and msg["seq"] <= old["seq"]:
+                    return False
+                if msg["instance"] != old["instance"]:
+                    if msg["sent"] < old["sent"] <= now + 2:
+                        return False
+                    retired[(source, old["instance"])] = mono + 302
+            self._contest_retired = retired
+            self._contest_expires = mono + min(msg["ttl"], msg["sent"] + msg["ttl"] - now)
+            self._contest_msg, self._contest_master = msg, source
+        return True
+
+    def _contest_update(self, master, now):
+        with self.lock:
+            if getattr(self, "_contest_master", None) != master:
+                self._contest_expires = 0.0
+            msg = getattr(self, "_contest_msg", None)
+            stale = time.monotonic() >= getattr(self, "_contest_expires", 0.0)
+        text = ""
+        if msg:
+            pc = os.environ.get("COMPUTERNAME") or socket.gethostname()
+            text = contest.display(msg, now, {pc}, self.var_last_qso.get(), stale)
+        if text == getattr(self, "_contest_text", ""):
+            return
+        self._contest_text = text
+        lines = text.splitlines()
+        activity = lines.pop() if lines and lines[-1].startswith("Last QSO · ") else ""
+        self._contest_label = self._contest_row(getattr(self, "_contest_label", None),
+                                                "\n".join(lines), 9, UI_TEXT)
+        self._activity_label = self._contest_row(getattr(self, "_activity_label", None),
+                                                 activity, 8, UI_DIM)
+
+    def _contest_row(self, label, text, size, color):
+        if not text:
+            if label is not None:
+                label.pack_forget()
+            return label
+        if label is None:
+            label = tk.Label(self.frame, font=("Segoe UI", size), justify=tk.LEFT,
+                             bg=UI_BG, fg=color)
+        label.configure(text=text)
+        if not label.winfo_manager():
+            label.pack(fill=tk.X, pady=(2, 0))
+        return label
 
     def _band_take(self, msg, source):
         with self.lock:
@@ -100,6 +175,12 @@ class BandAlertMixin:
 
     def _band_update_body(self, now):
         master = "me" if self._i_am_master else getattr(self._master_peer, "id", None)
+        try:
+            self._contest_update(master, now)
+        except Exception:
+            if now - getattr(self, "_contest_error_at", 0.0) > 60:
+                self._contest_error_at = now
+                log_error("contest status display")
         if self._band_master is not None and master != self._band_master:
             self.band.reset()  # the master changed: forget the old alert
             self._band_master = None
@@ -129,6 +210,10 @@ class BandAlertMixin:
 
     def _band_repack(self):
         """After the layout changed (compact mode): show the footer at the bottom again."""
+        for row in (getattr(self, "_contest_label", None), getattr(self, "_activity_label", None)):
+            if row is not None:
+                row.pack_forget()
+        self._contest_text = ""
         label = getattr(self, "_band_label", None)
         if label is not None:
             label.pack_forget()

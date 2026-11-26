@@ -59,6 +59,8 @@ class OptionsMixin:
         display.add_separator()
         display.add_checkbutton(label="Night mode (dim lamp colors)", variable=self.var_night,
                                 command=self._night_changed)
+        display.add_checkbutton(label="Show time since my last CQ WW QSO", variable=self.var_last_qso,
+                                command=lambda: self.settings.set("show_last_qso", self.var_last_qso.get()))
         menu.add_cascade(label="Display", menu=display)
 
         # Calls and keys

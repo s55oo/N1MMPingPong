@@ -291,6 +291,7 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
         self._restore_window()
         self.root.bind("<Configure>", self._on_root_configure, add="+")
         self.stop = threading.Event()
+        self._band_init()
         self.thread = threading.Thread(
             target=listener_loop,
             args=("0.0.0.0", port, self.on_packet, self.stop),
@@ -326,7 +327,6 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
             self._phone_server, self._phone_error = phone.start_server(
                 phone_port, lambda: self._phone_state, self._phone_seen)
             threading.Thread(target=self._phone_address_loop, daemon=True).start()
-        self._band_init()  # BAND VIOLATION alerts from N1MM_timer
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(120, self._update)
         if keys.supported():

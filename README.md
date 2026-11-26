@@ -1216,3 +1216,21 @@ pingpong_overview.vX.exe – backup kept when the Overview updated itself
 pingpong_stats.json – Overview's statistics (function keys, activity)
 pingpong_events.csv – Overview's contest event log
 ```
+
+### CQ WW CW and SSB band status on the lamp
+
+Run the matching N1MM_timer on the PingPong master and select or follow the
+active local N1MM log database in the timer. Leave its PingPong alerts enabled.
+Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
+bands and their independent countdowns, using the UTC minute of each signal's
+first QSO on its band. “Timer clear” refers only to the ten-minute rule.
+Multi-Two displays TX1 and TX2 changes used in the current UTC clock hour.
+At hour rollover the display waits for the master’s new counts. If all logged
+QSOs fall outside the configured contest dates, the lamp flags the date mismatch.
+At 8/8 you can continue working the same band.
+
+Options → Display → **Show time since my last CQ WW QSO** adds the age of
+the latest logged contact on this PC. This is the only row for single-operator
+entries, overlays, Multi-Multi, Multi-Distributed and checklogs. A missing
+role/category or an expired snapshot shows “Timer data unavailable”. An older
+timer supplies violation alerts only. The display is advisory.

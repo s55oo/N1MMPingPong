@@ -732,6 +732,10 @@ def discovery_loop(
         data, status = unseal(data, addr[0])
         if not accepted(status):
             continue
+        if data.startswith(b"PPS1"):
+            if on_band is not None:
+                guarded("contest status", on_band)(addr[0], data)
+            continue
         if data.startswith(BAND_MAGIC):
             # A BAND VIOLATION alert from N1MM_timer, passed on by the master's lamp.
             if on_band is not None:
