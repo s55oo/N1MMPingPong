@@ -66,6 +66,7 @@ def make_lamp(**over):
     state = dict(
         root=Root(), port=12062, stale=5.0,
         local={MY_IP, "127.0.0.1"}, local_nets={MY_IP}, self_seen=set(),
+        _contest_tuning={}, _contest_roles={},
         stations={}, peers={}, node_id="ME0001", hints={}, used_colors=set(), tracked=None,
         var_sound=Var(True), var_keys=Var(True), var_block=Var(True), var_relay=Var(True),
         var_auto=Var(False), var_check=Var(True), var_test=Var(False),

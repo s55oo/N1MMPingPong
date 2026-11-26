@@ -61,6 +61,11 @@ class OptionsMixin:
                                 command=self._night_changed)
         display.add_checkbutton(label="Show time since my last CQ WW QSO", variable=self.var_last_qso,
                                 command=lambda: self.settings.set("show_last_qso", self.var_last_qso.get()))
+        for nr, role in self._contest_roles.items():
+            signals = tk.Menu(display, tearoff=0)
+            for name in ("Unassigned", "RUN", "MULT"):
+                signals.add_radiobutton(label=name, variable=role, value=name)
+            display.add_cascade(label=f"Radio {nr} · CQ WW Multi-Single role", menu=signals)
         menu.add_cascade(label="Display", menu=display)
 
         # Calls and keys
@@ -71,7 +76,7 @@ class OptionsMixin:
         )
         calls.add_checkbutton(label="Block my F-keys while another station calls (F12)",
                               variable=self.var_block, command=self._keys_toggled)
-        calls.add_checkbutton(label="Sound (F12 calls, BAND VIOLATION)", variable=self.var_sound,
+        calls.add_checkbutton(label="Sound (F12 calls)", variable=self.var_sound,
                               command=lambda: self.settings.set("call_sound", self.var_sound.get()))
         menu.add_cascade(label="Calls and keys", menu=calls)
 

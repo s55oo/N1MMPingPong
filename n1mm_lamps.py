@@ -407,9 +407,12 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
                 self._test_verdict(station, radios.verdict, relayed)
             if event is None:
                 return
+            radio, started, ended = event
             if local_input:
                 self._contest_radio_seen = time.monotonic()
-            radio, started, ended = event
+                freq = radio.reported_tx_freq
+                band = contest_log.band_metres(float(freq) / 100000) if freq.isascii() and freq.isdecimal() else None
+                self._contest_tuning[radio.radio_nr] = (self._contest_radio_seen, band)
             if not relayed:
                 radio.direct_seen = time.time()
             # Per-radio transition context, with the same PC identity/color.

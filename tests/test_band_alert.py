@@ -203,9 +203,9 @@ class LampTest(unittest.TestCase):
         app._band_update(time.time())
         self.assertTrue(app._band_label.mapped)
         self.assertEqual(app._band_label.text, "BAND VIOLATION: RUN 20->15 m 14:29 - 1 QSOs  ·  YOUR STATION")
-        self.assertEqual(app.beeps, [1])
+        self.assertEqual(app.beeps, [])
         app._band_update(time.time())
-        self.assertEqual(app.beeps, [1])  # once per violation
+        self.assertEqual(app.beeps, [])
 
     def test_non_loopback_sender_is_refused(self):
         app = band_lamp(_i_am_master=True)

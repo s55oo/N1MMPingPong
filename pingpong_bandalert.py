@@ -5,9 +5,8 @@ contest (10-minute rule, hourly band changes, MULT on the RUN band) on the
 master PC. It sends a small JSON status to the lamp on that PC
 (UDP 127.0.0.1:46071, loopback only). That lamp passes it on to every lamp and
 the Overview over PingPong's own signed network (UDP 46070), and every screen
-shows it in a footer. PingPong only displays and relays: it never checks the
-rules, and an alert never touches the ping-pong lock, F-key blocking, radios
-or N1MM.
+shows it in a footer. Built-in CQ WW warnings use the separate contest status
+channel. This legacy feed is advisory.
 
 This module has no Tk and no sockets: validation and the alert state, so both
 can be tested on their own.

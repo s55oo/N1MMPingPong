@@ -1,6 +1,6 @@
 # PingPong – N1MM Logger+ Lamps
 
-> **Version:** 1.120 · Made by **S55OO** with AI assistance.
+> **Version:** 1.121 · Made by **S55OO** with AI assistance.
 > **Download:** [latest release](https://github.com/s55oo/N1MMPingPong/releases/latest) – `n1mm_lamps.exe` (every PC), `pingpong_overview.exe` (master PC) and `PingPong-cheat-sheet.pdf` (print one per position), no Python needed; SHA-256 of each in `SHA256SUMS.txt`.
 > **In short:** what PingPong does, on one page – [docs/SUMMARY.md](docs/SUMMARY.md).
 > **For operators:** one-page cheat sheet – [docs/CHEATSHEET.md](docs/CHEATSHEET.md) · [printable PDF](docs/PingPong-cheat-sheet.pdf).
@@ -324,7 +324,7 @@ Warn the other operators on your band without transmitting.
   your lamp closes; on a receiving PC it ends when that PC changes band,
   or (for an S&P call) goes to Run.
 - The receiving PC also gives a short **double beep** when the call starts
-  (once per call; **Options ▾ → Calls and keys → Sound (F12 calls, BAND VIOLATION)**, on by default).
+  (once per call; **Options ▾ → Calls and keys → Sound (F12 calls)**, on by default).
 - On a blinking lamp, **click the lamp** to silence that call there
   (`click = silence`). A new F12 call blinks again.
 - **S&P stations can't answer a call with their own.** While another PC's
@@ -709,14 +709,12 @@ PC, kept by updates.
 
 ### BAND VIOLATION (from N1MM_timer)
 
-PingPong does **not** check band-change rules itself. A separate program,
-[N1MM_timer](https://github.com/s55oo/N1MM_timer), runs on the **master PC**, follows the N1MM log and
-checks the contest's band-change rules (10-minute rule, hourly band changes, MULT on the RUN band).
-PingPong only shows what it reports, on every lamp, in the Overview and on its web page:
+PingPong calculates [CQ WW band status and warnings](#cq-ww-cw-and-ssb-band-status-on-the-lamp)
+inside the master lamp. For stations using the optional legacy N1MM_timer feed,
+PingPong also displays that feed on the lamps, in the Overview and on its web page.
 
 - **Red footer `BAND VIOLATION: <text>`**, plus `(+N more)` when there are more, and `· YOUR STATION`
-  on the lamp whose N1MM StationName logged one of them. One beep per new violation if the lamp's
-  sound is on (**Options ▾ → Calls and keys → Sound (F12 calls, BAND VIOLATION)**).
+  on the lamp whose N1MM StationName logged one of them. This footer is silent.
 - **Grey `Band watcher offline`**: N1MM_timer was heard before but sent nothing for longer than its
   `ttl_s` (10 s). Nothing is shown if N1MM_timer never ran.
 - The footer clears when N1MM_timer reports `ok` (a violation acknowledged in N1MM_timer leaves its list).
@@ -1231,12 +1229,36 @@ stop for 30 seconds, lamps show “N1MM feed unavailable” until reception resu
 A QSO dated more than two seconds ahead of the master produces a clock warning.
 
 Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
-bands and their independent countdowns, using the UTC minute of each signal's
-first QSO on its band. “Timer clear” refers only to the ten-minute rule.
+bands and their independent countdowns. RUN starts with the UTC minute of its
+first QSO on a new band. MULT starts with the first new zone or country on
+that band, using N1MM’s logged multiplier flags. An early move keeps the
+original band and deadline. A log with missing multiplier data shows a check
+message for MULT. “Timer clear” refers only to the ten-minute rule.
 Multi-Two displays TX1 and TX2 changes used in the current UTC clock hour.
 At hour rollover the display waits for the master’s new counts. If all logged
 QSOs fall outside the configured contest dates, the lamp flags the date mismatch.
-At 8/8 you can continue working the same band.
+At 7/8 the row says **1 change left**. At 8/8 every lamp shows a steady amber
+banner with the transmitter, its band and the UTC hour when it can change again.
+You can continue working the same band.
+
+Each additional logged Multi-Two band change, or an early Multi-Single RUN or
+MULT band change, flashes a red banner on every connected lamp for **10 seconds**.
+The text names the signal and the band change. A further violation starts a fresh
+10 seconds. Same-band QSOs leave the deadline alone. If a logging error caused
+a warning, correcting the entry updates the display on the next master read.
+Keep every actual on-air QSO in the log, including an early band change.
+See the [CQ WW logging guidance](https://cqww.com/rules/faq.htm).
+
+Use PingPong **1.121 or later on the master and every lamp** for network-wide
+warnings. The phone page mirrors its desktop lamp’s warning. Keep station and
+phone clocks synchronized so screens share the same expiry. Band warnings are
+silent and appear separately from TX and F12 indications.
+
+For an optional local warning before logging in Multi-Single, select the radio’s
+**CQ WW Multi-Single role** under **Options → Display**. If that radio tunes to
+another band during its signal’s hold, its lamp shows amber until it tunes back
+or the hold expires. Assignments last for the current PingPong session. The
+network-wide warnings use the logged signal and work with both radios unassigned.
 
 Options → Display → **Show time since my last CQ WW QSO** adds the age of
 the latest logged contact on this PC. This is the only row for single-operator

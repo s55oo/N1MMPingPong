@@ -1,13 +1,4 @@
-"""Lamp side of the BAND VIOLATION alert from N1MM_timer (see pingpong_bandalert.py).
-
-- The lamp on the PC running N1MM_timer receives the alert on 127.0.0.1:46071
-  (loopback only) and, if it is the master, passes it on to all PingPong PCs
-  over the signed lamp network (UDP 46070).
-- Every lamp accepts it from the network only from the master PC, shows it in
-  a footer (red: BAND VIOLATION, grey: Band watcher offline) and beeps once per
-  new violation if the lamp's sound is on.
-- Advisory only: nothing here touches the ping-pong lock, F-keys, radios or N1MM.
-"""
+"""Display built-in CQ WW warnings and relay optional legacy band alerts."""
 
 import os
 import socket
@@ -23,11 +14,13 @@ from pingpong_net import BAND_MAGIC, loopback_loop, send_relay
 
 BAND_RED = "#c62828"
 BAND_GREY = "#5f6368"
+WARNING_COLORS = {"red": ("#c62828", "white"), "dark-red": ("#761414", "white"),
+                  "amber": ("#ffbf47", "#181818")}
 
 
 class BandAlertMixin:
     """Mixed into the lamp. Needs: settings, stop, local, _i_am_master,
-    _master_peer, _share, stations, var_sound, frame, root, _key_event."""
+    _master_peer, _share, stations, frame, root, _key_event."""
 
     def _band_init(self):
         self._contest_radio_seen = None
@@ -37,6 +30,10 @@ class BandAlertMixin:
         self._contest_master = None
         self._contest_retired = {}
         self._contest_expires = 0.0
+        self._contest_warning_label = None
+        self._contest_warning = None
+        self._contest_tuning = {}
+        self._contest_roles = {nr: tk.StringVar(value="Unassigned") for nr in (1, 2)}
         self._contest_label = None
         self._activity_label = None
         self._contest_text = ""
@@ -117,6 +114,14 @@ class BandAlertMixin:
             if old and self._contest_master == source:
                 if msg["instance"] == old["instance"] and msg["seq"] <= old["seq"]:
                     return False
+                if msg["instance"] == old["instance"] and msg.get("flash") and old.get("flash"):
+                    # A delayed heartbeat must never extend a window already seen here.
+                    deadlines = {f["window"]: old["_received"] + f["ms"] / 1000 for f in old["flash"]}
+                    for flash in msg["flash"]:
+                        end = deadlines.get(flash["window"])
+                        if end is not None:
+                            left = round((end - msg["_received"]) * 1000)
+                            flash["ms"] = max(0, min(flash["ms"], left))
                 if msg["instance"] != old["instance"]:
                     if msg["sent"] < old["sent"] <= now + 2:
                         return False
@@ -131,7 +136,13 @@ class BandAlertMixin:
             if getattr(self, "_contest_master", None) != master:
                 self._contest_expires = 0.0
             msg = getattr(self, "_contest_msg", None)
-            stale = time.monotonic() >= getattr(self, "_contest_expires", 0.0)
+            mono = time.monotonic()
+            stale = mono >= getattr(self, "_contest_expires", 0.0)
+            tuning = dict(self._contest_tuning)
+        local_bands = [(nr, role.get(), tuning[nr][1])
+                       for nr, role in self._contest_roles.items()
+                       if nr in tuning and tuning[nr][1] and mono - tuning[nr][0] <= 30]
+        self._show_contest_warning(contest.warning_view(msg, now, stale, local_bands))
         text = ""
         if msg:
             pc = os.environ.get("COMPUTERNAME") or socket.gethostname()
@@ -148,6 +159,27 @@ class BandAlertMixin:
                                                 before=getattr(self, "_activity_label", None))
         self._activity_label = self._contest_row(getattr(self, "_activity_label", None),
                                                  activity, 8, UI_DIM)
+
+    def _show_contest_warning(self, view):
+        if view == getattr(self, "_contest_warning", None):
+            return
+        label = getattr(self, "_contest_warning_label", None)
+        if view:
+            color, text = view
+            bg, fg = WARNING_COLORS[color]
+            if label is None:
+                label = tk.Label(self.frame, font=("Segoe UI", 10, "bold"), wraplength=320,
+                                 justify=tk.CENTER, padx=4, pady=3)
+                self._contest_warning_label = label
+            label.configure(text=text, bg=bg, fg=fg)
+            if not label.winfo_manager():
+                # Pack first so the warning gets space in a manually sized window.
+                children = self.frame.pack_slaves()
+                position = {"before": children[0]} if children else {}
+                label.pack(fill=tk.X, pady=(2, 0), **position)
+        elif label is not None:
+            label.pack_forget()
+        self._contest_warning = view
 
     def _contest_row(self, label, text, size, color, before=None):
         if not text:
@@ -199,9 +231,6 @@ class BandAlertMixin:
             self.band.reset()  # the master changed: forget the old alert
             self._band_master = None
         kind, text = self.band.footer(now, self._own_station_names())
-        fresh = self.band.new_ids(now)
-        if fresh and self.var_sound.get():
-            self._band_sound()
         view = (kind, text)
         if view == self._band_view:
             return
@@ -224,7 +253,9 @@ class BandAlertMixin:
 
     def _band_repack(self):
         """After the layout changed (compact mode): show the footer at the bottom again."""
-        for row in (getattr(self, "_contest_label", None), getattr(self, "_activity_label", None)):
+        self._contest_warning = None
+        for row in (getattr(self, "_contest_label", None), getattr(self, "_activity_label", None),
+                    getattr(self, "_contest_warning_label", None)):
             if row is not None:
                 row.pack_forget()
         self._contest_text = ""
@@ -232,15 +263,3 @@ class BandAlertMixin:
         if label is not None:
             label.pack_forget()
         self._band_view = None
-
-    def _band_sound(self):
-        def beep():
-            try:
-                import winsound
-
-                for freq in (880, 660, 880):
-                    winsound.Beep(freq, 180)
-            except Exception:
-                pass  # no sound device / not Windows
-
-        threading.Thread(target=beep, daemon=True).start()

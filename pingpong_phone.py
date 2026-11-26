@@ -91,6 +91,10 @@ PAGE = """<!doctype html>
   #who, #freq { position:absolute; top:8px; font-weight:700; font-size:16px; }
   #who { left:12px; } #freq { right:12px; }
   #info { font-size:13px; color:#bbb; max-height:4.2em; overflow:hidden; }
+  #warning { padding:8px; text-align:center; font-weight:700; white-space:pre-line; }
+  #warning.amber { background:#ffbf47; color:#181818; }
+  #warning.red { background:#c62828; color:white; }
+  #warning.dark-red { background:#761414; color:white; }
   #bands { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
   .band { border-radius:10px; padding:8px 10px; background:#2a2a2a; min-height:64px; }
   .band.mine { outline:2px solid #fff; }
@@ -104,6 +108,7 @@ PAGE = """<!doctype html>
 </head>
 <body>
 <div id="top"><span><b id="name">PingPong</b> <span id="ver"></span></span><span id="clock"></span></div>
+<div id="warning" role="status" hidden></div>
 <div id="lamp"><span id="who"></span><span id="freq"></span><span id="text">—</span></div>
 <div id="info"></div>
 <div id="bands"></div>
@@ -115,6 +120,18 @@ function textOn(hex) {
   const [r, g, b] = [1, 2, 3].map(i => parseInt(m[i], 16));
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#000" : "#fff";
 }
+let warning = null;
+function renderWarning() {
+  const banner = document.getElementById("warning");
+  const left = warning ? warning.expires - Date.now() : 0;
+  banner.hidden = left <= 0;
+  if (!banner.hidden) {
+    banner.className = warning.kind === "amber" ? "amber" :
+      (Math.floor((10000 - left) / 1000) % 2 ? "dark-red" : "red");
+    if (banner.textContent !== warning.text) banner.textContent = warning.text;
+  }
+}
+setInterval(renderWarning, 100);
 let failures = 0;
 async function tick() {
   try {
@@ -126,6 +143,8 @@ async function tick() {
     document.getElementById("clock").textContent = d.time || "";
     document.title = (d.name || "PingPong") + " lamp";
     const L = d.lamp || {};
+    warning = L.warning || null;
+    renderWarning();
     const lamp = document.getElementById("lamp");
     lamp.style.background = L.bg || "#3a3a3a";
     lamp.style.color = L.fg || textOn(L.bg);  // same text color as on the PC (GO: black)

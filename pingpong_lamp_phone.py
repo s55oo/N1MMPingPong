@@ -128,6 +128,14 @@ class PhoneMixin:
             "border": "" if border == self._window_bg else self._hex(border),
             "info": self.info.cget("text")[:300],
         }
+        warning = getattr(self, "_contest_warning", None)
+        if warning:
+            kind, text = warning
+            msg = self._contest_msg
+            deadline = (msg["sent"] + msg["ttl"]) * 1000
+            if kind != "amber":
+                deadline = min(deadline, max(f["expires"] for f in msg["flash"]))
+            lamp["warning"] = {"kind": kind, "text": text, "expires": deadline}
         owners = self._color_owners(now)
         groups = {}
         for st in self._radio_stations(now):

@@ -75,6 +75,16 @@ class SnapshotTest(unittest.TestCase):
         self.assertEqual((mine["who"], mine["msg"], mine["color"]), ("RUN1", "CQ", "#ff0000"))
         self.assertEqual(snap["bands"][0]["who"], "")
 
+    def test_band_warning_on_phone_preserves_original_expiry(self):
+        app = phone_lamp()
+        app._contest_warning = ("red", "TX1 · LIMIT EXCEEDED · 9/8")
+        app._contest_msg = {"sent": 108, "ttl": 10, "flash": [{"expires": 110000}]}
+        lamp = app._phone_snapshot(109)["lamp"]
+        self.assertEqual(lamp["warning"], {"kind": "red", "text": app._contest_warning[1], "expires": 110000})
+        self.assertEqual(lamp["text"], "CQ")
+        app._contest_warning = None
+        self.assertNotIn("warning", app._phone_snapshot(110)["lamp"])
+
     def test_state_built_only_while_watched(self):
         app = phone_lamp()
         app._phone_tail()

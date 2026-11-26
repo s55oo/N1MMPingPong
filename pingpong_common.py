@@ -444,8 +444,8 @@ class RadioSet:
         # TXFreq is per packet: absent/invalid values fall back to RX, not an
         # old split frequency. N1MM frequencies are positive 10 Hz integers.
         tx_freq = (root.findtext("TXFreq") or "").strip()
-        radio.tx_freq = (tx_freq if re.fullmatch(r"0*[1-9][0-9]*", tx_freq)
-                         else radio.rx_freq)
+        radio.reported_tx_freq = tx_freq if re.fullmatch(r"0*[1-9][0-9]*", tx_freq) else freq
+        radio.tx_freq = radio.reported_tx_freq or radio.rx_freq
         if mode:
             radio.mode = mode
         radio.tx = tx

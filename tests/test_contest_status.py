@@ -16,7 +16,7 @@ class ContestStatusTest(unittest.TestCase):
         msg = self.receive(dict(category="MS", signals={"RUN": {"band": "20", "until": self.now+4},
                                                         "MULT": None}, last={"PC": self.now-50}))
         self.assertEqual(contest.display(msg, self.now, {"pc"}, True),
-                         "RUN · 20 m · 0:04 left\nMULT · No QSO yet\nLast QSO · 0:50 ago")
+                         "RUN · 20 m · 0:04 left\nMULT · No new multiplier yet\nLast QSO · 0:50 ago")
         msg["_received"] -= 4
         self.assertIn("Timer clear", contest.display(msg, self.now+4, set(), False))
         self.assertEqual(contest.display(msg, self.now+11, set(), True), "Timer data unavailable")
@@ -100,3 +100,80 @@ class LampRelayTest(unittest.TestCase):
             mono.return_value = 111
             lamp._contest_update("me", now-1)
             self.assertEqual(lamp._contest_text, "Timer data unavailable")
+
+    def test_delayed_heartbeat_and_late_join_share_remaining_window(self):
+        from unittest.mock import patch
+        from test_band_alert import band_lamp
+
+        early, late = band_lamp(), band_lamp()
+        now = 36000
+        state = dict(category="M2", signals={"TX1": {"band": "20", "used": 9}, "TX2": None},
+                     last={}, hour=10)
+        def packet(seq, sent, ms):
+            flash = dict(window=90000, text="TX1 · LIMIT EXCEEDED · 9/8", ms=ms)
+            return contest.MAGIC + json.dumps(dict(v=1, sent=sent, ttl=10, instance="a",
+                                                   seq=seq, state=state, flash=[flash])).encode()
+
+        with patch("time.monotonic", return_value=100) as mono, patch("time.time", return_value=now) as wall:
+            self.assertTrue(early._contest_take(packet(1, now, 10000), "master"))
+            mono.return_value, wall.return_value = 108, now + 8
+            current = packet(5, now + 8, 2000)
+            self.assertTrue(late._contest_take(current, "master"))
+            self.assertIsNotNone(contest.warning_view(late._contest_msg, now + 8, False, []))
+            self.assertIsNone(contest.warning_view(late._contest_msg, now + 8, True, []))
+            mono.return_value, wall.return_value = 110, now + 10
+            self.assertTrue(early._contest_take(current, "master"))  # arrives two seconds late
+            first_delivery = band_lamp()
+            self.assertTrue(first_delivery._contest_take(current, "master"))
+            for lamp in (early, late, first_delivery):
+                self.assertIsNone(contest.warning_view(lamp._contest_msg, now + 10, False, []))
+
+    def test_wire_rejects_invalid_flashes_and_supports_older_masters(self):
+        state = dict(category="M2", last={}, hour=23,
+                     signals={"TX1": {"band": "20", "used": 8}, "TX2": {"band": "40", "used": 8}})
+        now = 86400 - 5
+        base = dict(v=1, seq=1, instance="a", sent=now, ttl=10, state=state)
+        def receive(**extra):
+            return contest.decode(contest.MAGIC + json.dumps(dict(base, **extra)).encode(), now)
+        msg = receive()
+        color, text = contest.warning_view(msg, now, False, [])
+        self.assertEqual(color, "amber")
+        self.assertIn("TX1 · LIMIT REACHED · stay on 20 m until 00:00 UTC", text)
+        self.assertIn("TX2 · LIMIT REACHED · stay on 40 m until 00:00 UTC", text)
+        msg["_received"] -= 5
+        self.assertIsNone(contest.warning_view(msg, now+5, False, []))
+        valid = dict(ms=10000, window=1000, text="TX1")
+        for flash in (False, {}, [valid] * 3, [dict(valid, ms=0)], [dict(valid, ms=10001)],
+                      [dict(valid, ms=True)], [dict(valid, text="TX1\ninvalid")], [dict(valid, window=None)]):
+            with self.subTest(flash=flash):
+                self.assertIsNone(receive(flash=flash))
+        self.assertIsNone(receive(state=None, flash=[valid]))
+        self.assertIsNone(receive(state=dict(category="activity", last={}, signals={}), flash=[valid]))
+
+    def test_red_banner_stays_visible_in_manually_resized_lamp(self):
+        import tkinter as tk
+        from pingpong_lamp_band import BandAlertMixin
+
+        try:
+            root = tk.Tk()
+        except tk.TclError as exc:
+            self.skipTest(str(exc))
+        self.addCleanup(root.destroy)
+        lamp = BandAlertMixin()
+        lamp.frame = tk.Frame(root)
+        lamp.frame.pack(fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(lamp.frame, width=370, height=190)
+        canvas.pack()
+        tk.Label(lamp.frame, text="TX1 · 9/8 changes").pack()
+        root.update()
+        root.geometry(f"{root.winfo_width() + 40}x{root.winfo_height()}")
+        root.update()
+        lamp._show_contest_warning(("red", "TX1 · LIMIT EXCEEDED · 9/8"))
+        root.update()
+        banner = lamp._contest_warning_label
+        self.assertTrue(banner.winfo_ismapped())
+        self.assertGreaterEqual(banner.winfo_height(), banner.winfo_reqheight())
+        self.assertTrue(canvas.winfo_ismapped())
+        lamp._show_contest_warning(None)
+        root.update()
+        self.assertFalse(banner.winfo_ismapped())
