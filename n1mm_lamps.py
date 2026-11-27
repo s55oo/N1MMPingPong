@@ -717,6 +717,17 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
             font=("Segoe UI", 8, "bold"), fill="white",
         )
         self._freq_text = ""
+        # CQ WW status on the lamp's lower corners: RUN / TX1 left, MULT / TX2
+        # right (countdown or band changes), like the name and frequency above.
+        self._contest_corners = ("", "")
+        self.c_sig_l = self.canvas.create_text(
+            CALL_BORDER + 6, LAMP_HEIGHT - CALL_BORDER - 2, text="", anchor="sw",
+            font=("Segoe UI", 8, "bold"), fill="white",
+        )
+        self.c_sig_r = self.canvas.create_text(
+            330 - CALL_BORDER - 6, LAMP_HEIGHT - CALL_BORDER - 2, text="", anchor="se",
+            font=("Segoe UI", 8, "bold"), fill="white",
+        )
         self.c_info = self.canvas.create_text(
             165, LAMP_HEIGHT - 4, text="", anchor="s", font=("Segoe UI", 7),
             fill="white", width=320, justify="center",
@@ -825,6 +836,8 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
         self.info.configure(wraplength=int(340 * s), font=("Segoe UI", max(8, int(8 * s))))
         self.canvas.itemconfigure(self.c_who, font=("Segoe UI", int(WHO_FONT * s), "bold"))
         self.canvas.itemconfigure(self.c_freq, font=("Segoe UI", int(8 * s), "bold"))
+        for item in (self.c_sig_l, self.c_sig_r):
+            self.canvas.itemconfigure(item, font=("Segoe UI", int(8 * s), "bold"))
         self.canvas.itemconfigure(self.c_info, font=("Segoe UI", int(7 * s)))
         text = self.canvas.itemcget(self.text_id, "text")
         self.canvas.itemconfigure(self.text_id, font=self._font_for(text))
@@ -875,7 +888,20 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
         self.canvas.coords(self.c_freq, w - inset - 6, inset + 3)
         self.canvas.coords(self.c_info, w / 2.0, h - inset - 2)
         self.canvas.itemconfigure(self.c_info, width=max(50, w - 2 * inset - 12))
+        self._place_signals(w, h)
         self._round_corners(w, h)
+
+    def _place_signals(self, w=None, h=None):
+        """Lower corners: at the bottom, or just above the status line that
+        compact mode draws on the lamp."""
+        w = w or self.canvas.winfo_width()
+        h = h or self.canvas.winfo_height()
+        y = h - CALL_BORDER - 2
+        box = self.canvas.bbox(self.c_info) if self._compact else None
+        if box and self.canvas.itemcget(self.c_info, "text"):
+            y = box[1] - 1
+        self.canvas.coords(self.c_sig_l, CALL_BORDER + 6, y)
+        self.canvas.coords(self.c_sig_r, w - CALL_BORDER - 6, y)
 
     def _toggle_compact(self, event=None):
         """Shift+F: lamp only, no title bar or margins, info drawn on the
@@ -959,17 +985,24 @@ class DisplayApp(RulesMixin, OptionsMixin, UpdateMixin, PhoneMixin, BandAlertMix
 
     def _sync_compact(self):
         """Texts drawn on the lamp: sender name (top-left) and frequency
-        (top-right) always; the status line in compact mode."""
+        (top-right), CQ WW status on the lower corners (RUN / TX1 left,
+        MULT / TX2 right) always; the status line in compact mode."""
         who = self._who_text
         info = self.info.cget("text") if self._compact else ""
         fg = self.text_on(self.canvas.cget("bg"))
+        left, right = getattr(self, "_contest_corners", ("", ""))
+        moved = False
         for item, text in (
-            (self.c_who, who), (self.c_info, info), (self.c_freq, self._freq_text)
+            (self.c_who, who), (self.c_info, info), (self.c_freq, self._freq_text),
+            (self.c_sig_l, left), (self.c_sig_r, right),
         ):
             if self.canvas.itemcget(item, "text") != text:
                 self.canvas.itemconfigure(item, text=text)
+                moved = moved or item == self.c_info
             if self.canvas.itemcget(item, "fill") != fg:
                 self.canvas.itemconfigure(item, fill=fg)
+        if moved:
+            self._place_signals()  # the compact status line changed height
 
     def _press(self, event):
         self.root.focus_force()  # so Shift+F works after a click

@@ -1228,7 +1228,13 @@ log. PingPong checks the contest name and number. If valid local Radio packets
 stop for 30 seconds, lamps show “N1MM feed unavailable” until reception resumes.
 A QSO dated more than two seconds ahead of the master produces a clock warning.
 
-Every lamp shows both logged signals. Multi-Single displays the RUN and MULT
+Every lamp shows both logged signals on the lamp's **lower corners**, like the
+name and frequency at the top: RUN (Multi-Single) or TX1 (Multi-Two) bottom
+left, MULT or TX2 bottom right – e.g. `RUN 20 m · 6:12` and `MULT 15 m · clear`,
+or `TX1 20 m · 7/8 · 1 left` and `TX2 40 m · 0/8`. In compact mode they sit
+just above the status line drawn on the lamp. Warnings (unclear log, missing
+feed, waiting for counts) and the optional Last QSO line stay under the lamp.
+Multi-Single displays the RUN and MULT
 bands and their independent countdowns. RUN starts with the UTC minute of its
 first QSO on a new band. MULT starts with the first new zone or country on
 that band, using N1MM’s logged multiplier flags. An early move keeps the
@@ -1237,7 +1243,7 @@ message for MULT. “Timer clear” refers only to the ten-minute rule.
 Multi-Two displays TX1 and TX2 changes used in the current UTC clock hour.
 At hour rollover the display waits for the master’s new counts. If all logged
 QSOs fall outside the configured contest dates, the lamp flags the date mismatch.
-At 7/8 the row says **1 change left**. At 8/8 every lamp shows a steady amber
+At 7/8 the corner says **1 left**. At 8/8 every lamp shows a steady amber
 banner with the transmitter, its band and the UTC hour when it can change again.
 You can continue working the same band.
 

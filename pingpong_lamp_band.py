@@ -152,6 +152,10 @@ class BandAlertMixin:
         if text == getattr(self, "_contest_text", ""):
             return
         self._contest_text = text
+        # RUN / TX1 and MULT / TX2 go on the lamp's lower corners (drawn by
+        # _sync_compact); the rest stays in the rows under the lamp.
+        left, right, text = contest.split_corners(text)
+        self._contest_corners = (left, right)
         lines = text.splitlines()
         activity = lines.pop() if lines and lines[-1].startswith("Last QSO · ") else ""
         self._contest_label = self._contest_row(getattr(self, "_contest_label", None),

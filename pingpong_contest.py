@@ -109,6 +109,54 @@ def warning_view(msg, now, stale, tuning):
     return ("amber", "\n".join(lines)) if lines else None
 
 
+LEFT_SIGNALS = ("RUN", "TX1")  # drawn on the lamp's bottom-left corner
+RIGHT_SIGNALS = ("MULT", "TX2")  # bottom-right corner
+
+
+def _corner(parts):
+    """One signal line of display(), split on ' · ', as a short corner text;
+    None if it does not fit a corner (it then stays in the row under the lamp)."""
+    name = parts[0]
+    if len(parts) == 2 and parts[1] == "No QSO yet":
+        return name + " · no QSO yet"
+    if len(parts) == 2 and parts[1] == "No new multiplier yet":
+        return name + " · no mult yet"
+    if len(parts) in (3, 4) and parts[1].endswith(" m"):
+        status = parts[2]
+        if status == "Timer clear":
+            status = "clear"
+        elif status.endswith(" left"):
+            status = status[:-len(" left")]
+        elif status.endswith(" changes"):
+            status = status[:-len(" changes")]
+        else:
+            return None
+        if len(parts) == 4:
+            if parts[3] != "1 change left":
+                return None
+            status += " · 1 left"
+        return "{} {} · {}".format(name, parts[1], status)
+    return None
+
+
+def split_corners(text):
+    """display() text -> (left, right, rest): RUN / TX1 for the lamp's
+    bottom-left corner, MULT / TX2 for the bottom-right one, everything else
+    (warnings, unclear log, Last QSO) stays in the row under the lamp."""
+    left = right = ""
+    rest = []
+    for line in text.splitlines():
+        parts = line.split(" · ")
+        short = _corner(parts) if parts[0] in LEFT_SIGNALS + RIGHT_SIGNALS else None
+        if short and parts[0] in LEFT_SIGNALS and not left:
+            left = short
+        elif short and parts[0] in RIGHT_SIGNALS and not right:
+            right = short
+        else:
+            rest.append(line)
+    return left, right, "\n".join(rest)
+
+
 def display(msg, now, station_names, show_last, stale=False):
     if msg is None or msg["state"] is None:
         return ""
