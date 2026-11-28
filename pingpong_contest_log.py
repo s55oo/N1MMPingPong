@@ -344,10 +344,18 @@ def snapshot(db, nr, announced, now, violations, expected_date=None, operating_s
                 else:
                     qualifies = None
             signals[names[int(role) - 1]].append((ts, band, str(row["ID"]), qualifies))
+    if operating_start is not None and latest is not None:
+        # N1MM indexes TS. Restrict to this UTC day or later, then compare
+        # parsed timestamps so equivalent ISO spellings count as a tie.
+        day = time.strftime("%Y-%m-%d", time.gmtime(latest))
+        others = db.execute("SELECT TS FROM DXLOG WHERE TS >= ? AND ContestNR IS NOT ?",
+                            (day, nr))
+        if any((utc(row[0]) or 0) >= latest for row in others):
+            return unknown("conflicting_log")
     if evidence is not None:
         evidence.update(count=kept, latest=latest)
     if operating_start is not None and not kept:
-        return unknown("contest_dates")
+        return unknown("no_weekend_qso")
     if skipped and not kept:
         return unknown("contest_dates")
     state = {"category": category, "last": last, "signals": {}}
@@ -432,6 +440,7 @@ class WarningWindow:
 
 class LogReader:
     def __init__(self):
+        self.evidence = {}
         self.db = self.key = self.revision = self.state = None
         self.warnings = WarningWindow()
         self.category = None
@@ -441,6 +450,7 @@ class LogReader:
     def close(self):
         if self.db is not None:
             self.db.close()
+        self.evidence = {}
         self.db = self.key = self.revision = self.state = None
         self.warnings = WarningWindow()
         self.category = None
@@ -483,8 +493,9 @@ class LogReader:
                 self.db.execute("BEGIN")
                 try:
                     violations = {}
-                    self.evidence = {}
-                    self.state = snapshot(self.db, int(nr), contest, now, violations, expected_date, operating_start, self.evidence)
+                    evidence = {}
+                    state = snapshot(self.db, int(nr), contest, now, violations, expected_date, operating_start, evidence)
+                    self.state, self.evidence = state, evidence
                     if self.state and self.state["category"] in ("MS", "M2"):
                         changed = self.category is not None and self.category != self.state["category"]
                         if changed:
@@ -561,6 +572,7 @@ class OverviewRecovery:
         self.published = False
         self.note = ""
         self.verified = None
+        self.confirmed_log = None
 
     def packet(self, now, radio_live):
         self.verified = None
@@ -574,6 +586,7 @@ class OverviewRecovery:
             active = None
         if active is None:
             self.reader.close()
+            self.confirmed_log = None
             if not self.published:
                 return None
             state = None
@@ -590,12 +603,19 @@ class OverviewRecovery:
                 latest = evidence["latest"]
                 self.note += time.strftime(" · weekend %Y-%m-%d", time.gmtime(weekend))
                 self.note += f" · {evidence['count']} QSOs" + time.strftime(" · latest %Y-%m-%d %H:%M:%S UTC", time.gmtime(latest))
+                identity = self.reader.key
                 if now - latest <= 1800:
+                    self.confirmed_log = identity
                     self.verified = selected, date, weekend
-                elif not matches_date(weekend, date):
+                elif not matches_date(weekend, date) and self.confirmed_log != identity:
                     state = unknown("stale_log")
             if state and state.get("category") == "unknown":
-                self.note += " · check database " + str(state.get("reason", ""))
+                self.confirmed_log = None
+                reason = state.get("reason", "")
+                self.note += {"no_weekend_qso": " · waiting for the first QSO in the official weekend",
+                              "stale_log": " · waiting for a QSO logged in the last 30 minutes",
+                              "conflicting_log": " · another contest has an equally recent or newer QSO"}.get(
+                                  reason, " · check database " + str(reason))
         self.seq += 1
         self.published = active is not None
         msg = dict(v=1, instance=self.instance, seq=self.seq, sent=int(now), ttl=10, state=state)

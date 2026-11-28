@@ -80,8 +80,44 @@ class OverviewRecoveryTests(unittest.TestCase):
         self.assertEqual(wire.decode(packet, self.now)["state"]["signals"]["TX1"], {"band": "20", "used": 0})
         self.assertIn("1 QSOs", self.recovery.note)
         self.assertIsNotNone(self.recovery.verified)
-        self.assertEqual(wire.decode(self.recovery.packet(self.now+3600, True), self.now+3600)["state"]["category"], "unknown")
+        self.assertEqual(wire.decode(self.recovery.packet(self.now+3600, True), self.now+3600)["state"]["category"], "M2")
         self.assertIsNone(self.recovery.verified)
+
+    def test_equal_or_newer_qso_in_other_contest_blocks_recovery(self):
+        with sqlite3.connect(self.db) as db:
+            db.execute("INSERT INTO DXLOG SELECT 1, TS, ID, Band, Freq, Run1Run2, NetBiosName FROM DXLOG")
+        db.close()
+        state = wire.decode(self.recovery.packet(self.now, True), self.now)["state"]
+        self.assertEqual(state["reason"], "conflicting_log")
+        self.assertIsNone(self.recovery.verified)
+
+    def test_ssb_weekend_is_last_full_weekend_in_utc(self):
+        start = log.utc("2026-10-24")
+        self.assertEqual(log.contest_weekend("CQWWSSB", start), start)
+        self.trn.rename(self.folder / self.trn.name.replace("CQWWCW", "CQWWSSB"))
+        for now in (start-1, start+48*3600):
+            with self.assertRaises(log.NoTransaction):
+                log.latest_transaction([self.root], now)
+
+    def test_restart_confirmation_rechecks_target(self):
+        from test_overview import make_overview
+        from unittest.mock import Mock
+        app = make_overview()
+        candidate = ("master", ("db", "date", "weekend"), 1, "verified")
+        app._send_command = Mock(return_value=1)
+        with patch("pingpong_overview.messagebox") as dialogs:
+            dialogs.askyesno.return_value = False
+            with patch.object(app, "_recovery_target", return_value=candidate):
+                app._restart_for_recovery()
+            dialogs.askyesno.return_value = True
+            with patch.object(app, "_recovery_target", side_effect=[candidate, None]):
+                app._restart_for_recovery()
+            app._send_command.assert_not_called()
+            with patch.object(app, "_recovery_target", return_value=candidate):
+                app._restart_for_recovery()
+            import pingpong_net
+            cmd = pingpong_net.parse_command(app._send_command.call_args.args[0])
+            self.assertEqual((cmd["cmd"], cmd["to"]), ("restart", "master"))
 
     def test_legacy_filename_requires_unique_local_database(self):
         import shutil
@@ -120,6 +156,9 @@ class OverviewRecoveryTests(unittest.TestCase):
             packet = dict(v=1, instance="native", sent=self.now-9, ttl=10, seq=2, state=None)
             app._packet("10.0.0.9", wire.MAGIC + json.dumps(packet).encode())
             self.assertEqual(app._contest_source, ("master", 101))
+            packet.update(seq=1, state=log.unknown("contest_dates"))
+            app._packet("10.0.0.9", wire.MAGIC + json.dumps(packet).encode())
+            self.assertFalse(app._contest_dates)
 
     def test_locked_legacy_database_preserves_warning_history(self):
         self.trn.rename(self.folder / "CQWWCW - 2026-11-28 - 38.trn")

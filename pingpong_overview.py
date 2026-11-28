@@ -87,6 +87,9 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
         except ValueError:
             self.reset_at = 0.0
+        self._restart_pending = None
+        self._contest_order = None
+        self._retired_native = {}
         self._contest_dates = False
         self._restart_candidate = None
         self._contest_source = None
@@ -179,6 +182,9 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             candidate = self._restart_candidate
             masters = self._masters(time.time())
             now = time.monotonic()
+            pending = self._restart_pending
+            if candidate and pending and pending[0] == candidate[0] and pending[1] > now:
+                return None
             if (candidate and len(masters) == 1 and masters[0].id == candidate[0]
                     and candidate[0] not in ("", "*") and self._contest_dates
                     and self._contest_source and self._contest_source[0] == candidate[0]
@@ -200,7 +206,12 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         if not current or current[:2] != candidate[:2]:
             messagebox.showinfo(TITLE, "Master or log changed. Check recovery status again.", parent=self.root)
             return
-        if not self._send_command(pp.make_command("restart", to=current[0])):
+        if self._send_command(pp.make_command("restart", to=current[0])):
+            self._restart_pending = current[0], time.monotonic() + 60
+            self._event("-", "Master lamp restart requested for CQ WW recovery")
+            messagebox.showinfo(TITLE, "Restart requested. Keep Overview open and watch for "
+                                "the master to relay recovered status.", parent=self.root)
+        else:
             messagebox.showerror(TITLE, "Could not send the master restart.", parent=self.root)
 
     def _band_packet(self, src, data, now):
@@ -340,6 +351,21 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     if len(masters) == 1 and (src == masters[0].src or src in (masters[0].hello.get("ips") or [])):
                         end = time.monotonic() + min(msg["ttl"], msg["sent"] + msg["ttl"] - now)
                         if msg["instance"] != self._contest_instance:
+                            source = masters[0].id, msg["instance"]
+                            mono = time.monotonic()
+                            retired = {k: v for k, v in self._retired_native.items() if v > mono}
+                            old = self._contest_order
+                            if source in retired:
+                                return
+                            if old and old[0][0] == source[0]:
+                                if source == old[0] and msg["seq"] <= old[1]:
+                                    return
+                                if source != old[0]:
+                                    if msg["sent"] < old[2]:
+                                        return
+                                    retired[old[0]] = mono + 302
+                            self._retired_native = retired
+                            self._contest_order = source, msg["seq"], msg["sent"]
                             self._contest_dates = (msg["state"] or {}).get("reason") == "contest_dates"
                             self._contest_source = masters[0].id, end
                             self._contest_recovered = None

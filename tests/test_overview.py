@@ -28,6 +28,8 @@ def make_overview():
     o._shared = ov.pp.EchoFilter()
     o.lock = threading.Lock()
     o.slots = {}
+    o._contest_order = o._restart_pending = None
+    o._retired_native = {}
     o.error = o.web_error = ""
     o._hex = {}
     o.operating = set()
