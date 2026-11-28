@@ -74,8 +74,12 @@ def database_dirs():
     return dirs
 
 
-TRN_NAME = re.compile(r"(.+\.s3db)\s*[-–—]\s*([\w-]+)\s*[-–—]\s*"
+TRN_NAME = re.compile(r"(?:(.+\.s3db)\s*[-–—]\s*)?([\w-]+)\s*[-–—]\s*"
                       r"(\d{4}-\d{2}-\d{2})\s*[-–—]\s*(\d+)\.trn", re.IGNORECASE)
+
+
+class NoTransaction(ValueError):
+    """The active local contest cannot be identified from the transaction files."""
 
 
 def latest_transaction(roots, now):
@@ -100,17 +104,47 @@ def latest_transaction(roots, now):
                         candidates.add(Path(entry.path).resolve())
         except FileNotFoundError:
             continue
+    if not candidates:
+        raise NoTransaction("No .TRN files in " + ", ".join(str(r / "TransactionLogFiles") for r in sorted(roots)))
     if len(candidates) != 1:
-        return None
+        raise NoTransaction("Multiple transaction files share the newest write time.")
     path = candidates.pop()
     match = TRN_NAME.fullmatch(path.name)
     if not match:
-        return None
+        raise NoTransaction(f"Unrecognized transaction filename: {path.name}")
     db, name, date, nr = match.groups()
     start = utc(date)
     if not cqww(name) or start is None or not start <= now < start + 48 * 3600:
-        return None
-    return (str(path.parent.parent / db), nr, name.upper()), date
+        raise NoTransaction(f"The newest transaction file is outside the active CQ WW contest: {path.name}")
+    root = path.parent.parent
+    if db:
+        database = root / db
+    else:
+        # Earlier N1MM filenames omit the database. A contest number by
+        # itself is only unique within a single database.
+        matches = []
+        for candidate in root.iterdir():
+            if candidate.suffix.lower() != ".s3db" or not candidate.is_file():
+                continue
+            try:
+                probe = open_db(candidate)
+                try:
+                    if not probe.execute("SELECT 1 FROM sqlite_master WHERE lower(name)='contestinstance'").fetchone():
+                        continue
+                    row = probe.execute("SELECT ContestName,StartDate FROM ContestInstance WHERE ContestNR=?",
+                                        (int(nr),)).fetchone()
+                    if row and contest_name(row[0]) == contest_name(name) and matches_date(utc(row[1]), date):
+                        matches.append(candidate)
+                finally:
+                    probe.close()
+            except sqlite3.Error as exc:
+                if (getattr(exc, "sqlite_errorcode", 0) & 255) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                    raise BlockingIOError(f"Waiting for {candidate.name} to finish writing.") from exc
+                raise NoTransaction(f"Cannot verify {candidate.name}: {exc}") from exc
+        if len(matches) != 1:
+            raise NoTransaction(f"{len(matches)} local databases match {path.name}.")
+        database = matches[0]
+    return (str(database), nr, name.upper()), date
 
 
 def unknown(reason=""):
@@ -137,6 +171,10 @@ def utc(value):
         return calendar.timegm(dt.utctimetuple())
     except (OverflowError, ValueError):
         return None
+
+
+def matches_date(timestamp, date):
+    return timestamp is not None and time.strftime("%Y-%m-%d", time.gmtime(timestamp)) == date
 
 
 def contact_groups(contacts):
@@ -227,15 +265,16 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
     info = db.execute("SELECT * FROM ContestInstance WHERE ContestNR=?", (nr,)).fetchone()
     if info is None or contest_name(info["ContestName"]) != contest_name(announced):
         return unknown("contest_mismatch")
-    if expected_date and str(info["StartDate"])[:10] != expected_date:
+    start = utc(info["StartDate"])
+    if expected_date and not matches_date(start, expected_date):
         return unknown("contest_dates")
     if not cqww(info["ContestName"]):
         return None
-    op = (info["OperatorCategory"] or "").upper()
-    tx = (info["TransmitterCategory"] or "").upper()
+    op = str(info["OperatorCategory"] or "").upper()
+    tx = str(info["TransmitterCategory"] or "").upper()
     if op in ("SINGLE-OP", "SINGLE-OP-ASSISTED", "CHECKLOG"):
         category = "activity"
-    elif op == "MULTI-OP" and (tx == "UNLIMITED" or (info["StationCategory"] or "").upper() == "DISTRIBUTED"):
+    elif op == "MULTI-OP" and (tx == "UNLIMITED" or str(info["StationCategory"] or "").upper() == "DISTRIBUTED"):
         category = "activity"
     elif op in ("MULTI-OP", "MULTI-ONE") and tx == "ONE":
         category = "MS"
@@ -247,7 +286,6 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
     signals = {name: [] for name in names}
     last = {}
     skipped = kept = 0
-    start = utc(info["StartDate"])
     hour = int(now) // 3600
     fields = "TS,ID,Band,Freq,Run1Run2,NetBiosName"
     if category == "MS":
@@ -269,8 +307,9 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
             return state
         if category == "M2" and ts // 3600 > hour:
             continue
-        station = (row["NetBiosName"] or "").strip().upper()
-        if station:
+        station = row["NetBiosName"]
+        if isinstance(station, str) and station.strip():
+            station = station.strip().upper()
             last[station] = max(ts, last.get(station, 0))
         if names:
             try:
@@ -503,19 +542,31 @@ class OverviewRecovery:
         self.instance = uuid.uuid4().hex
         self.seq = 0
         self.published = False
+        self.note = ""
 
     def packet(self, now, radio_live):
-        active = latest_transaction(self.roots, now)
+        try:
+            active = latest_transaction(self.roots, now)
+        except OSError as exc:
+            self.note = str(exc)
+            return None  # retain the last verified log and its warning history during a retry
+        except NoTransaction as exc:
+            self.note = str(exc)
+            active = None
         if active is None:
             self.reader.close()
             if not self.published:
                 return None
             state = None
         elif not radio_live:
+            self.note = "Waiting for the master’s N1MM Radio feed."
             state = unknown("radio_offline")
         else:
             selected, date = active
             state = self.reader.read(selected, "", now, expected_date=date)
+            self.note = f"{selected[2]} · {Path(selected[0]).name} · contest {selected[1]} · {date}"
+            if state and state.get("category") == "unknown":
+                self.note += " · check database " + str(state.get("reason", ""))
         self.seq += 1
         self.published = active is not None
         msg = dict(v=1, instance=self.instance, seq=self.seq, sent=int(now), ttl=10, state=state)

@@ -88,7 +88,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         except ValueError:
             self.reset_at = 0.0
         self._contest_source = None
-        self._contest_recovered_until = 0
+        self._contest_recovered = None
+        self._contest_note = "Waiting for the master lamp."
         self._contest_instance = None
         self._build()
         threading.Thread(target=self._contest_recovery_loop, daemon=True).start()
@@ -132,6 +133,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         except ValueError:
             port = band.BAND_PORT
         if not 0 < port <= 65535:
+            self._contest_note = "The master lamp’s local band-alert input is disabled in pingpong.ini."
             return
         recovery = contest_log.OverviewRecovery(settings.get_text("contest", "database_folder", ""))
         self._contest_instance = recovery.instance
@@ -147,14 +149,18 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                             live = master and now - max(master.radio_seen, getattr(master, "local_radio_seen", 0)) <= 30
                             native = self._contest_source
                         if (src and contest_log.local_input(src, {src})
-                                and not (native and native[0] == src and native[1] > time.monotonic())):
+                                and not (native and native[0] == master.id and native[1] > time.monotonic())):
                             packet = recovery.packet(now, live)
+                            self._contest_note = recovery.note
                             if packet:
                                 sender.sendto(packet, ("127.0.0.1", port))
                         else:
                             recovery.reader.close()
-                    except (OSError, ValueError):
-                        pass  # a rotating transaction file or temporarily unavailable interface
+                            self._contest_note = ("Master is supplying its own contest status."
+                                                  if master and native and native[0] == master.id and native[1] > time.monotonic()
+                                                  else "Waiting for one active master lamp on this PC.")
+                    except (OSError, ValueError) as exc:
+                        self._contest_note = str(exc)
                     self.stop.wait(2)
         finally:
             recovery.reader.close()
@@ -293,15 +299,15 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             if msg:
                 with self.lock:
                     masters = self._masters(now)
-                    if len(masters) == 1 and src == masters[0].src:
-                        end = time.monotonic() + msg["ttl"]
+                    if len(masters) == 1 and (src == masters[0].src or src in (masters[0].hello.get("ips") or [])):
+                        end = time.monotonic() + min(msg["ttl"], msg["sent"] + msg["ttl"] - now)
                         if msg["instance"] != self._contest_instance:
-                            self._contest_source = src, end
-                            self._contest_recovered_until = 0
+                            self._contest_source = masters[0].id, end
+                            self._contest_recovered = None
                         elif (msg["state"] or {}).get("category") in ("MS", "M2", "activity"):
-                            self._contest_recovered_until = end
+                            self._contest_recovered = masters[0].id, end
                         else:
-                            self._contest_recovered_until = 0
+                            self._contest_recovered = None
             return
         if data.startswith(band.BAND_MAGIC):
             self._band_packet(src, data[len(band.BAND_MAGIC):], now)
@@ -848,6 +854,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
         with self.lock:
             heard = [l for l in self.lamps.values() if l.hello and time.time() - l.hello_seen < 30]
             on = [l.name() for l in heard if l.hello.get("diag")]
+        m.add_command(label="CQ WW recovery status…", command=lambda: messagebox.showinfo(
+            TITLE, self._contest_note, parent=self.root))
         m.add_command(label="Diagnostics ON on all lamps  (now on: {} of {})".format(len(on), len(heard)),
                       command=lambda: self._diagnostics_all(True))
         m.add_command(label="Diagnostics OFF on all lamps", command=lambda: self._diagnostics_all(False))
@@ -1016,7 +1024,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 ready = "ok"
                 head = "✔ READY  ·  " + head
         notes = []
-        if len(masters) == 1 and time.monotonic() < getattr(self, "_contest_recovered_until", 0):
+        recovered = getattr(self, "_contest_recovered", None)
+        if recovered and len(masters) == 1 and masters[0].id == recovered[0] and time.monotonic() < recovered[1]:
             notes.append("CQ WW · master is relaying status from the transaction log")
         for err in (self.error, self.web_error):
             if err:

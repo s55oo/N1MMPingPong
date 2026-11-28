@@ -57,7 +57,8 @@ class OverviewRecoveryTests(unittest.TestCase):
         self.assertIsNone(self.recovery.packet(self.now, True))
         other.unlink()
         self.assertIsNotNone(self.recovery.packet(self.now, True))
-        self.assertIsNone(log.latest_transaction([self.root], self.now + 2*86400))
+        with self.assertRaises(log.NoTransaction):
+            log.latest_transaction([self.root], self.now + 2*86400)
 
     def test_date_and_radio_checks(self):
         self.assertEqual(wire.decode(self.recovery.packet(self.now, False), self.now)["state"]["reason"],
@@ -68,3 +69,55 @@ class OverviewRecoveryTests(unittest.TestCase):
         state = wire.decode(self.recovery.packet(self.now, True), self.now)["state"]
         self.assertEqual(state["category"], "unknown")
         self.assertEqual(state["reason"], "contest_dates")
+
+    def test_legacy_filename_requires_unique_local_database(self):
+        import shutil
+        self.trn.rename(self.folder / "CQWWCW - 2026-11-28 - 38.trn")
+        self.assertEqual(log.latest_transaction([self.root], self.now)[0][0], str(self.db.resolve()))
+        shutil.copyfile(self.db, self.root / "backup.s3db")
+        with self.assertRaises(log.NoTransaction):
+            log.latest_transaction([self.root], self.now)
+
+    def test_unparseable_database_date_is_rejected(self):
+        with sqlite3.connect(self.db) as db:
+            db.execute("UPDATE ContestInstance SET StartDate='2026-11-28(GARBAGE)'")
+        db.close()
+        state = wire.decode(self.recovery.packet(self.now, True), self.now)["state"]
+        self.assertEqual(state["reason"], "contest_dates")
+
+    def test_malformed_fields_do_not_stop_recovery(self):
+        with sqlite3.connect(self.db) as db:
+            db.execute("UPDATE ContestInstance SET OperatorCategory=42")
+            db.execute("UPDATE DXLOG SET NetBiosName=X'52554E'")
+        db.close()
+        self.assertEqual(wire.decode(self.recovery.packet(self.now, True), self.now)["state"]["category"], "unknown")
+        with sqlite3.connect(self.db) as db:
+            db.execute("UPDATE ContestInstance SET OperatorCategory='MULTI-OP'")
+        db.close()
+        state = wire.decode(self.recovery.packet(self.now, True), self.now)["state"]
+        self.assertEqual((state["category"], state["last"]), ("M2", {}))
+
+    def test_delayed_native_packet_suppresses_fallback_only_for_remaining_ttl(self):
+        import json
+        from test_overview import make_overview, hello
+        app = make_overview()
+        app._contest_instance = "fallback"
+        with patch("time.time", return_value=self.now), patch("time.monotonic", return_value=100):
+            hello(app, "master", "LOCAL", "RUN", block_time=30)
+            packet = dict(v=1, instance="native", sent=self.now-9, ttl=10, seq=2, state=None)
+            app._packet("10.0.0.9", wire.MAGIC + json.dumps(packet).encode())
+            self.assertEqual(app._contest_source, ("master", 101))
+
+    def test_locked_legacy_database_preserves_warning_history(self):
+        self.trn.rename(self.folder / "CQWWCW - 2026-11-28 - 38.trn")
+        self.recovery.packet(self.now, True)
+        history = self.recovery.reader.warnings
+        with sqlite3.connect(self.db) as writer:
+            writer.execute("BEGIN EXCLUSIVE")
+            self.assertIsNone(self.recovery.packet(self.now, True))
+            self.assertIs(self.recovery.reader.warnings, history)
+            self.assertIn("finish writing", self.recovery.note)
+        writer.close()
+        state = wire.decode(self.recovery.packet(self.now+2, True), self.now+2)["state"]
+        self.assertEqual(state["category"], "M2")
+        self.assertIs(self.recovery.reader.warnings, history)

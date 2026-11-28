@@ -1229,7 +1229,10 @@ stop for 30 seconds, lamps show “N1MM feed unavailable” until reception resu
 A QSO dated more than two seconds ahead of the master produces a clock warning.
 
 **Overview-only recovery during a live contest.** Run the Overview recovery
-build on the master PC, beside its existing v1.122 lamp. Keep Overview open.
+build on the master PC, beside its existing v1.122 lamp. Close only Overview,
+replace its executable in its current folder beside `pingpong.ini`, and reopen it.
+Keep Overview open. **Settings → CQ WW recovery status…** shows the selected log
+or the reason recovery is waiting.
 When Application Info is missing, Overview checks the newest file by write time
 in N1MM’s `Databases/TransactionLogFiles` folder. It matches the database,
 contest number, CQ WW mode and start date before calculating status. A tie
