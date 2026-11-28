@@ -82,6 +82,14 @@ class NoTransaction(ValueError):
     """The active local contest cannot be identified from the transaction files."""
 
 
+def contest_weekend(name, now):
+    year = time.gmtime(now).tm_year
+    month = 11 if contest_name(name) == "CQWWCW" else 10
+    weekday, days = calendar.monthrange(year, month)
+    sunday = days - (weekday + days - 1 - calendar.SUNDAY) % 7
+    return calendar.timegm((year, month, sunday - 1, 0, 0, 0))
+
+
 def latest_transaction(roots, now):
     """Select by write time across ALL contests before checking for CQ WW."""
     newest = -1
@@ -114,7 +122,7 @@ def latest_transaction(roots, now):
         raise NoTransaction(f"Unrecognized transaction filename: {path.name}")
     db, name, date, nr = match.groups()
     start = utc(date)
-    if not cqww(name) or start is None or not start <= now < start + 48 * 3600:
+    if not cqww(name) or start is None or not contest_weekend(name, now) <= now < contest_weekend(name, now) + 48 * 3600:
         raise NoTransaction(f"The newest transaction file is outside the active CQ WW contest: {path.name}")
     root = path.parent.parent
     if db:
@@ -261,7 +269,7 @@ def multi_single_row(contacts, now, name, violations):
     return {"band": held, "until": until} if held else None
 
 
-def snapshot(db, nr, announced, now, violations, expected_date=None):
+def snapshot(db, nr, announced, now, violations, expected_date=None, operating_start=None, evidence=None):
     info = db.execute("SELECT * FROM ContestInstance WHERE ContestNR=?", (nr,)).fetchone()
     if info is None or contest_name(info["ContestName"]) != contest_name(announced):
         return unknown("contest_mismatch")
@@ -270,6 +278,8 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
         return unknown("contest_dates")
     if not cqww(info["ContestName"]):
         return None
+    if operating_start is not None:
+        start = operating_start
     op = str(info["OperatorCategory"] or "").upper()
     tx = str(info["TransmitterCategory"] or "").upper()
     if op in ("SINGLE-OP", "SINGLE-OP-ASSISTED", "CHECKLOG"):
@@ -285,6 +295,7 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
     names = {"MS": ("RUN", "MULT"), "M2": ("TX1", "TX2")}.get(category, ())
     signals = {name: [] for name in names}
     last = {}
+    latest = None
     skipped = kept = 0
     hour = int(now) // 3600
     fields = "TS,ID,Band,Freq,Run1Run2,NetBiosName"
@@ -300,6 +311,7 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
             continue
         if ts is None or not str(row["ID"] or "").strip():
             return unknown("incomplete_log")
+        latest = max(latest or ts, ts)
         kept += 1
         if ts > now + 2:
             state = unknown("future_qso")
@@ -332,6 +344,10 @@ def snapshot(db, nr, announced, now, violations, expected_date=None):
                 else:
                     qualifies = None
             signals[names[int(role) - 1]].append((ts, band, str(row["ID"]), qualifies))
+    if evidence is not None:
+        evidence.update(count=kept, latest=latest)
+    if operating_start is not None and not kept:
+        return unknown("contest_dates")
     if skipped and not kept:
         return unknown("contest_dates")
     state = {"category": category, "last": last, "signals": {}}
@@ -429,7 +445,7 @@ class LogReader:
         self.warnings = WarningWindow()
         self.category = None
 
-    def read(self, selected, folder, now, expected_date=None):
+    def read(self, selected, folder, now, expected_date=None, operating_start=None):
         name, nr, contest = selected
         if contest and not cqww(contest):
             self.close()
@@ -456,7 +472,7 @@ class LogReader:
                 path = matches[0]
             else:
                 path = paths[0]
-            key = path, path.stat().st_ino, nr, contest_name(contest), expected_date
+            key = path, path.stat().st_ino, nr, contest_name(contest), expected_date, operating_start
             if key != self.key:
                 self.close()
                 self.db = open_db(path)
@@ -467,7 +483,8 @@ class LogReader:
                 self.db.execute("BEGIN")
                 try:
                     violations = {}
-                    self.state = snapshot(self.db, int(nr), contest, now, violations, expected_date)
+                    self.evidence = {}
+                    self.state = snapshot(self.db, int(nr), contest, now, violations, expected_date, operating_start, self.evidence)
                     if self.state and self.state["category"] in ("MS", "M2"):
                         changed = self.category is not None and self.category != self.state["category"]
                         if changed:
@@ -543,8 +560,10 @@ class OverviewRecovery:
         self.seq = 0
         self.published = False
         self.note = ""
+        self.verified = None
 
     def packet(self, now, radio_live):
+        self.verified = None
         try:
             active = latest_transaction(self.roots, now)
         except OSError as exc:
@@ -563,8 +582,18 @@ class OverviewRecovery:
             state = unknown("radio_offline")
         else:
             selected, date = active
-            state = self.reader.read(selected, "", now, expected_date=date)
-            self.note = f"{selected[2]} · {Path(selected[0]).name} · contest {selected[1]} · {date}"
+            weekend = contest_weekend(selected[2], now)
+            state = self.reader.read(selected, "", now, expected_date=date, operating_start=weekend)
+            self.note = f"{selected[2]} · {Path(selected[0]).name} · contest {selected[1]} · stored date {date}"
+            if state and state["category"] in ("MS", "M2", "activity"):
+                evidence = self.reader.evidence
+                latest = evidence["latest"]
+                self.note += time.strftime(" · weekend %Y-%m-%d", time.gmtime(weekend))
+                self.note += f" · {evidence['count']} QSOs" + time.strftime(" · latest %Y-%m-%d %H:%M:%S UTC", time.gmtime(latest))
+                if now - latest <= 1800:
+                    self.verified = selected, date, weekend
+                elif not matches_date(weekend, date):
+                    state = unknown("stale_log")
             if state and state.get("category") == "unknown":
                 self.note += " · check database " + str(state.get("reason", ""))
         self.seq += 1

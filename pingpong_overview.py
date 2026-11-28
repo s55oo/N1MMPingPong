@@ -87,6 +87,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
         except ValueError:
             self.reset_at = 0.0
+        self._contest_dates = False
+        self._restart_candidate = None
         self._contest_source = None
         self._contest_recovered = None
         self._contest_note = "Waiting for the master lamp."
@@ -148,22 +150,58 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                             src = master.src if master else ""
                             live = master and now - max(master.radio_seen, getattr(master, "local_radio_seen", 0)) <= 30
                             native = self._contest_source
+                            dates = self._contest_dates
+                        supplied = master and native and native[0] == master.id and native[1] > time.monotonic()
                         if (src and contest_log.local_input(src, {src})
-                                and not (native and native[0] == master.id and native[1] > time.monotonic())):
+                                and (not supplied or dates)):
                             packet = recovery.packet(now, live)
                             self._contest_note = recovery.note
-                            if packet:
+                            with self.lock:
+                                self._restart_candidate = ((master.id, recovery.verified, time.monotonic(), recovery.note)
+                                                           if supplied and dates and recovery.verified else None)
+                            if packet and not supplied:
                                 sender.sendto(packet, ("127.0.0.1", port))
                         else:
+                            self._restart_candidate = None
                             recovery.reader.close()
                             self._contest_note = ("Master is supplying its own contest status."
                                                   if master and native and native[0] == master.id and native[1] > time.monotonic()
                                                   else "Waiting for one active master lamp on this PC.")
                     except (OSError, ValueError) as exc:
+                        self._restart_candidate = None
                         self._contest_note = str(exc)
                     self.stop.wait(2)
         finally:
             recovery.reader.close()
+
+    def _recovery_target(self):
+        with self.lock:
+            candidate = self._restart_candidate
+            masters = self._masters(time.time())
+            now = time.monotonic()
+            if (candidate and len(masters) == 1 and masters[0].id == candidate[0]
+                    and candidate[0] not in ("", "*") and self._contest_dates
+                    and self._contest_source and self._contest_source[0] == candidate[0]
+                    and self._contest_source[1] > now and now - candidate[2] < 5
+                    and contest_log.local_input(masters[0].src, {masters[0].src})):
+                return candidate
+        return None
+
+    def _restart_for_recovery(self):
+        candidate = self._recovery_target()
+        if not candidate:
+            messagebox.showinfo(TITLE, "Recovery restart unavailable. " + self._contest_note, parent=self.root)
+            return
+        if not messagebox.askyesno(TITLE, candidate[3] + "\n\nRestart the master PingPong lamp? "
+                                   "Master coordination pauses briefly. Keep Overview open for recovery.",
+                                   parent=self.root, default="no"):
+            return
+        current = self._recovery_target()
+        if not current or current[:2] != candidate[:2]:
+            messagebox.showinfo(TITLE, "Master or log changed. Check recovery status again.", parent=self.root)
+            return
+        if not self._send_command(pp.make_command("restart", to=current[0])):
+            messagebox.showerror(TITLE, "Could not send the master restart.", parent=self.root)
 
     def _band_packet(self, src, data, now):
         """A BAND VIOLATION alert: accepted only from the master PC's lamp."""
@@ -302,6 +340,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                     if len(masters) == 1 and (src == masters[0].src or src in (masters[0].hello.get("ips") or [])):
                         end = time.monotonic() + min(msg["ttl"], msg["sent"] + msg["ttl"] - now)
                         if msg["instance"] != self._contest_instance:
+                            self._contest_dates = (msg["state"] or {}).get("reason") == "contest_dates"
                             self._contest_source = masters[0].id, end
                             self._contest_recovered = None
                         elif (msg["state"] or {}).get("category") in ("MS", "M2", "activity"):
@@ -856,6 +895,7 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             on = [l.name() for l in heard if l.hello.get("diag")]
         m.add_command(label="CQ WW recovery status…", command=lambda: messagebox.showinfo(
             TITLE, self._contest_note, parent=self.root))
+        m.add_command(label="Restart master lamp for CQ WW recovery…", command=self._restart_for_recovery)
         m.add_command(label="Diagnostics ON on all lamps  (now on: {} of {})".format(len(on), len(heard)),
                       command=lambda: self._diagnostics_all(True))
         m.add_command(label="Diagnostics OFF on all lamps", command=lambda: self._diagnostics_all(False))

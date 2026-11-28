@@ -70,6 +70,19 @@ class OverviewRecoveryTests(unittest.TestCase):
         self.assertEqual(state["category"], "unknown")
         self.assertEqual(state["reason"], "contest_dates")
 
+    def test_prepared_log_uses_current_weekend_contacts(self):
+        self.trn.rename(self.folder / self.trn.name.replace("11-28", "11-07"))
+        with sqlite3.connect(self.db) as db:
+            db.execute("UPDATE ContestInstance SET StartDate='2026-11-07'")
+            db.execute("INSERT INTO DXLOG VALUES(38,'2026-11-07 12:00','practice',7,7025,1,'RUN')")
+        db.close()
+        packet = self.recovery.packet(self.now, True)
+        self.assertEqual(wire.decode(packet, self.now)["state"]["signals"]["TX1"], {"band": "20", "used": 0})
+        self.assertIn("1 QSOs", self.recovery.note)
+        self.assertIsNotNone(self.recovery.verified)
+        self.assertEqual(wire.decode(self.recovery.packet(self.now+3600, True), self.now+3600)["state"]["category"], "unknown")
+        self.assertIsNone(self.recovery.verified)
+
     def test_legacy_filename_requires_unique_local_database(self):
         import shutil
         self.trn.rename(self.folder / "CQWWCW - 2026-11-28 - 38.trn")
