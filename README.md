@@ -1228,6 +1228,17 @@ log. PingPong checks the contest name and number. If valid local Radio packets
 stop for 30 seconds, lamps show “N1MM feed unavailable” until reception resumes.
 A QSO dated more than two seconds ahead of the master produces a clock warning.
 
+**Overview-only recovery during a live contest.** Run the Overview recovery
+build on the master PC, beside its existing v1.122 lamp. Keep Overview open.
+When Application Info is missing, Overview checks the newest file by write time
+in N1MM’s `Databases/TransactionLogFiles` folder. It matches the database,
+contest number, CQ WW mode and start date before calculating status. A tie
+or a newest file outside the current CQ WW contest stops recovery. Overview
+uses the master lamp’s existing local band-alert input (default UDP 46071)
+and its configured `[contest] database_folder`. The lamp distributes the result
+to all stations. Its own N1MM selection takes priority. The Overview footer
+confirms when the master is relaying recovered status.
+
 Every lamp shows both logged signals on the lamp's **lower corners**, like the
 name and frequency at the top: RUN (Multi-Single) or TX1 (Multi-Two) bottom
 left, MULT or TX2 bottom right – e.g. `RUN 20 m · 6:12` and `MULT 15 m · clear`,

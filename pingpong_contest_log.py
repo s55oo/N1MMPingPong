@@ -3,6 +3,7 @@ import calendar
 import hashlib
 import json
 import os
+import re
 import socket
 import sqlite3
 import time
@@ -12,6 +13,7 @@ from datetime import datetime
 from itertools import groupby
 from pathlib import Path
 
+from pingpong_common import n1mm_ini_path
 from pingpong_contest import FLASH_SECONDS, MAGIC
 
 BAND_EDGES = ((1.8, 2.0, "160"), (3.5, 4.0, "80"), (7.0, 7.3, "40"),
@@ -60,12 +62,55 @@ def database_paths(name, folder):
     if folder:
         path = Path(folder) / path.name
         return [path] if path.is_file() else []
+    return sorted({(d / path.name).resolve() for d in database_dirs() if (d / path.name).is_file()})
+
+
+def database_dirs():
     home = Path.home()
-    dirs = []
+    dirs = {Path(n1mm_ini_path()).parent / "Databases"}
     for base in (home, Path(os.environ.get("OneDrive") or home / "OneDrive")):
         for docs in ("Documents", "Dokumenti"):
-            dirs.append(base / docs / "N1MM Logger+" / "Databases")
-    return sorted({(d / path.name).resolve() for d in dirs if (d / path.name).is_file()})
+            dirs.add(base / docs / "N1MM Logger+" / "Databases")
+    return dirs
+
+
+TRN_NAME = re.compile(r"(.+\.s3db)\s*[-–—]\s*([\w-]+)\s*[-–—]\s*"
+                      r"(\d{4}-\d{2}-\d{2})\s*[-–—]\s*(\d+)\.trn", re.IGNORECASE)
+
+
+def latest_transaction(roots, now):
+    """Select by write time across ALL contests before checking for CQ WW."""
+    newest = -1
+    candidates = set()
+    for root in roots:
+        directory = root / "TransactionLogFiles"
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    if not entry.name.lower().endswith(".trn") or not entry.is_file():
+                        continue
+                    try:
+                        stamp = entry.stat().st_mtime_ns
+                    except FileNotFoundError:
+                        continue
+                    if stamp > newest:
+                        newest = stamp
+                        candidates.clear()
+                    if stamp == newest:
+                        candidates.add(Path(entry.path).resolve())
+        except FileNotFoundError:
+            continue
+    if len(candidates) != 1:
+        return None
+    path = candidates.pop()
+    match = TRN_NAME.fullmatch(path.name)
+    if not match:
+        return None
+    db, name, date, nr = match.groups()
+    start = utc(date)
+    if not cqww(name) or start is None or not start <= now < start + 48 * 3600:
+        return None
+    return (str(path.parent.parent / db), nr, name.upper()), date
 
 
 def unknown(reason=""):
@@ -178,10 +223,12 @@ def multi_single_row(contacts, now, name, violations):
     return {"band": held, "until": until} if held else None
 
 
-def snapshot(db, nr, announced, now, violations):
+def snapshot(db, nr, announced, now, violations, expected_date=None):
     info = db.execute("SELECT * FROM ContestInstance WHERE ContestNR=?", (nr,)).fetchone()
     if info is None or contest_name(info["ContestName"]) != contest_name(announced):
         return unknown("contest_mismatch")
+    if expected_date and str(info["StartDate"])[:10] != expected_date:
+        return unknown("contest_dates")
     if not cqww(info["ContestName"]):
         return None
     op = (info["OperatorCategory"] or "").upper()
@@ -343,7 +390,7 @@ class LogReader:
         self.warnings = WarningWindow()
         self.category = None
 
-    def read(self, selected, folder, now):
+    def read(self, selected, folder, now, expected_date=None):
         name, nr, contest = selected
         if contest and not cqww(contest):
             self.close()
@@ -370,7 +417,7 @@ class LogReader:
                 path = matches[0]
             else:
                 path = paths[0]
-            key = path, path.stat().st_ino, nr, contest_name(contest)
+            key = path, path.stat().st_ino, nr, contest_name(contest), expected_date
             if key != self.key:
                 self.close()
                 self.db = open_db(path)
@@ -381,7 +428,7 @@ class LogReader:
                 self.db.execute("BEGIN")
                 try:
                     violations = {}
-                    self.state = snapshot(self.db, int(nr), contest, now, violations)
+                    self.state = snapshot(self.db, int(nr), contest, now, violations, expected_date)
                     if self.state and self.state["category"] in ("MS", "M2"):
                         changed = self.category is not None and self.category != self.state["category"]
                         if changed:
@@ -445,3 +492,33 @@ def publish_loop(app):
             app.stop.wait(2)
     finally:
         reader.close()
+
+
+class OverviewRecovery:
+    """Supply the existing master's loopback fallback using this PC's own log."""
+
+    def __init__(self, folder):
+        self.roots = {Path(folder)} if folder else database_dirs()
+        self.reader = LogReader()
+        self.instance = uuid.uuid4().hex
+        self.seq = 0
+        self.published = False
+
+    def packet(self, now, radio_live):
+        active = latest_transaction(self.roots, now)
+        if active is None:
+            self.reader.close()
+            if not self.published:
+                return None
+            state = None
+        elif not radio_live:
+            state = unknown("radio_offline")
+        else:
+            selected, date = active
+            state = self.reader.read(selected, "", now, expected_date=date)
+        self.seq += 1
+        self.published = active is not None
+        msg = dict(v=1, instance=self.instance, seq=self.seq, sent=int(now), ttl=10, state=state)
+        if state and state["category"] in ("MS", "M2"):
+            msg["flash"] = self.reader.warnings.packet()
+        return MAGIC + json.dumps(msg, separators=(",", ":")).encode()

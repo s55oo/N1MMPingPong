@@ -27,6 +27,8 @@ from tkinter import messagebox, simpledialog, ttk  # noqa: F401  (simpledialog: 
 
 import n1mm_lamps as pp
 import pingpong_bandalert as band
+import pingpong_contest as contest
+import pingpong_contest_log as contest_log
 from pingpong_overview_admin import AdminMixin
 from pingpong_overview_common import *  # noqa: F401,F403
 from pingpong_overview_stats import StatsMixin
@@ -85,7 +87,11 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
             self.reset_at = float(self.cfg.get("stats", "reset_at", fallback="0") or 0)
         except ValueError:
             self.reset_at = 0.0
+        self._contest_source = None
+        self._contest_recovered_until = 0
+        self._contest_instance = None
         self._build()
+        threading.Thread(target=self._contest_recovery_loop, daemon=True).start()
         threading.Thread(target=self._listen, daemon=True).start()
         if web_port:
             threading.Thread(target=self._serve_web, daemon=True).start()
@@ -118,6 +124,40 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 self._packet(addr[0], data)
             except Exception:
                 pp.log_error("overview packet")
+
+    def _contest_recovery_loop(self):
+        settings = pp.upd.Settings(app_dir())
+        try:
+            port = int(settings.get_text("band_alert", "port", str(band.BAND_PORT)))
+        except ValueError:
+            port = band.BAND_PORT
+        if not 0 < port <= 65535:
+            return
+        recovery = contest_log.OverviewRecovery(settings.get_text("contest", "database_folder", ""))
+        self._contest_instance = recovery.instance
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+                while not self.stop.is_set():
+                    try:
+                        now = time.time()
+                        with self.lock:
+                            masters = self._masters(now)
+                            master = masters[0] if len(masters) == 1 else None
+                            src = master.src if master else ""
+                            live = master and now - max(master.radio_seen, getattr(master, "local_radio_seen", 0)) <= 30
+                            native = self._contest_source
+                        if (src and contest_log.local_input(src, {src})
+                                and not (native and native[0] == src and native[1] > time.monotonic())):
+                            packet = recovery.packet(now, live)
+                            if packet:
+                                sender.sendto(packet, ("127.0.0.1", port))
+                        else:
+                            recovery.reader.close()
+                    except (OSError, ValueError):
+                        pass  # a rotating transaction file or temporarily unavailable interface
+                    self.stop.wait(2)
+        finally:
+            recovery.reader.close()
 
     def _band_packet(self, src, data, now):
         """A BAND VIOLATION alert: accepted only from the master PC's lamp."""
@@ -248,6 +288,21 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
 
     def _packet(self, src, data):
         now = time.time()
+        if data.startswith(contest.MAGIC):
+            msg = contest.decode(data, now)
+            if msg:
+                with self.lock:
+                    masters = self._masters(now)
+                    if len(masters) == 1 and src == masters[0].src:
+                        end = time.monotonic() + msg["ttl"]
+                        if msg["instance"] != self._contest_instance:
+                            self._contest_source = src, end
+                            self._contest_recovered_until = 0
+                        elif (msg["state"] or {}).get("category") in ("MS", "M2", "activity"):
+                            self._contest_recovered_until = end
+                        else:
+                            self._contest_recovered_until = 0
+            return
         if data.startswith(band.BAND_MAGIC):
             self._band_packet(src, data[len(band.BAND_MAGIC):], now)
             return
@@ -277,6 +332,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 lamp = self._lamp(info["id"])
                 lamp.hello = info
                 lamp.hello_seen = now
+                if info.get("local_n1mm"):
+                    lamp.local_radio_seen = now
                 lamp.src = src
                 replaced = self._replace_old(lamp)
                 if replaced:
@@ -959,6 +1016,8 @@ class Overview(AdminMixin, StatsMixin, WebMixin):
                 ready = "ok"
                 head = "✔ READY  ·  " + head
         notes = []
+        if len(masters) == 1 and time.monotonic() < getattr(self, "_contest_recovered_until", 0):
+            notes.append("CQ WW · master is relaying status from the transaction log")
         for err in (self.error, self.web_error):
             if err:
                 notes.append("⚠ " + err)
